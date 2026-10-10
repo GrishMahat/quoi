@@ -11,7 +11,6 @@ import quoi.api.skyblock.dungeon.Dungeon.allTeammatesNoSelf
 import quoi.api.skyblock.dungeon.Dungeon.dungeonTeammatesNoSelf
 import quoi.api.skyblock.dungeon.Floor7
 import quoi.api.skyblock.dungeon.enums.DungeonClass
-import quoi.api.skyblock.dungeon.enums.Floor
 import quoi.api.skyblock.dungeon.enums.Phase
 import quoi.api.skyblock.dungeon.enums.Stage
 import quoi.api.skyblock.location.Island
@@ -129,7 +128,7 @@ object AutoLeap : Module(
     private var oofCount = 0
     private var melodyTarget: String? = null
     private var leapedHealerPy = false
-    private var p4Leapt = false
+    private var p4Leaped = false
 
     private val melodyProgress = setOf("1/3", "2/3", "33%", "66%", "67%")
 
@@ -224,10 +223,10 @@ object AutoLeap : Module(
         }
 
         on<BossBarEvent.Update> {
-            if (Dungeon.floor != Floor.M7 || !Dungeon.inBoss) return@on
-            if (progress !in 0.01..0.05 || p4Leapt || !p4Auto || !unformatted.contains("necron", ignoreCase = true) || !Floor7.inPhaseAt(Phase.P4)) return@on
+            if (!p4Leap || !p4Auto || !Floor7.inF7Boss) return@on
+            if (progress !in 0.001..0.05 || p4Leaped || !unformatted.contains("necron", ignoreCase = true) || !Floor7.inPhaseAt(Phase.P4)) return@on
 
-            p4Leapt = true
+            p4Leaped = true
             leapToConfigured(p4Name, p4Class.selected)
         }
 
@@ -365,7 +364,7 @@ object AutoLeap : Module(
         crystalCount = 0
         oofCount = 0
         leapedHealerPy = false
-        p4Leapt = false
+        p4Leaped = false
     }
 
     private fun isIn(box: AABB): Boolean = box.contains(player.position())
