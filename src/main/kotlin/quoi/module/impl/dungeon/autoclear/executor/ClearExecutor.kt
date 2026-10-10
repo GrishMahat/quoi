@@ -33,6 +33,9 @@ object ClearExecutor : EventListener {
     var active = false
         private set
 
+    val routing: Boolean
+        get() = !nodes.isNullOrEmpty() || pendingInteract != null || active
+
     private var pendingInteract: Direction? = null
     private var position: MutableVec3? = null
     private var activeNode: ClearNode? = null
@@ -87,6 +90,7 @@ object ClearExecutor : EventListener {
             globalDelay = 0
             hypeDelay = 0
             position = null
+            pendingInteract = null
             active = false
             activeNode = null
             onComplete = null
@@ -130,6 +134,7 @@ object ClearExecutor : EventListener {
     fun cancel() {
         nodes = null
         position = null
+        pendingInteract = null
         compDelay = 2
         onComplete = null
         pendingCompletion = null

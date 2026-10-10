@@ -7,15 +7,10 @@ import quoi.api.autoroutes.RouteRegistry
 import quoi.api.autoroutes.nodes.BreakerNode
 import quoi.api.colour.Colour
 import quoi.api.colour.withAlpha
-import quoi.api.events.DungeonEvent
-import quoi.api.events.KeyEvent
-import quoi.api.events.MouseEvent
-import quoi.api.events.RenderEvent
-import quoi.api.events.TickEvent
-import quoi.api.events.WorldEvent
+import quoi.api.events.*
 import quoi.api.events.core.on
-import quoi.api.skyblock.location.Island
 import quoi.api.skyblock.dungeon.odonscanning.tiles.OdonRoom
+import quoi.api.skyblock.location.Island
 import quoi.api.skyblock.location.invoke
 import quoi.api.vec.MutableVec3
 import quoi.api.world.Direction
@@ -27,14 +22,10 @@ import quoi.module.impl.dungeon.autoclear.executor.ClearExecutor
 import quoi.module.settings.Setting.Companion.json
 import quoi.module.settings.UIComponent.Companion.childOf
 import quoi.module.settings.UIComponent.Companion.visibleIf
-import quoi.utils.EntityUtils
+import quoi.utils.*
 import quoi.utils.StringUtils.noControlCodes
 import quoi.utils.StringUtils.width
-import quoi.utils.equalsOneOf
-import quoi.utils.mutable
 import quoi.utils.render.DrawContextUtils.drawText
-import quoi.utils.scaledHeight
-import quoi.utils.scaledWidth
 import quoi.utils.skyblock.player.PlayerUtils.useItem
 
 object AutoRoutes : Module(
@@ -67,6 +58,8 @@ object AutoRoutes : Module(
 
     var executing = false
         private set
+    val routing: Boolean
+        get() = !editMode && (executing || pendingInteract != null) && active
     var editMode = false
     var breakerRing: BreakerNode? = null
     var currentChain: String? = null
@@ -140,6 +133,7 @@ object AutoRoutes : Module(
             forcedNode = node
             activeNode = node
 
+            executing = true
             if (node.execute(pos)) {
                 node.triggered = true
                 node.chain?.let {
@@ -185,6 +179,7 @@ object AutoRoutes : Module(
         on<WorldEvent.Change> {
             roomNodes = emptyList()
             activeNode = null
+            executing = false
             forcedNode = null
             position = null
             pendingInteract = null
@@ -206,6 +201,7 @@ object AutoRoutes : Module(
             .maxByOrNull { it.priority } ?: run {
 
             activeNode = null
+            executing = false
 
             if (roomNodes.none { it.inside() && it.triggered }) {
                 position = null
@@ -216,17 +212,12 @@ object AutoRoutes : Module(
         if (activeNode != node) {
             activeNode = node
         }
-
-//        val c = node.chain
-//        if (c != null && c.index > 0) {
-//            if (lastChainName != c.name || lastChainIndex != c.index - 1) return
-//        }
-
-
+        
         if (interactDelay > 0) return
 
         if (!executing && !node.checkAwaits()) return
 
+        executing = true
         if (node.execute(playerPos)) {
             node.triggered = true
             node.chain?.let {
@@ -242,6 +233,14 @@ object AutoRoutes : Module(
 
     fun queueInteract(dir: Direction) {
         pendingInteract = dir
+    }
+
+    override fun onDisable() {
+        pendingInteract = null
+        activeNode = null
+        forcedNode = null
+        position = null
+        executing = false
     }
 
     fun updateCache(room: OdonRoom) {
