@@ -23,7 +23,6 @@ import quoi.api.events.core.Subscription
 import quoi.api.events.core.on
 import quoi.api.skyblock.dungeon.Dungeon.currentRoom
 import quoi.api.skyblock.dungeon.Dungeon.inClear
-import quoi.api.skyblock.dungeon.Dungeon.isProtectedBlock
 import quoi.config.configPath
 import quoi.config.typeName
 import quoi.module.impl.dungeon.autoclear.impl.AutoRoutes
@@ -158,18 +157,12 @@ object AutoRoutesCommand : EventListener {
             modMessage("Cleared &e${toRm.size}&r rings in &e${room.name}! &7(Use /route restore to undo)")
         }.description("Clears all nodes in the current room.")
 
-//        ar.sub("edit") { args: GreedyString -> // gets shit on with chains sometimes
-//            val node = routeNodes[room.name]?.firstOrNull { it.inside(player) }
-//                ?: return@sub modMessage("&cYou need to stand in a ring!")
-//            editNode(node, args)
-//        }.description("Modifies arguments of ring you're standing in.").suggestArgs(true)
-
         ar.sub("edit") { type: String, args: GreedyString ->
             val node = routeNodes[room.name]?.firstOrNull { it.inside() && it.typeName.equals(type, true) }
                 ?: return@sub modMessage("&cNo &e$type&c ring found!")
             editNode(node, args)
         }.description("Modifies arguments of ring you're standing in.").suggestArgs(true)
-        .suggests("type") { routeNodes[room.name]?.filter { it.inside() }?.map { it.typeName } ?: emptyList<String>() }
+            .suggests("type") { routeNodes[room.name]?.filter { it.inside() }?.map { it.typeName } ?: emptyList<String>() }
 
         ar.sub("editdb") {
             if (breakerRing == null) {
@@ -193,12 +186,12 @@ object AutoRoutesCommand : EventListener {
                 modMessage("Usage: /chain <name>")
             }
         }.description("Sets the chain for newly placed rings.")
-        .suggests { routeNodes[room.name]?.mapNotNull { it.chain?.name }?.distinct() ?: emptyList<String>() }
+            .suggests { routeNodes[room.name]?.mapNotNull { it.chain?.name }?.distinct() ?: emptyList<String>() }
 
         ar.sub("convert") { from: String ->
             val name = when (from) {
                 "legacy" -> "auto_routes"
-                "rsa"    -> "rsa"
+                "rsa" -> "rsa"
                 else -> return@sub modMessage("legacy or rsa only")
             }
             val file = File(configPath, "$name.json")
@@ -208,7 +201,7 @@ object AutoRoutesCommand : EventListener {
                 try {
                     when (from) {
                         "legacy" -> LegacyConverter.convert(file)
-                        "rsa"    -> RsaConverter.convert(file)
+                        "rsa" -> RsaConverter.convert(file)
                     }
                     modMessage("Converted. Some nodes can be bugged.")
                     save()
@@ -224,7 +217,7 @@ object AutoRoutesCommand : EventListener {
                 }
             }
         }.description("Converts configs. Must have auto_routes.json or rsa.json in the config folder.")
-        .suggests("from", "legacy", "rsa")
+            .suggests("from", "legacy", "rsa")
 
         ar.sub("reload") {
             routeNodes.reload()
@@ -255,13 +248,10 @@ object AutoRoutesCommand : EventListener {
 
             val (pos, adding) = when (packet) {
                 is ServerboundUseItemOnPacket -> packet.hitResult.blockPos to !player.isCrouching
-//                is ServerboundPlayerActionPacket if (packet.action == ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK) -> {
-//                    packet.pos to true
-//                }
                 else -> return@on
             }
 
-            if (lastClickedBlock == pos || isProtectedBlock(pos)) return@on
+            if (lastClickedBlock == pos) return@on
             lastClickedBlock = pos
 
             val relativePos = room.getRelativeCoords(pos)
@@ -352,12 +342,12 @@ object AutoRoutesCommand : EventListener {
             val value = parts.getOrNull(1) ?: ""
 
             when (key) {
-                "radius" ->  radius = value.toFloatOrNull()
-                "height" ->  height = value.toFloatOrNull()
-                "start" ->   start = true
+                "radius" -> radius = value.toFloatOrNull()
+                "height" -> height = value.toFloatOrNull()
+                "start" -> start = true
                 "unsneak" -> unsneak = !ether
-                "chain" ->   chain = value
-                "index" ->   index = value.toIntOrNull()
+                "chain" -> chain = value
+                "index" -> index = value.toIntOrNull()
                 "await" -> {
                     when (value) {
                         "raycast" if (ether) -> awaits.add(RaycastAwait())
@@ -430,5 +420,4 @@ object AutoRoutesCommand : EventListener {
         val index: Int? = null,
         val awaits: List<RouteAwait> = emptyList()
     )
-
 }

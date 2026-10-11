@@ -2,7 +2,6 @@ package quoi.module.impl.dungeon
 
 import net.minecraft.core.BlockPos
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket
-import net.minecraft.world.effect.MobEffects
 import net.minecraft.world.level.ClipContext
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.phys.BlockHitResult
@@ -10,16 +9,19 @@ import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.Vec3
 import quoi.api.colour.Colour
 import quoi.api.colour.withAlpha
-import quoi.api.events.*
+import quoi.api.events.BlockEvent
+import quoi.api.events.PacketEvent
+import quoi.api.events.RenderEvent
+import quoi.api.events.TickEvent
 import quoi.api.events.core.on
 import quoi.api.input.Keybinds
-import quoi.api.skyblock.dungeon.Dungeon.floor
-import quoi.api.skyblock.dungeon.Dungeon.inBoss
+import quoi.api.skyblock.dungeon.Dungeon.canInstaMine
 import quoi.api.skyblock.dungeon.Dungeon.isProtectedBlock
-import quoi.api.skyblock.dungeon.Dungeon.isSecret
+import quoi.api.skyblock.dungeon.Floor7.inF7Boss
 import quoi.api.skyblock.location.Island
 import quoi.config.configList
 import quoi.module.Module
+import quoi.module.settings.Setting.Companion.json
 import quoi.module.settings.UIComponent.Companion.childOf
 import quoi.module.settings.UIComponent.Companion.visibleIf
 import quoi.utils.ChatUtils.modMessage
@@ -31,6 +33,7 @@ import quoi.utils.minFovDot
 import quoi.utils.render.drawFilledBox
 import quoi.utils.render.drawWireFrameBox
 import quoi.utils.skyblock.item.ItemUtils.getBreakerCharges
+import quoi.utils.skyblock.item.ItemUtils.skyblockId
 import quoi.utils.skyblock.player.PlayerUtils
 import quoi.utils.skyblock.player.PlayerUtils.eyePosition
 import quoi.utils.skyblock.player.SwapManager
@@ -59,18 +62,18 @@ object DungeonBreaker : Module(
         )
     }.setting()
 
-    private val zeroPingDungeonBreaker by switch("Zero ping", desc = "Insta-mine blocks.")
-    private val onlyWhenFatigue by switch("Fatigue only", desc = "Only insta-mine blocks when mining fatigue is applied.").childOf(::zeroPingDungeonBreaker)
+    private val zeroPing by switch("Zero ping", desc = "Insta-mine blocks.")
     private val disableInInventory by switch("Disable in inventory", desc = "Prevents dungeon breaker from working while inside of an inventory.")
-    private val preventMineSecrets by switch("Prevent mine secrets", desc = "Prevents Dungeon Breaker from mining secrets.")
+    private val preventMineSecrets by switch("Prevent mine secrets", desc = "Prevents Dungeon Breaker from mining protected blocks, except Redstone Keys and boss levers or stone buttons.")
+    private val autoSwap by switch("Auto swap", true, desc = "Automatically switches to Dungeon Breaker before mining preset blocks.")
 
-    private val triggerBot by switch("Triggerbot", desc = "Mines preset blocks when looking at them.")
-    private val triggerBotDelay by slider("Delay", 0, 0, 10, 1, desc = "Delay before mining the looked-at block.", unit = " ticks").childOf(::triggerBot)
-    private val autoDb by switch("Auto dungeon breaker", desc = "Automatically mines preset route when in boss.")
-    private val autoDbRange by slider("Range", 5.5, 1.0, 5.5, 0.1, desc = "Maximum distance to auto dungeon breaker blocks.", unit = " blocks").childOf(::autoDb)
-    private val autoDbFov by slider("FOV", 360, 10, 360, 1, desc = "Only mines route blocks inside this field of view.", unit = "°").childOf(::autoDb)
-    private val autoDbDelay by slider("Delay", 0, 0, 20, 1, desc = "Delay between auto dungeon breaker mining attempts.", unit = " ticks").childOf(::autoDb)
-    private val zeroTickDb by switch("Zero tick").childOf(::autoDb)
+    private val triggerbot by switch("Triggerbot", desc = "Mines preset blocks when looking at them.")
+    private val triggerbotDelay by slider("Delay", 0, 0, 10, 1, desc = "Delay before mining the looked-at block.", unit = " ticks").childOf(::triggerbot).json("Triggerbot Delay")
+    private val aura by switch("Aura", desc = "Automatically mines preset route when in boss.").json("Auto dungeon breaker")
+    private val auraRange by slider("Range", 5.5, 1.0, 5.5, 0.1, desc = "Maximum distance to auto dungeon breaker blocks.", unit = " blocks").childOf(::aura)
+    private val auraFov by slider("FOV", 360, 10, 360, 1, desc = "Only mines route blocks inside this field of view.", unit = "°").childOf(::aura)
+    private val auraDelay by slider("Delay", 0, 0, 20, 1, desc = "Delay between auto dungeon breaker mining attempts.", unit = " ticks").childOf(::aura).json("Aura Delay")
+    private val zeroTickAura by switch("Zero tick").childOf(::aura)
 
     private val highlightBlocks by switch("Highlight blocks", true, desc = "Highlights blocks set for dungeon breaker.")
     private val blockStyle by selector("Block style", "Filled box", arrayListOf("Box", "Filled box", "Filled"), desc = "Render style for set dungeon breaker blocks.").childOf(::highlightBlocks)
@@ -85,14 +88,15 @@ object DungeonBreaker : Module(
     @Suppress("unused")
     private val toggleBlock by keybind("Toggle block", Keybinds.KEY_NONE, desc = "Adds or removes the block you are currently looking at.")
         .onPress {
-            if (!enabled || !inBoss || floor?.floorNumber != 7) return@onPress
+            if (!enabled || !inF7Boss) return@onPress
             if (disableInGUI()) return@onPress
             toggleLookedBlock()
         }
 
     @Suppress("unused")
     private val clearBlocks by button("Clear blocks", desc = "Clears all dungeon breaker blocks.") {
-        clearDbBlocks()
+        dbBlocks.clear()
+        modMessage("&aCleared all dungeon breaker blocks.")
     }
 
     private var triggerTarget: BlockPos? = null
@@ -103,24 +107,23 @@ object DungeonBreaker : Module(
     private const val DEFAULT_RANGE = 5.5
 
     init {
+        on<BlockEvent.Destroy.Start> {
+            if (!preventMineSecrets || player.mainHandItem.skyblockId != "DUNGEONBREAKER") return@on
+            if (isProtectedBlock(pos, allowInteractions = true)) cancel()
+        }
+
         on<PacketEvent.Sent, ServerboundPlayerActionPacket> {
             if (packet.action != ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK) return@on
 
             val packetPos = packet.pos
-            if (preventMineSecrets && getBreakerCharges(player.mainHandItem) > 0 && isSecret(packetPos.state, packetPos)) {
-                cancel()
-                return@on
-            }
-
-            if (!zeroPingDungeonBreaker) return@on
+            if (!zeroPing) return@on
             if (disableInGUI()) return@on
-            if (onlyWhenFatigue && !player.hasEffect(MobEffects.MINING_FATIGUE)) return@on
 
             mc.execute {
                 val heldItem = player.mainHandItem
                 if (getBreakerCharges(heldItem) <= 0) return@execute
 
-                if (isProtectedBlock(packetPos)) return@execute
+                if (!canInstaMine(packetPos)) return@execute
 
                 val clipResult = level.clip(
                     ClipContext(
@@ -155,27 +158,24 @@ object DungeonBreaker : Module(
         }
 
         on<TickEvent.Start> {
-            if ((!autoDb && !triggerBot) || !inBoss || floor?.floorNumber != 7) return@on
+            if ((!aura && !triggerbot) || !inF7Boss) return@on
             if (disableInGUI()) return@on
             if (dbBlocks.isEmpty()) return@on
 
-            if (autoDb) tickAutoDb()
-            if (triggerBot) tickTriggerBot()
+            if (aura) tickAutoDb()
+            if (triggerbot) tickTriggerBot()
         }
 
         scheduleLoop(10) {
-            if (enabled && (autoDb || triggerBot)) clearCooldownCache()
+            if (enabled && (aura || triggerbot)) {
+                val now = System.currentTimeMillis()
+                recentlyBroken.entries.removeIf { (pos, time) -> now - time > 10_500 || !pos.state.isAir }
+            }
         }
-    }
-
-    private fun clearDbBlocks() {
-        dbBlocks.clear()
-        modMessage("&aCleared all dungeon breaker blocks.")
     }
 
     private fun toggleLookedBlock() {
         val pos = lookedBlock() ?: return modMessage("&cLook at a block to toggle it.")
-        if (isProtectedBlock(pos)) return modMessage("&cThat block is protected.")
 
         if (dbBlocks.remove(pos)) {
             modMessage("&cRemoved dungeon breaker block at &f${pos.x}, ${pos.y}, ${pos.z}&c.")
@@ -207,7 +207,7 @@ object DungeonBreaker : Module(
             triggerTicks = 0
         }
 
-        if (triggerTicks++ < triggerBotDelay) return
+        if (triggerTicks++ < triggerbotDelay) return
         if (mineDbBlocks(listOf(pos), allowZeroTick = false)) {
             triggerTarget = null
             triggerTicks = 0
@@ -215,8 +215,8 @@ object DungeonBreaker : Module(
     }
 
     private fun tickAutoDb() {
-        if (autoDbTicks++ < autoDbDelay) return
-        if (mineDbBlocks(dbBlocks, allowZeroTick = zeroTickDb, range = autoDbRange, fov = autoDbFov)) {
+        if (autoDbTicks++ < auraDelay) return
+        if (mineDbBlocks(dbBlocks, allowZeroTick = zeroTickAura, range = auraRange, fov = auraFov)) {
             autoDbTicks = 0
         }
     }
@@ -225,7 +225,7 @@ object DungeonBreaker : Module(
         val blocks = targetBlocks.filter { isMineableDbBlock(it, range) }
         if (blocks.isEmpty()) return false
 
-        val breakerSlot = PlayerUtils.breakerSlot ?: return false
+        val breakerSlot = if (autoSwap) PlayerUtils.breakerSlot ?: return false else player.inventory.selectedSlot
 
         if (player.inventory.selectedSlot != breakerSlot) {
             if (!SwapManager.swapToSlot(breakerSlot).success) return false
@@ -252,9 +252,7 @@ object DungeonBreaker : Module(
         val fullCircleFov = fov >= 360
 
         return mineDbBlocks(
-            targetBlocks.filter { pos ->
-                isWithinFov(eyePos, Vec3.atCenterOf(pos), lookVec, minFovDot, fullCircleFov)
-            },
+            targetBlocks.filter { pos -> isWithinFov(eyePos, Vec3.atCenterOf(pos), lookVec, minFovDot, fullCircleFov) },
             allowZeroTick,
             range
         )
@@ -262,12 +260,7 @@ object DungeonBreaker : Module(
 
     private fun isMineableDbBlock(pos: BlockPos, range: Double = DEFAULT_RANGE) =
         !recentlyBroken.containsKey(pos) &&
-            level.isLoaded(pos) &&
-            !pos.state.isAir &&
-            pos.distToCenterSqr(player.eyePosition()) <= range * range
-
-    private fun clearCooldownCache() {
-        val now = System.currentTimeMillis()
-        recentlyBroken.entries.removeIf { (pos, time) -> now - time > 10_500 || !pos.state.isAir }
-    }
+                level.isLoaded(pos) &&
+                !pos.state.isAir &&
+                pos.distToCenterSqr(player.eyePosition()) <= range * range
 }

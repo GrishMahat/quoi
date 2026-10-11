@@ -22,6 +22,7 @@ import quoi.api.events.core.on
 import quoi.api.skyblock.dungeon.enums.*
 import quoi.api.skyblock.dungeon.odonscanning.ScanUtils
 import quoi.api.skyblock.dungeon.odonscanning.tiles.OdonRoom
+import quoi.api.skyblock.dungeon.odonscanning.tiles.RoomType
 import quoi.api.skyblock.location.Island
 import quoi.api.skyblock.location.Location
 import quoi.module.impl.dungeon.LeapMenu
@@ -115,8 +116,7 @@ object Dungeon : EventListener, Shortcuts {
         private set
 
     inline val currentDungeonPlayer: DungeonPlayer
-        get() = dungeonTeammates.find { it.name == player.name.string } ?:
-        DungeonPlayer(player.name.string, DungeonClass.Unknown, 0, null)
+        get() = dungeonTeammates.find { it.name == player.name.string } ?: DungeonPlayer(player.name.string, DungeonClass.Unknown, 0, null)
 
     inline val isDead: Boolean
         get() = currentDungeonPlayer.isDead
@@ -216,8 +216,10 @@ object Dungeon : EventListener, Shortcuts {
                 when (this) {
                     is ClientboundPlayerInfoUpdatePacket -> {
                         if (actions().none {
-                                it.equalsOneOf(ClientboundPlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME,
-                                    ClientboundPlayerInfoUpdatePacket.Action.ADD_PLAYER)
+                                it.equalsOneOf(
+                                    ClientboundPlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME,
+                                    ClientboundPlayerInfoUpdatePacket.Action.ADD_PLAYER
+                                )
                             }) return@on
                         val tabListEntries = entries()
                             .mapNotNull { it.displayName }
@@ -396,12 +398,22 @@ object Dungeon : EventListener, Shortcuts {
 
     fun isBossLever(pos: BlockPos): Boolean = pos in bossLevers || pos in deviceLevers || pos == EXTRA_DEVICE_LEVER
 
-    fun isProtectedBlock(pos: BlockPos): Boolean {
-        if (level.getBlockEntity(pos) != null) return true
-
+    fun isProtectedBlock(pos: BlockPos, allowInteractions: Boolean = false): Boolean {
         val state = level.getBlockState(pos)
+        val blockEntity = level.getBlockEntity(pos)
+
+        if (allowInteractions) {
+            if (inBoss && state.block.equalsOneOf(Blocks.LEVER, Blocks.STONE_BUTTON)) return false
+            if (blockEntity is SkullBlockEntity && isRedstoneKey(blockEntity.ownerProfile?.partialProfile()?.id)) return false
+        }
 
         return state.block in blacklistedDBBlocks
+    }
+
+    fun canInstaMine(pos: BlockPos): Boolean {
+        if (currentRoom?.data?.type.equalsOneOf(RoomType.PUZZLE, RoomType.FAIRY)) return false
+        val block = level.getBlockState(pos).block
+        return block !in blacklistedDBBlocks && block != Blocks.OBSIDIAN
     }
 
     fun getBoss(): Boolean = with(player) {
@@ -503,12 +515,12 @@ object Dungeon : EventListener, Shortcuts {
     private val EXTRA_DEVICE_LEVER = BlockPos(59, 133, 142)
 
     val blacklistedDBBlocks = setOf(
-        Blocks.BARRIER, Blocks.BEDROCK, Blocks.COMMAND_BLOCK, Blocks.CHAIN_COMMAND_BLOCK,
-        Blocks.REPEATING_COMMAND_BLOCK, Blocks.SKELETON_SKULL, Blocks.SKELETON_WALL_SKULL,
-        Blocks.WITHER_SKELETON_SKULL, Blocks.WITHER_SKELETON_WALL_SKULL, Blocks.TNT,
+        Blocks.BARRIER, Blocks.BEDROCK, Blocks.COMMAND_BLOCK, Blocks.SKELETON_SKULL, Blocks.SKELETON_WALL_SKULL,
+        Blocks.WITHER_SKELETON_SKULL, Blocks.WITHER_SKELETON_WALL_SKULL, Blocks.PLAYER_HEAD,
+        Blocks.PLAYER_WALL_HEAD, Blocks.TNT,
         Blocks.CHEST, Blocks.TRAPPED_CHEST, Blocks.END_PORTAL_FRAME, Blocks.END_PORTAL,
         Blocks.PISTON, Blocks.PISTON_HEAD, Blocks.STICKY_PISTON, Blocks.MOVING_PISTON,
-        Blocks.LEVER, Blocks.STONE_BUTTON
+        Blocks.LEVER, Blocks.STONE_BUTTON, Blocks.DISPENSER, Blocks.HOPPER, Blocks.DROPPER
     )
 
     val terminalTitles = setOf("Correct all the panes!", "Change all to same color!", "Click in order!", "What starts with:", "Select all the", "Click the button on time!")

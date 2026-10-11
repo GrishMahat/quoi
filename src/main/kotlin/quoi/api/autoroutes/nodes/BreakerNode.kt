@@ -52,7 +52,7 @@ class BreakerNode : RouteNode() {
 
         val toBreak = realBlocks.filter { pos ->
             level.isLoaded(pos) &&
-            !pos.state.isAir //&&
+                    !pos.state.isAir
 //            pos.distToCenterSqr(player.eyePosition()) <= 30.0
         }
 
