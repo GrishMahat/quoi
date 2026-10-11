@@ -19,20 +19,18 @@ import org.lwjgl.system.MemoryStack
  * so this works on every RenderDevice backend (OpenGL and Vulkan).
  *
  * Metrics model replicates fontstash/NanoVG:
- *  - pixel scale = stbtt_ScaleForPixelHeight (size spans ascent..descent),
- *  - top-aligned text: baseline = y + ascent * scale,
- *  - advances accumulate kerning, widths are continuous in `size`.
+ *  - glyph scale = stbtt_ScaleForMappingEmToPixels,
+ *  - top alignment uses the normalized ascender, including the line gap,
+ *  - advances and kerning use fontstash's integer raster-space pen steps.
  *
- * Bitmaps are rasterized at integer pixel-size buckets and scaled by size/bucket when
- * drawn; measurements always use the exact float size.
+ * Bitmaps and measurements share Fontstash's tenths-of-a-pixel raster sizes and
+ * integer pen steps, then scale back into UI coordinates.
  */
 class McFonts {
 
     companion object {
         const val PAGE_SIZE = 512
         const val PADDING = 1
-        const val MIN_BUCKET = 4
-        const val MAX_BUCKET = 96
     }
 
     class GlyphQuad(
@@ -57,12 +55,14 @@ class McFonts {
      * text scale), then scaled the atlas quad back into UI coordinates.
      */
     private fun bucketFor(size: Float, rasterScale: Float): Int =
-        (size * rasterScale * 10f).toInt().coerceIn(MIN_BUCKET * 10, MAX_BUCKET * 10)
+        (size * rasterScale * 10f).toInt()
 
-    /** Advance width of [text] at the exact float [size], including kerning. */
-    fun width(font: Font, text: String, size: Float): Float {
+    /** Fontstash measures in quantized raster space, then NanoVG divides by the raster scale. */
+    fun width(font: Font, text: String, size: Float, rasterScale: Float = 1f): Float {
+        val bucket = bucketFor(size, rasterScale)
+        if (bucket < 2) return 0f
         val loaded = loaded(font)
-        val scale = loaded.scaleFor(size)
+        val scale = loaded.scaleFor(bucket / 10f)
         var width = 0f
         var prevGlyph = -1
         var i = 0
@@ -70,21 +70,17 @@ class McFonts {
             val cp = text.codePointAt(i)
             i += Character.charCount(cp)
             val glyph = loaded.glyphIndex(cp)
-            // continuous float metrics: matches NanoVG behaviour on hidpi setups, where
-            // fontstash's integer pen steps happen at size*devicePixelRatio and get scaled
-            // back down, so effective widths are fractional (this also preserves the
-            // stable ClickGUI width-sort order)
-            if (prevGlyph != -1) width += loaded.kern(prevGlyph, glyph) * scale
-            width += loaded.advance(glyph) * scale
+            if (prevGlyph != -1) width += (loaded.kern(prevGlyph, glyph) * scale + 0.5f).toInt()
+            width += fontstashAdvance(loaded.advance(glyph), scale)
             prevGlyph = glyph
         }
-        return width
+        return width / rasterScale
     }
 
     /** Pixel ascent (distance from text top to baseline) at the float [size]. */
     fun ascent(font: Font, size: Float): Float {
         val loaded = loaded(font)
-        return loaded.ascent * loaded.scaleFor(size)
+        return loaded.ascender * size
     }
 
     /**
@@ -101,34 +97,31 @@ class McFonts {
         emit: (GlyphQuad) -> Unit,
     ) {
         val loaded = loaded(font)
-        val scale = loaded.scaleFor(size)
         val bucket = bucketFor(size, rasterScale)
+        if (bucket < 2) return
+        val scale = loaded.scaleFor(bucket / 10f)
         val sizedFont = sized(font, bucket)
         val rasterSize = bucket / 10f
-        val bitmapScale = size / rasterSize
-        val effectiveRasterScale = rasterSize / size
+        val bitmapScale = 1f / rasterScale
 
-        val baseline = y + loaded.ascent * scale
+        val baseline = y * rasterScale + loaded.ascender * rasterSize
 
-        var penX = x
+        var penX = x * rasterScale
         var prevGlyph = -1
         var i = 0
         while (i < text.length) {
             val cp = text.codePointAt(i)
             i += Character.charCount(cp)
             val glyph = loaded.glyphIndex(cp)
-            // pen advances stay continuous (see width()); only the bitmap origin is
-            // snapped to the pixel grid like fontstash's floorf(x + xoff), which keeps
-            // glyphs crisp under 1:1 texel mapping without changing metrics
-            if (prevGlyph != -1) penX += loaded.kern(prevGlyph, glyph) * scale
+            if (prevGlyph != -1) penX += (loaded.kern(prevGlyph, glyph) * scale + 0.5f).toInt()
 
             val sprite = sizedFont.sprite(glyph)
             if (sprite != null && sprite.w > 0 && sprite.h > 0) {
                 // Fontstash snaps in atlas/raster space and NanoVG then applies
                 // invscale. Snapping directly in UI space makes HiDPI text smaller and
                 // thinner, and causes transformed text to shimmer while moving.
-                val gx = floor((penX + sprite.xoff * bitmapScale) * effectiveRasterScale) / effectiveRasterScale
-                val gy = floor((baseline + sprite.yoff * bitmapScale) * effectiveRasterScale) / effectiveRasterScale
+                val gx = floor(penX + sprite.xoff) * bitmapScale
+                val gy = floor(baseline + sprite.yoff) * bitmapScale
                 emit(
                     GlyphQuad(
                         sprite.page.texture,
@@ -139,10 +132,13 @@ class McFonts {
                 )
             }
 
-            penX += loaded.advance(glyph) * scale
+            penX += fontstashAdvance(loaded.advance(glyph), scale)
             prevGlyph = glyph
         }
     }
+
+    private fun fontstashAdvance(advance: Int, scale: Float): Int =
+        ((advance * scale * 10f).toInt() / 10f + 0.5f).toInt()
 
     /** Uploads any atlas pages that gained new glyphs since the last call. */
     fun flushUploads() {
@@ -166,8 +162,7 @@ class McFonts {
         // the buffer must stay strongly referenced for as long as the STBTTFontinfo lives
         val buffer: ByteBuffer
         val info: STBTTFontinfo = STBTTFontinfo.malloc()
-        val ascent: Int
-        val descent: Int
+        val ascender: Float
 
         private val glyphIndexCache = HashMap<Int, Int>()
         private val advanceCache = HashMap<Int, Int>()
@@ -182,12 +177,12 @@ class McFonts {
                 val d = stack.mallocInt(1)
                 val l = stack.mallocInt(1)
                 stbtt_GetFontVMetrics(info, a, d, l)
-                ascent = a[0]
-                descent = d[0]
+                val ascent = a[0] + l[0]
+                ascender = ascent.toFloat() / (ascent - d[0])
             }
         }
 
-        fun scaleFor(size: Float): Float = stbtt_ScaleForPixelHeight(info, size)
+        fun scaleFor(size: Float): Float = stbtt_ScaleForMappingEmToPixels(info, size)
 
         fun glyphIndex(cp: Int): Int = glyphIndexCache.getOrPut(cp) { stbtt_FindGlyphIndex(info, cp) }
 
@@ -210,6 +205,12 @@ class McFonts {
         val texture = DynamicTexture({ "quoi! ui font atlas $index" }, image)
         val packer = ShelfPacker(PAGE_SIZE, PAGE_SIZE)
         var dirty = false
+
+        init {
+            // GUI_TEXTURED uses straight alpha. Transparent texels must stay white so
+            // bilinear sampling only changes coverage, as NanoVG's alpha-only atlas does.
+            image.fillRect(0, 0, PAGE_SIZE, PAGE_SIZE, 0x00ffffff)
+        }
     }
 
     private class GlyphSprite(
@@ -258,11 +259,11 @@ class McFonts {
 
                     return GlyphSprite(
                         page,
-                        px.toFloat() / PAGE_SIZE,
-                        py.toFloat() / PAGE_SIZE,
-                        (px + gw).toFloat() / PAGE_SIZE,
-                        (py + gh).toFloat() / PAGE_SIZE,
-                        gw, gh, xoff[0], yoff[0],
+                        (px - 1).toFloat() / PAGE_SIZE,
+                        (py - 1).toFloat() / PAGE_SIZE,
+                        (px + gw + 1).toFloat() / PAGE_SIZE,
+                        (py + gh + 1).toFloat() / PAGE_SIZE,
+                        gw + 2, gh + 2, xoff[0] - 1, yoff[0] - 1,
                     )
                 } finally {
                     stbtt_FreeBitmap(bitmap)

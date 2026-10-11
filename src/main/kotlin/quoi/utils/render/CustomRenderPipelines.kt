@@ -18,6 +18,8 @@ import com.mojang.blaze3d.vertex.VertexFormat
  * original: https://github.com/odtheking/OdinFabric/blob/main/src/main/kotlin/com/odtheking/odin/utils/render/CustomRenderPipelines.kt
  */
 object CustomRenderPipelines {
+    // Follow vanilla's depth convention, which became reversed Z in 26.2.
+    private val testedDepth = DepthStencilState(DepthStencilState.DEFAULT.depthTest(), false)
     //$ pipeline_start LINE_LIST
     val LINE_LIST: RenderPipeline = RenderPipelines.register(
         RenderPipeline.builder(RenderPipelines.LINES_SNIPPET)
@@ -27,7 +29,7 @@ object CustomRenderPipelines {
             //$}
             .withCull(false)
             .withColorTargetState(ColorTargetState(BlendFunction.TRANSLUCENT))
-            .withDepthStencilState(DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, false))
+            .withDepthStencilState(testedDepth)
             .build()
     //$ pipeline_end {
     )
@@ -56,7 +58,7 @@ object CustomRenderPipelines {
             //$ pipeline_vertices POSITION_COLOR QUADS {
             .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS)
             //$}
-            .withDepthStencilState(DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, false))
+            .withDepthStencilState(testedDepth)
             .withColorTargetState(ColorTargetState(BlendFunction.TRANSLUCENT))
             .build()
     //$ pipeline_end {

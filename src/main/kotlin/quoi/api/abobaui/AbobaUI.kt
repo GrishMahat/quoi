@@ -76,6 +76,7 @@ class AbobaUI(val title: String) {
     }
 
     fun close() {
+        unfocus()
         eventManager.postToAll(Lifetime.Uninitialised, main)
         initialised = false
     }

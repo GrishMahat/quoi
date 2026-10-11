@@ -214,9 +214,7 @@ object MapRenderer {
                                     if (border) {
                                         ctx.rect(w - t / 2, h - t / 2, w + t.toInt(), h + t.toInt(), col.rgb)
                                     }
-                                    //$ map_player_face {
                                     PlayerFaceExtractor.extractRenderState(ctx, it, w, h, w)
-                                    //$}
                                 } ?: ctx.drawImage(WHITE_MARKER, 0, 0, w, h)
                                 else -> ctx.drawImage(WHITE_MARKER, 0, 0, w, h)
                             }

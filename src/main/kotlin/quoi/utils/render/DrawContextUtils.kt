@@ -190,12 +190,10 @@ object DrawContextUtils {
             if (skin.body.texturePath() != defaultSkin.body.texturePath()) textureCache[uuid] = skin
             skin
         }
-        //$ player_face {
         withMatrix {
             pose().rotate(180f.rad)
             PlayerFaceExtractor.extractRenderState(this, textures, x, y, size)
         }
-        //$}
     }
 
     fun GuiGraphicsExtractor.drawImage(image: Identifier, x: Int, y: Int, width: Int, height: Int) {

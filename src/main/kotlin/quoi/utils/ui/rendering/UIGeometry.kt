@@ -29,11 +29,11 @@ object UIGeometry {
     }
 
     /**
-     * Clamps per-corner radii the same way NanoVG does: each radius is limited to half
-     * of the rectangle's smaller dimension.
+     * Clamps one axis of a NanoVG corner. X and Y radii are independent, so a
+     * narrow rectangle can have elliptical corners.
      */
-    fun clampRadius(radius: Float, w: Float, h: Float): Float =
-        min(max(0f, radius), min(abs(w), abs(h)) * 0.5f)
+    private fun clampRadius(radius: Float, dimension: Float): Float =
+        min(max(0f, radius), abs(dimension) * 0.5f)
 
     /**
      * Outline of a rounded rectangle as x,y pairs in clockwise order starting from the
@@ -44,39 +44,10 @@ object UIGeometry {
         x: Float, y: Float, w: Float, h: Float,
         tl: Float, bl: Float, br: Float, tr: Float,
     ): FloatArray {
-        val rtl = clampRadius(tl, w, h)
-        val rbl = clampRadius(bl, w, h)
-        val rbr = clampRadius(br, w, h)
-        val rtr = clampRadius(tr, w, h)
-
-        if (rtl == 0f && rbl == 0f && rbr == 0f && rtr == 0f) {
-            return floatArrayOf(x, y, x + w, y, x + w, y + h, x, y + h)
-        }
-
-        val points = ArrayList<Float>(64)
-
-        // each corner: arc from start angle going clockwise 90°
-        corner(points, x + rtl, y + rtl, rtl, 180f) // top-left: from left edge to top edge
-        corner(points, x + w - rtr, y + rtr, rtr, 270f) // top-right
-        corner(points, x + w - rbr, y + h - rbr, rbr, 0f) // bottom-right
-        corner(points, x + rbl, y + h - rbl, rbl, 90f) // bottom-left
-
-        return points.toFloatArray()
-    }
-
-    private fun corner(out: MutableList<Float>, cx: Float, cy: Float, r: Float, startDeg: Float) {
-        if (r <= 0f) {
-            // r == 0 means cx,cy is the rectangle corner itself
-            out.add(cx)
-            out.add(cy)
-            return
-        }
-        val segments = arcSegments(r)
-        for (i in 0..segments) {
-            val angle = Math.toRadians(startDeg + 90.0 * i / segments)
-            out.add(cx + (r * cos(angle)).toFloat())
-            out.add(cy + (r * sin(angle)).toFloat())
-        }
+        return roundedRectOutlineFixedSegments(x, y, w, h, tl, bl, br, tr, intArrayOf(
+            segmentsFor(tl, w, h), segmentsFor(tr, w, h),
+            segmentsFor(br, w, h), segmentsFor(bl, w, h),
+        ))
     }
 
     /** Outline of a full circle as x,y pairs. */
@@ -246,9 +217,17 @@ object UIGeometry {
         val pointCount = innerOutline.size / 2
         if (pointCount < 2) return FloatArray(0)
         val out = FloatArray(pointCount * 8)
-        var o = 0
+        // Lines use the GUI quad winding, while rounded outlines use the opposite
+        // traversal. Keep both inner-colour vertices first and choose the edge direction
+        // that makes the band face the camera in either case.
+        var area = 0f
         for (i in 0 until pointCount) {
             val j = (i + 1) % pointCount
+            area += outerOutline[i * 2] * outerOutline[j * 2 + 1] - outerOutline[j * 2] * outerOutline[i * 2 + 1]
+        }
+        var o = 0
+        for (i in 0 until pointCount) {
+            val j = (i + (if (area < 0f) pointCount - 1 else 1)) % pointCount
             out[o++] = innerOutline[i * 2]; out[o++] = innerOutline[i * 2 + 1]
             out[o++] = innerOutline[j * 2]; out[o++] = innerOutline[j * 2 + 1]
             out[o++] = outerOutline[j * 2]; out[o++] = outerOutline[j * 2 + 1]
@@ -279,7 +258,7 @@ object UIGeometry {
     )
 
     fun segmentsFor(radius: Float, w: Float, h: Float): Int {
-        val r = clampRadius(radius, w, h)
+        val r = max(clampRadius(radius, w), clampRadius(radius, h))
         return if (r <= 0f) 0 else arcSegments(r)
     }
 
@@ -289,35 +268,35 @@ object UIGeometry {
         tl: Float, bl: Float, br: Float, tr: Float,
         segments: IntArray,
     ): FloatArray {
-        val rtl = clampRadius(tl, w, h)
-        val rbl = clampRadius(bl, w, h)
-        val rbr = clampRadius(br, w, h)
-        val rtr = clampRadius(tr, w, h)
+        val rxTL = clampRadius(tl, w); val ryTL = clampRadius(tl, h)
+        val rxBL = clampRadius(bl, w); val ryBL = clampRadius(bl, h)
+        val rxBR = clampRadius(br, w); val ryBR = clampRadius(br, h)
+        val rxTR = clampRadius(tr, w); val ryTR = clampRadius(tr, h)
 
         val points = ArrayList<Float>(64)
-        cornerFixed(points, x + rtl, y + rtl, rtl, 180f, segments[0])
-        cornerFixed(points, x + w - rtr, y + rtr, rtr, 270f, segments[1])
-        cornerFixed(points, x + w - rbr, y + h - rbr, rbr, 0f, segments[2])
-        cornerFixed(points, x + rbl, y + h - rbl, rbl, 90f, segments[3])
+        cornerFixed(points, x + rxTL, y + ryTL, rxTL, ryTL, 180f, segments[0])
+        cornerFixed(points, x + w - rxTR, y + ryTR, rxTR, ryTR, 270f, segments[1])
+        cornerFixed(points, x + w - rxBR, y + h - ryBR, rxBR, ryBR, 0f, segments[2])
+        cornerFixed(points, x + rxBL, y + h - ryBL, rxBL, ryBL, 90f, segments[3])
         return points.toFloatArray()
     }
 
-    private fun cornerFixed(out: MutableList<Float>, cx: Float, cy: Float, r: Float, startDeg: Float, segments: Int) {
+    private fun cornerFixed(out: MutableList<Float>, cx: Float, cy: Float, rx: Float, ry: Float, startDeg: Float, segments: Int) {
         if (segments <= 0) {
             // sharp corner: emit the corner point once; offset centre back to the corner
             val sx = when (startDeg) {
-                180f -> cx - r; 90f -> cx - r; else -> cx + r
+                180f -> cx - rx; 90f -> cx - rx; else -> cx + rx
             }
             val sy = when (startDeg) {
-                180f -> cy - r; 270f -> cy - r; else -> cy + r
+                180f -> cy - ry; 270f -> cy - ry; else -> cy + ry
             }
             out.add(sx); out.add(sy)
             return
         }
         for (i in 0..segments) {
             val angle = Math.toRadians(startDeg + 90.0 * i / segments)
-            out.add(cx + (r * cos(angle)).toFloat())
-            out.add(cy + (r * sin(angle)).toFloat())
+            out.add(cx + (rx * cos(angle)).toFloat())
+            out.add(cy + (ry * sin(angle)).toFloat())
         }
     }
 

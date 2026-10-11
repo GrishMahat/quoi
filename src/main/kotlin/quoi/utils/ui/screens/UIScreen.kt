@@ -71,9 +71,9 @@ class UIScreen(val instance: AbobaUI.Instance, val background: Boolean = true ) 
     override fun mouseScrolled(mouseX: Double, mouseY: Double, horizontalAmount: Double, verticalAmount: Double) =
         instance.eventManager.onMouseScroll(verticalAmount.toFloat())
 
-    override fun onClose() {
+    override fun removed() {
         instance.close()
-        super.onClose()
+        super.removed()
     }
 
     override fun isPauseScreen() = false

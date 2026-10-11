@@ -139,10 +139,25 @@ class McBackend : RendererBackend {
 
     override fun line(x1: Float, y1: Float, x2: Float, y2: Float, thickness: Float, color: Int) {
         if (thickness > 0f) {
-            val inner = UIGeometry.lineQuad(x1, y1, x2, y2, (thickness - AA_FRINGE).coerceAtLeast(0f))
-            val outer = UIGeometry.lineQuad(x1, y1, x2, y2, thickness + AA_FRINGE)
-            emitQuads(inner, color)
-            emitQuadEdgeFade(inner, outer, color)
+            // NanoVG transforms the path before stroking. Stroke width follows the
+            // average transform scale; the AA fringe stays one device pixel wide.
+            val start = state.pose.transformPosition(x1, y1, Vector2f())
+            val end = state.pose.transformPosition(x2, y2, Vector2f())
+            val strokeWidth = (thickness * averageTransformScale()).coerceIn(0f, 200f)
+            val fringe = AA_FRINGE / devicePixelRatio()
+            val width = strokeWidth.coerceAtLeast(fringe)
+            val coverage = (strokeWidth / fringe).coerceAtMost(1f)
+            val strokeColor = (((color ushr 24) * coverage * coverage).toInt() shl 24) or (color and 0xffffff)
+            val inner = UIGeometry.lineQuad(start.x, start.y, end.x, end.y, width - fringe)
+            val outer = UIGeometry.lineQuad(start.x, start.y, end.x, end.y, width + fringe)
+            val savedPose = Matrix3x2f(state.pose)
+            state.pose.identity()
+            try {
+                emitQuads(inner, strokeColor)
+                emitQuadEdgeFade(inner, outer, strokeColor)
+            } finally {
+                state.pose.set(savedPose)
+            }
         }
     }
 
@@ -264,10 +279,14 @@ class McBackend : RendererBackend {
 
     /** Mirrors NanoVG's quantized average transform scale times its device pixel ratio. */
     private fun textRasterScale(): Float {
+        val transformScale = (round(averageTransformScale() * 100f) / 100f).coerceAtMost(4f)
+        return (transformScale * devicePixelRatio()).coerceAtLeast(0.01f)
+    }
+
+    private fun averageTransformScale(): Float {
         val sx = sqrt(state.pose.m00() * state.pose.m00() + state.pose.m10() * state.pose.m10())
         val sy = sqrt(state.pose.m01() * state.pose.m01() + state.pose.m11() * state.pose.m11())
-        val transformScale = (round(((sx + sy) * 0.5f) * 100f) / 100f).coerceAtMost(4f)
-        return (transformScale * devicePixelRatio()).coerceAtLeast(0.01f)
+        return (sx + sy) * 0.5f
     }
 
     private fun devicePixelRatio(): Float {
@@ -298,7 +317,7 @@ class McBackend : RendererBackend {
     }
 
     override fun textWidth(text: String, size: Float, font: Font): Float =
-        fonts.width(font, text, size)
+        fonts.width(font, text, size, textRasterScale())
 
     override fun image(image: Image, x: Float, y: Float, w: Float, h: Float, tl: Float, bl: Float, br: Float, tr: Float, color: Int?) {
         val entry = images.entry(image)

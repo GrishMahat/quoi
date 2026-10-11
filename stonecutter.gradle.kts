@@ -370,10 +370,6 @@ stonecutter parameters {
         !sdl -> "val KEY_MENU: Int = InputConstants.getKey(\"key.keyboard.menu\").value"
         else -> "const val KEY_MENU: Int = SDLScancode.SDL_SCANCODE_APPLICATION"
     }
-    swaps["map_player_face"] = when {
-        !gui -> "PlayerFaceExtractor.extractRenderState(ctx, it, w, h, w)"
-        else -> "ctx.drawImage(WHITE_MARKER, 0, 0, w, h)"
-    }
     swaps["movement_zero_delta"] = when {
         !sdl -> "if (packet.xa.toInt() == 0 && packet.ya.toInt() == 0 && packet.za.toInt() == 0) return@on"
         else -> "// Empty."
@@ -558,15 +554,6 @@ stonecutter parameters {
         !gui -> "import com.mojang.blaze3d.vertex.VertexFormat"
         gui && !sdl -> "import com.mojang.blaze3d.PrimitiveTopology"
         else -> "import com.mojang.renderpearl.api.pipeline.PrimitiveTopology"
-    }
-    swaps["player_face"] = when {
-        !gui -> """
-            withMatrix {
-                pose().rotate(180f.rad)
-                PlayerFaceExtractor.extractRenderState(this, textures, x, y, size)
-            }
-        """.trimIndent()
-        else -> "drawImage(textures.body.texturePath(), x, y, size, size)"
     }
     swaps["use_key_state"] = when {
         !sdl -> """
