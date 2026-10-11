@@ -31,6 +31,7 @@ object AutoSell : Module(
     private val delay by slider("Delay", 6, 2, 10, 1, desc = "The delay between each sell action.", unit = " ticks")
     private val randomization by slider("Randomization", 1, 0, 5, 1, desc = "Random delay variance", unit = " ticks")
     private val inventoryToggleKey by keybind("Toggle hovered item", Keybinds.KEY_NONE, desc = "Adds or removes the hovered item from the auto sell list while an inventory is open.")
+
     @Suppress("unused")
     private val addDefaults by button("Add defaults", desc = "Add default dungeon items to the auto sell list.") {
         sellList.addAll(defaultItems)
@@ -97,7 +98,7 @@ object AutoSell : Module(
 
         val lore = sellItem.lore ?: return false
         return lore.firstOrNull().noControlCodes == "Click items in your inventory to sell" ||
-            lore.lastOrNull().noControlCodes == "Click to buyback!"
+                lore.lastOrNull().noControlCodes == "Click to buyback!"
     }
 
     private fun shouldSell(stack: ItemStack, entries: List<String>): Boolean {
@@ -109,7 +110,7 @@ object AutoSell : Module(
         val name = value?.let(::normalizeSellEntry)?.takeIf(String::isNotEmpty)
             ?: return modMessage("Either hold an item or write an item name for autosell.")
         val changed = if (add) name !in normalizedEntries && sellList.add(name)
-            else sellList.removeAll { normalizeSellEntry(it) == name }
+        else sellList.removeAll { normalizeSellEntry(it) == name }
         if (!changed) return modMessage("$name ${if (add) "is already" else "isn't"} in the Auto sell list.")
 
         modMessage("${if (add) "Added" else "Removed"} \"$name\" ${if (add) "to" else "from"} the Auto sell list.")
@@ -155,6 +156,6 @@ object AutoSell : Module(
         "machine gun", "sniper bow", "soulstealer bow", "silent death", "training weight",
         "beating heart", "premium flesh", "mimic fragment", "enchanted rotten flesh", "sign",
         "enchanted bone", "defuse kit", "optical lens", "tripwire hook", "button", "carpet", "lever", "diamond atom",
-        "healing viii splash potion", "healing 8 splash potion", "candycomb"
+        "healing viii splash potion", "healing 8 splash potion", "candycomb", "earthen blade", "conjuring", "bouncy"
     )
 }
