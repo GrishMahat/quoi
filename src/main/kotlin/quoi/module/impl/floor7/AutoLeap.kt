@@ -224,7 +224,7 @@ object AutoLeap : Module(
 
         on<BossBarEvent.Update> {
             if (!p4Leap || !p4Auto || !Floor7.inF7Boss) return@on
-            if (progress !in 0.001..0.05 || p4Leaped || !unformatted.contains("necron", ignoreCase = true) || !Floor7.inPhaseAt(Phase.P4)) return@on
+            if (progress !in 0.001f..0.051f || p4Leaped || !unformatted.contains("necron", ignoreCase = true) || !Floor7.inPhaseAt(Phase.P4)) return@on
 
             p4Leaped = true
             leapToConfigured(p4Name, p4Class.selected)
