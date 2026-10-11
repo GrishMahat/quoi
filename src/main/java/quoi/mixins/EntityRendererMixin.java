@@ -19,9 +19,11 @@ public class EntityRendererMixin<T extends Entity, S extends EntityRenderState> 
             at = @At("HEAD"),
             cancellable = true
     )
-    //$ entity_visibility_handler {
+    //? if <26.3 {
     private void onRender(T entity, Frustum frustum, double x, double y, double z, CallbackInfoReturnable<Boolean> cir) {
-    //$}
+    //?} else {
+    /*private void onRender(T entity, Frustum frustum, double x, double y, double z, float partialTick, CallbackInfoReturnable<Boolean> cir) {
+    *///?}
         if (new RenderEvent.Entity(entity).post()) {
             cir.setReturnValue(false);
         }

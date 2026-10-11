@@ -2,9 +2,9 @@ package quoi.api.input
 
 import com.mojang.blaze3d.platform.InputConstants
 import quoi.QuoiMod.mc
-//$ keyboard_backend_import {
+//? if <26.3 {
 import org.lwjgl.glfw.GLFW
-//$}
+//?}
 
 object Keyboard {
     val modifierCodes = intArrayOf(
@@ -46,12 +46,14 @@ object Keyboard {
     fun getKeyName(key: Int): String? {
         if (key == Keybinds.KEY_NONE) return "None"
 
-        //$ key_name {
+        //? if <26.3 {
         val scancode = GLFW.glfwGetKeyScancode(key)
         if (scancode == -1) return null
 
         return GLFW.glfwGetKeyName(key, scancode) ?: when (key) {
-        //$}
+        //?} else {
+        /*return InputConstants.Type.KEYBOARD.getOrCreate(key).displayName.string.ifBlank { null } ?: when (key) {
+        *///?}
             Keybinds.KEY_SPACE -> "Space"
             Keybinds.KEY_ENTER -> "Enter"
             Keybinds.KEY_TAB -> "Tab"
@@ -68,18 +70,25 @@ object Keyboard {
             Keybinds.KEY_RIGHT_CONTROL -> "RCtrl"
             Keybinds.KEY_LEFT_ALT -> "LAlt"
             Keybinds.KEY_RIGHT_ALT -> "RAlt"
-            //$ function_key_names {
+            //? if <26.3 {
             in Keybinds.KEY_F1..GLFW.GLFW_KEY_F25 -> "F${key - Keybinds.KEY_F1 + 1}"
-            //$}
+            //?} else {
+            /*in Keybinds.KEY_F1..Keybinds.KEY_F12 ->
+                "F${key - Keybinds.KEY_F1 + 1}"
+            in InputConstants.KEY_F13..InputConstants.KEY_F24 ->
+                "F${key - InputConstants.KEY_F13 + 13}"
+            *///?}
             else -> null
         }
     }
 
     @JvmStatic
     fun isKeyDown(key: Int): Boolean {
-        //$ key_state {
+        //? if <26.3 {
         val state = GLFW.glfwGetKey(mc.window.handle(), key)
         return state == GLFW.GLFW_PRESS || state == GLFW.GLFW_REPEAT
-        //$}
+        //?} else {
+        /*return InputConstants.isKeyDown(key)
+        *///?}
     }
 }

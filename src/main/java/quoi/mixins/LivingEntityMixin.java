@@ -20,9 +20,16 @@ import static quoi.module.impl.render.RenderOptimiser.should;
 
 @Mixin(LivingEntity.class)
 public class LivingEntityMixin {
-    //$ living_swing_hook {
-    // Empty.
-    //$}
+    //? if >=26.3 {
+    /*@Inject(
+            method = "swing(Lnet/minecraft/world/InteractionHand;Lnet/minecraft/world/item/component/SwingAnimation;Z)Z",
+            at = @At("HEAD"),
+            require = 1
+    )
+    private void quoi$onSwing(InteractionHand hand, SwingAnimation animation, boolean sendToSwingingEntity, CallbackInfoReturnable<Boolean> cir) {
+        if ((Object) this == Minecraft.getInstance().player) ItemAnimations.onSwing(hand, animation);
+    }
+    *///?}
 
     @Redirect(
             method = "tickEffects",

@@ -7,9 +7,9 @@ import net.minecraft.world.phys.Vec3
 import quoi.QuoiMod.mc
 import quoi.utils.skyblock.player.PlayerUtils.eyePosition
 import quoi.utils.skyblock.player.interact.AuraManager.debugBox
-//$ block_center_import {
-// Empty.
-//$}
+//? if >=26.2 {
+/*import quoi.utils.center
+*///?}
 
 class EntityInteract(private val entity: Entity, private val action: AuraAction) {
     fun execute() { // todo improve
@@ -30,18 +30,22 @@ class EntityInteract(private val entity: Entity, private val action: AuraAction)
                 )
 
                 mc.connection?.send(
-                    //$ interact_entity_packet {
+                    //? if <26.2 {
                     ServerboundInteractPacket(entity.id, InteractionHand.MAIN_HAND, entity.boundingBox.center.subtract(entity.position()), player.isShiftKeyDown)
-                    //$}
+                    //?} else {
+                    /*ServerboundInteractPacket(entity.id, InteractionHand.MAIN_HAND, Vec3.ZERO, player.isShiftKeyDown)
+                    *///?}
                 )
 
                 debugBox(hitVec)
             }
         } else {
             mc.connection?.send(
-                //$ interact_entity_packet {
+                //? if <26.2 {
                 ServerboundInteractPacket(entity.id, InteractionHand.MAIN_HAND, entity.boundingBox.center.subtract(entity.position()), player.isShiftKeyDown)
-                //$}
+                //?} else {
+                /*ServerboundInteractPacket(entity.id, InteractionHand.MAIN_HAND, Vec3.ZERO, player.isShiftKeyDown)
+                *///?}
             )
             debugBox(entity.boundingBox.center)
         }

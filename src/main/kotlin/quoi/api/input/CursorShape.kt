@@ -1,8 +1,10 @@
 package quoi.api.input
 
-//$ mouse_backend_import {
+//? if <26.3 {
 import org.lwjgl.glfw.GLFW
-//$}
+//?} else {
+/*import org.lwjgl.sdl.SDLMouse
+*///?}
 
 object CursorShape {
     //$ system_cursor ARROW ARROW DEFAULT

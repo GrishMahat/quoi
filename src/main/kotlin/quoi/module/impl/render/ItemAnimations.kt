@@ -57,21 +57,27 @@ object ItemAnimations : Module(
     private var swingTimeTick = 0
     private var attackAnim = 0f
     private var prevAttackAnim = 0f
-    //$ swing_description_field {
-    // Empty.
-    //$}
+    //? if >=26.3 {
+    /*private var swingDescription: LivingEntity.SwingDescription? = null
+    *///?}
     private val thirdPersonSwings = mutableMapOf<Int, ThirdPersonSwing>()
 
-    //$ third_person_swing_data {
+    //? if <26.3 {
     private data class ThirdPersonSwing(val startTime: Double, var previousVanilla: Float)
-    //$}
+    //?} else {
+    /*private data class ThirdPersonSwing(
+        val startTime: Double,
+        var previousVanilla: Float,
+        val description: LivingEntity.SwingDescription?
+    )
+    *///?}
 
     override fun onDisable() {
         super.onDisable()
         swinging = false
-        //$ clear_swing_description {
-        // Empty.
-        //$}
+        //? if >=26.3 {
+        /*swingDescription = null
+        *///?}
         thirdPersonSwings.clear()
     }
 
@@ -136,11 +142,15 @@ object ItemAnimations : Module(
     fun applyTransformations(pose: PoseStack, stack: ItemStack?) {
         if (!enabled) return
 
-        //$ item_rotation {
+        //? if <26.3 {
         pose.mulPose(Axis.XP.rotationDegrees(pitch))
         pose.mulPose(Axis.YP.rotationDegrees(yaw))
         pose.mulPose(Axis.ZP.rotationDegrees(roll))
-        //$}
+        //?} else {
+        /*pose.rotateDegrees(Axis.XP, pitch)
+        pose.rotateDegrees(Axis.YP, yaw)
+        pose.rotateDegrees(Axis.ZP, roll)
+        *///?}
 
         var renderY = y
 
@@ -204,9 +214,11 @@ object ItemAnimations : Module(
     }
 
     @JvmStatic
-    //$ third_person_swing_signature {
+    //? if <26.3 {
     fun getThirdPersonSwingAnimation(current: Float, stack: ItemStack, playerId: Int): Float {
-    //$}
+    //?} else {
+    /*fun getThirdPersonSwingAnimation(current: Float, stack: ItemStack, playerId: Int, description: LivingEntity.SwingDescription?): Float {
+    *///?}
         if (!shouldApplyThirdPerson(stack, playerId)) return current
         if (disableSwingRotation(stack)) return 0f
 
@@ -220,9 +232,11 @@ object ItemAnimations : Module(
 
         val vanillaStartedSwing = current > 0f && (existingSwing == null || existingSwing.previousVanilla <= 0f || current < existingSwing.previousVanilla)
         val swing = if (vanillaStartedSwing && (existingProgress == null || existingProgress >= 0.5f))
-            //$ third_person_swing_start {
+            //? if <26.3 {
             ThirdPersonSwing(currentTime, current).also { thirdPersonSwings[playerId] = it }
-            //$}
+            //?} else {
+            /*ThirdPersonSwing(currentTime, current, description).also { thirdPersonSwings[playerId] = it }
+            *///?}
         else existingSwing ?: return current
 
         val progress = swing.progress(currentTime, speed)
@@ -236,9 +250,20 @@ object ItemAnimations : Module(
 
     private fun ThirdPersonSwing.progress(time: Double, speed: Double) =
         ((time - startTime) * speed / getCurrentSwingDuration()).toFloat()
-    //$ swing_descriptions {
-    // Empty.
-    //$}
+    //? if >=26.3 {
+    /*@JvmStatic
+    fun getThirdPersonSwingDescription(current: LivingEntity.SwingDescription?, stack: ItemStack, playerId: Int): LivingEntity.SwingDescription? {
+        if (!shouldApplyThirdPerson(stack, playerId)) return current
+        return if (playerId == player.id) getSwingDescription(current, stack)
+        else thirdPersonSwings[playerId]?.description ?: current
+    }
+
+    @JvmStatic
+    fun getSwingDescription(current: LivingEntity.SwingDescription?, stack: ItemStack): LivingEntity.SwingDescription? {
+        if (!enabled || (stack.isEmpty && !affectHand()) || (stack.has(DataComponents.MAP_ID) && !affectMap())) return current
+        return if (swinging || prevAttackAnim > 0f) swingDescription ?: current else current
+    }
+    *///?}
 
     private fun shouldApplyThirdPerson(stack: ItemStack, playerId: Int): Boolean {
         return enabled &&
@@ -257,16 +282,18 @@ object ItemAnimations : Module(
     }
 
     @JvmStatic
-    //$ on_swing_signature {
+    //? if <26.3 {
     fun onSwing() {
-    //$}
+    //?} else {
+    /*fun onSwing(hand: InteractionHand, animation: SwingAnimation) {
+    *///?}
         if (!enabled) return
         if (swinging && swingTimeTick >= 0 && (swingTimeTick * calcSwingSpeed()) < getCurrentSwingDuration() / 2) return
         swingTimeTick = -1
         swinging = true
-        //$ on_swing_description {
-        // Empty.
-        //$}
+        //? if >=26.3 {
+        /*swingDescription = LivingEntity.SwingDescription(hand, animation, getCurrentSwingDuration())
+        *///?}
     }
 
     init {

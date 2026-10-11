@@ -15,9 +15,9 @@ import quoi.utils.EntityUtils.helmet
 import quoi.utils.getDirection
 import quoi.utils.skyblock.item.ItemUtils.skyblockId
 import quoi.utils.skyblock.player.PlayerUtils.useItem
-//$ block_center_import {
-// Empty.
-//$}
+//? if >=26.2 {
+/*import quoi.utils.center
+*///?}
 
 object AutoCarnival : Module(
     "Auto Carnival",

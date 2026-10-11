@@ -56,9 +56,11 @@ object ChatUtils {
     }
 
     fun removeLines(id: Int, text: String): Boolean {
-        //$ chat_message_content {
+        //? if <26.2 {
         return removeLines { it.id == id || it.content.string.noControlCodes == text }
-        //$}
+        //?} else {
+        /*return removeLines { it.id == id || it.content().string.noControlCodes == text }
+        *///?}
     }
 
     fun removeLines(id: Int): Boolean {
@@ -100,9 +102,11 @@ object ChatUtils {
             editedLine = true
             messageList.remove()
 
-            //$ chat_message_copy {
+            //? if <26.2 {
             val line = GuiMessage(msg.addedTime, replaceWith, null, GuiMessageSource.SYSTEM_CLIENT, indicator)
-            //$}
+            //?} else {
+            /*val line = GuiMessage(msg.addedTime(), replaceWith, null, msg.source(), indicator)
+            *///?}
             line.id = msg.id
             messageList.add(line)
         }
@@ -123,9 +127,12 @@ object ChatUtils {
     }
 
     private fun executeClientCommand(command: String): Boolean {
-        //$ client_command_dispatch {
+        //? if <26.2 {
         return ClientCommandInternals.executeCommand(command)
-        //$}
+        //?} else {
+        /*val source = mc.connection?.suggestionsProvider as? FabricClientCommandSource ?: return false
+        return ClientCommandInternals.executeCommand(command, source, null)
+        *///?}
     }
 
     fun say(message: String) = connection.sendChat(message)

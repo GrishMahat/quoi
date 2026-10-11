@@ -44,9 +44,9 @@ import quoi.utils.skyblock.player.RotationUtils.rotate
 import quoi.utils.ticker
 import quoi.utils.ui.hud.HudManager
 import quoi.utils.ui.screens.UIScreen.Companion.open
-//$ block_center_import {
-// Empty.
-//$}
+//? if >=26.2 {
+/*import quoi.utils.center
+*///?}
 
 object QuoiCommand : EventListener {
     val command = BaseCommand("quoi", "requise") { // https://imgur.com/a/tpz09C5

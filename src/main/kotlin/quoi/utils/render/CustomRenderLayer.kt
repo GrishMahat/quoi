@@ -12,9 +12,9 @@ object CustomRenderLayer {
         configure: RenderSetup.RenderSetupBuilder.() -> Unit = {}
     ): RenderType {
         val setup = RenderSetup.builder(pipeline)
-            //$ render_buffer_size {
+            //? if <26.2 {
             .bufferSize(RenderType.TRANSIENT_BUFFER_SIZE)
-            //$}
+            //?}
             .apply(configure)
             .createRenderSetup()
         return RenderType.create(name, setup)

@@ -16,9 +16,9 @@ import quoi.utils.distanceToSqr
 import quoi.utils.getArrowDirection
 import quoi.utils.skyblock.player.RotationUtils.rotateSmoothly
 import quoi.utils.skyblock.player.SwapManager
-//$ block_center_import {
-// Empty.
-//$}
+//? if >=26.2 {
+/*import quoi.utils.center
+*///?}
 
 // bow shit
 object Mastery : ToggleableGroup(Dojo, "Mastery", subarea = "dojo arena") {

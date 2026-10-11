@@ -8,9 +8,11 @@ import com.mojang.blaze3d.platform.CompareOp
 import com.mojang.blaze3d.vertex.DefaultVertexFormat
 import java.util.Optional
 import net.minecraft.client.renderer.RenderPipelines
-//$ primitive_topology_import {
+//? if <26.2 {
 import com.mojang.blaze3d.vertex.VertexFormat
-//$}
+//?} else {
+/*import com.mojang.blaze3d.PrimitiveTopology
+*///?}
 
 /**
  * from OdinFabric (BSD 3-Clause)

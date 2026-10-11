@@ -1,5 +1,7 @@
 package quoi.ui
 
+//~ texture_resources
+
 import com.mojang.blaze3d.Blaze3D
 import com.mojang.blaze3d.platform.NativeImage
 import java.io.ByteArrayInputStream
@@ -34,9 +36,9 @@ import quoi.module.impl.render.CustomMainMenu
 import quoi.utils.StringUtils.noControlCodes
 import quoi.utils.ThemeManager.theme
 import quoi.utils.render.DrawContextUtils.drawText
-//$ menu_mouse_import {
-// Empty.
-//$}
+//? if >=26.3 {
+/*import org.lwjgl.sdl.SDLMouse
+*///?}
 
 class CustomMainMenuScreen(
     private val externalTitleButtons: List<AbstractWidget> = emptyList(),
@@ -64,18 +66,22 @@ class CustomMainMenuScreen(
         addButton("Multiplayer") { minecraft.setScreen(JoinMultiplayerScreen(this)) }
         if (CustomMainMenu.showHypixelButton) addButton("Join Hypixel") { joinServer("Hypixel", HYPIXEL_ADDRESS) }
         if (CustomMainMenu.showP3SimButton) addButton("Join P3Sim") { joinServer("P3Sim", p3SimAddress()) }
-        //$ options_screen {
+        //? if <26.3 {
         addButton("Options") { minecraft.setScreen(OptionsScreen(this, minecraft.options, false)) }
-        //$}
+        //?} else {
+        /*addButton("Options") { minecraft.setScreen(OptionsScreen(this, minecraft.options)) }
+        *///?}
         externalTitleButtons.forEach { button ->
             addRenderableWidget(CustomMenuButton(x, y, buttonWidth, buttonHeight, button.message.string.noControlCodes.trim(), ::menuColour) {
                 button.mouseClicked(
                     MouseButtonEvent(
                         button.x + button.width / 2.0,
                         button.y + button.height / 2.0,
-                        //$ menu_mouse_button {
+                        //? if <26.3 {
                         MouseButtonInfo(0, 0),
-                        //$}
+                        //?} else {
+                        /*MouseButtonInfo(SDLMouse.SDL_BUTTON_LEFT, 0),
+                        *///?}
                     ),
                     false,
                 )
@@ -114,9 +120,11 @@ class CustomMainMenuScreen(
     override fun extractBackground(guiGraphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, deltaTicks: Float) {
         val background = background()
         if (background != null) drawCover(guiGraphics, background)
-        //$ menu_panorama {
+        //? if <26.2 {
         else extractPanorama(guiGraphics, deltaTicks)
-        //$}
+        //?} else {
+        /*else minecraft.gameRenderer.panorama().extractRenderState(guiGraphics, width, height)
+        *///?}
 
         val dim = (CustomMainMenu.dimAmount.coerceIn(0f, 1f) * 255).toInt() shl 24
         guiGraphics.fill(0, 0, width, height, dim)

@@ -67,9 +67,9 @@ inline val Vec3.floorPos: BlockPos get() = BlockPos(x, ceil(y - 1.0), z)
 
 inline val BlockPos.aabb: AABB get() = AABB(this)
 inline val BlockPos.vec3: Vec3 get() = Vec3(x.toDouble(), y.toDouble(), z.toDouble())
-//$ block_center_extension {
-// Empty.
-//$}
+//? if >=26.2 {
+/*inline val BlockPos.center: Vec3 get() = Vec3(x + 0.5, y + 0.5, z + 0.5)
+*///?}
 inline val BlockPos.bounds: AABB? get() {
     return level.let { level ->
         level.getBlockState(this).getShape(level, this).singleEncompassing()

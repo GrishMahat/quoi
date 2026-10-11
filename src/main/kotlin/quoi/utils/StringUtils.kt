@@ -19,15 +19,19 @@ object StringUtils {
 
     val Component.formattedString: String get() = buildString {
         val rgbMap = ChatFormatting.entries
-            //$ legacy_format_colors {
+            //? if <26.2 {
             .mapNotNull { it.color?.let { color -> color to it } }
-            //$}
+            //?} else {
+            /*.mapNotNull { formatting -> net.minecraft.network.chat.TextColor.fromLegacyFormat(formatting)?.getValue()?.let { it to formatting } }
+            *///?}
             .toMap()
 
         visit<Unit>({ style, content ->
-            //$ text_style_color {
+            //? if <26.2 {
             style.color?.value?.let { rgbMap[it]?.let(::append) }
-            //$}
+            //?} else {
+            /*style.getColor()?.value?.let { rgbMap[it]?.let(::append) }
+            *///?}
             if (style.isBold) append(ChatFormatting.BOLD)
             if (style.isItalic) append(ChatFormatting.ITALIC)
             if (style.isUnderlined) append(ChatFormatting.UNDERLINE)

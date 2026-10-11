@@ -118,18 +118,26 @@ public abstract class ChatComponentMixin implements IChatComponent {
     }
 
     @ModifyVariable(
-            //$ chat_extract_target {
+            //? if <26.2 {
             method = "extractRenderState*",
-            //$}
+            //?} else {
+            /*method = "extractRenderState(Lnet/minecraft/client/gui/GuiGraphicsExtractor;Lnet/minecraft/client/gui/Font;IIILnet/minecraft/client/gui/components/ChatComponent$DisplayMode;Z)V",
+            *///?}
             at = @At("HEAD"),
-            //$ chat_focus_args {
+            //? if <26.2 {
             argsOnly = true
-            //$}
+            //?} else {
+            /*argsOnly = true,
+            ordinal = 0
+            *///?}
     )
-    //$ chat_focus_handler {
+    //? if <26.2 {
     private ChatComponent.DisplayMode renderFocused(ChatComponent.DisplayMode mode) {
         return ChatPeek.displayMode(mode);
-    //$}
+    //?} else {
+    /*private boolean renderFocused(boolean focused) {
+        return focused || ChatPeek.isDown();
+    *///?}
     }
 
     @ModifyExpressionValue(

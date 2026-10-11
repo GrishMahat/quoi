@@ -7,16 +7,18 @@ import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.ModifyArgs;
 import org.spongepowered.asm.mixin.injection.invoke.arg.Args;
 import quoi.module.impl.render.NameTags;
-//$ nametag_import {
+//? if <26.3 {
 import net.minecraft.client.renderer.feature.NameTagFeatureRenderer;
-//$}
+//?}
 
-//$ nametag_mixin_target {
+//? if <26.3 {
 @Mixin(NameTagFeatureRenderer.class)
-//$}
+//?} else {
+/*@Mixin(SubmitNodeCollection.class)
+*///?}
 public class NameTagFeatureRendererMixin {
 
-    //$ nametag_hooks {
+    //? if <26.2 {
     @ModifyArgs(
             method = "render",
             at = @At(
@@ -29,5 +31,53 @@ public class NameTagFeatureRendererMixin {
         args.set(4, NameTags.getShadow());
         if (NameTags.getCustomBg()) args.set(8, NameTags.getBgColour().getRgb());
     }
-    //$}
+    //?} else if <26.3 {
+    /*@ModifyArg(
+            method = "prepareText",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/client/gui/Font;prepareText(Lnet/minecraft/util/FormattedCharSequence;FFIZZI)Lnet/minecraft/client/gui/Font$PreparedText;"
+            ),
+            index = 4
+    )
+    private static boolean quoi$modifyShadow(boolean shadow) {
+        return NameTags.INSTANCE.getEnabled() ? NameTags.getShadow() : shadow;
+    }
+
+    @ModifyArg(
+            method = "prepareText",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/client/gui/Font;prepareText(Lnet/minecraft/util/FormattedCharSequence;FFIZZI)Lnet/minecraft/client/gui/Font$PreparedText;"
+            ),
+            index = 6
+    )
+    private static int quoi$modifyBackground(int backgroundColor) {
+        return NameTags.INSTANCE.getEnabled() && NameTags.getCustomBg() ? NameTags.getBgColour().getRgb() : backgroundColor;
+    }
+    *///?} else {
+    /*@ModifyArg(
+            method = "nameTag",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/client/renderer/feature/TextFeatureRenderer$Content$Text;<init>(FFLnet/minecraft/util/FormattedCharSequence;ZIII)V"
+            ),
+            index = 3
+    )
+    private static boolean quoi$modifyShadow(boolean shadow) {
+        return NameTags.INSTANCE.getEnabled() ? NameTags.getShadow() : shadow;
+    }
+
+    @ModifyArg(
+            method = "nameTag",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/client/renderer/feature/TextFeatureRenderer$Content$Text;<init>(FFLnet/minecraft/util/FormattedCharSequence;ZIII)V"
+            ),
+            index = 5
+    )
+    private static int quoi$modifyBackground(int backgroundColor) {
+        return NameTags.INSTANCE.getEnabled() && NameTags.getCustomBg() ? NameTags.getBgColour().getRgb() : backgroundColor;
+    }
+    *///?}
 }

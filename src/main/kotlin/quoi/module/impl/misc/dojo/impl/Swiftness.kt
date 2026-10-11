@@ -17,9 +17,9 @@ import quoi.utils.skyblock.player.MovementUtils.cancelMovementTask
 import quoi.utils.skyblock.player.MovementUtils.fullStop
 import quoi.utils.skyblock.player.MovementUtils.moveTo
 import quoi.utils.skyblock.player.RotationUtils.rotateSmoothly
-//$ block_center_import {
-// Empty.
-//$}
+//? if >=26.2 {
+/*import quoi.utils.center
+*///?}
 
 // parkour shit
 

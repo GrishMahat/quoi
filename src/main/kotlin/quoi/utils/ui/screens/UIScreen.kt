@@ -23,18 +23,18 @@ class UIScreen(val instance: AbobaUI.Instance, val background: Boolean = true ) 
     }
 
     override fun extractRenderState(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, deltaTicks: Float) {
-        //$ screen_extract_before {
+        //? if <26.2 {
         super.extractRenderState(ctx, mouseX, mouseY, deltaTicks)
-        //$}
+        //?}
         instance.ctx = ctx
         instance.eventManager.onMouseMove(mouseX * sf.toFloat(), mouseY * sf.toFloat())
         NVGSpecialRenderer.draw(ctx, 0, 0, ctx.guiWidth(), ctx.guiHeight()) {
             instance.render(true)
         }
         instance.render(false)
-        //$ screen_extract_after {
-        // Empty.
-        //$}
+        //? if >=26.2 {
+        /*super.extractRenderState(ctx, mouseX, mouseY, deltaTicks)
+        *///?}
     }
 
     override fun mouseClicked(mouseButtonEvent: MouseButtonEvent, doubled: Boolean) =

@@ -25,8 +25,7 @@ public class LocalPlayerMixin extends AbstractClientPlayer {
         super(world, profile);
     }
 
-    //$ local_swing_hook {
-
+    //? if <26.3 {
     @Inject(
             method = "swing",
             at = @At("HEAD")
@@ -34,7 +33,7 @@ public class LocalPlayerMixin extends AbstractClientPlayer {
     private void quoi$onSwing(InteractionHand hand, CallbackInfo ci) {
         ItemAnimations.onSwing();
     }
-    //$}
+    //?}
 
     @ModifyExpressionValue(
             method = {"sendPosition", "tick"},

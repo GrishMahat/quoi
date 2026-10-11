@@ -1,5 +1,7 @@
 package quoi.utils.ui.rendering
 
+//~ texture_resources
+
 import com.mojang.blaze3d.pipeline.RenderPipeline
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.textures.FilterMode

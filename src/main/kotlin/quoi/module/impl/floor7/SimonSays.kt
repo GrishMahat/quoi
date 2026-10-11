@@ -32,9 +32,9 @@ import quoi.utils.skyblock.player.RotationAnimation
 import quoi.utils.skyblock.player.RotationUtils.rotate
 import quoi.utils.skyblock.player.RotationUtils.rotationTask
 import quoi.utils.skyblock.player.interact.AuraManager
-//$ block_center_import {
-// Empty.
-//$}
+//? if >=26.2 {
+/*import quoi.utils.center
+*///?}
 
 @Suppress("UNNECESSARY_SAFE_CALL")
 object SimonSays : Module(

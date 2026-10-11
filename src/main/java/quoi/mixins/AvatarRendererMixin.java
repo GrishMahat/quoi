@@ -17,8 +17,11 @@ public class AvatarRendererMixin {
             at = @At("RETURN")
     )
     private void quoi$itemAnimationsThirdPersonSwing(Avatar avatar, AvatarRenderState avatarRenderState, float tickProgress, CallbackInfo ci) {
-        //$ avatar_swing_state {
+        //? if <26.3 {
         avatarRenderState.attackTime = ItemAnimations.getThirdPersonSwingAnimation(avatarRenderState.attackTime, avatarRenderState.getMainHandItemStack(), avatarRenderState.id);
-        //$}
+        //?} else {
+        /*avatarRenderState.swingAnimation = ItemAnimations.getThirdPersonSwingAnimation(avatarRenderState.swingAnimation, avatarRenderState.getMainHandItemStack(), avatarRenderState.id, avatarRenderState.currentSwing);
+        avatarRenderState.currentSwing = ItemAnimations.getThirdPersonSwingDescription(avatarRenderState.currentSwing, avatarRenderState.getMainHandItemStack(), avatarRenderState.id);
+        *///?}
     }
 }

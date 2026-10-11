@@ -1,5 +1,7 @@
 package quoi.utils.ui.rendering
 
+//~ texture_resources
+
 import com.mojang.blaze3d.platform.NativeImage
 import com.mojang.blaze3d.systems.RenderSystem
 import java.nio.ByteBuffer
@@ -144,9 +146,13 @@ class McFonts {
     fun flushUploads() {
         pages.forEach { page ->
             if (page.dirty) {
-                //$ atlas_upload {
+                //? if >=26.4-snapshot-3 {
+                /*val encoder = RenderSystem.getDevice().createCommandEncoder()
+                page.image.writeToGpuTexture(encoder, page.texture.texture)
+                encoder.submit()
+                *///?} else {
                 page.texture.upload()
-                //$}
+                //?}
                 page.dirty = false
             }
         }

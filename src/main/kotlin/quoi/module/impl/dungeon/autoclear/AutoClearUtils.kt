@@ -38,9 +38,9 @@ import quoi.utils.rayCastVec
 import quoi.utils.skyblock.player.PlayerUtils.getEyeHeight
 import quoi.utils.skyblock.player.RotationUtils.rotate
 import quoi.utils.vec3
-//$ block_center_import {
-// Empty.
-//$}
+//? if >=26.2 {
+/*import quoi.utils.center
+*///?}
 
 const val HYPE_AOE = 6.0
 

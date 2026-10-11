@@ -1,9 +1,9 @@
 package quoi.api.input
 
 import com.mojang.blaze3d.platform.InputConstants
-//$ scancode_import {
-// Empty.
-//$}
+//? if >=26.3 {
+/*import org.lwjgl.sdl.SDLScancode
+*///?}
 
 @Suppress("unused")
 object Keybinds {
@@ -115,23 +115,30 @@ object Keybinds {
     const val KEY_NUMPAD_8: Int = InputConstants.KEY_NUMPAD8
     const val KEY_NUMPAD_9: Int = InputConstants.KEY_NUMPAD9
 
-    //$ keypad_decimal_divide {
+    //? if <26.3 {
     const val KEY_NUMPAD_DECIMAL: Int = InputConstants.KEY_NUMPADCOMMA
     val KEY_NUMPAD_DIVIDE: Int = InputConstants.getKey("key.keyboard.keypad.divide").value
-    //$}
+    //?} else {
+    /*const val KEY_NUMPAD_DECIMAL: Int = SDLScancode.SDL_SCANCODE_KP_PERIOD
+    const val KEY_NUMPAD_DIVIDE: Int = SDLScancode.SDL_SCANCODE_KP_DIVIDE
+    *///?}
     const val KEY_NUMPAD_MULTIPLY: Int = InputConstants.KEY_MULTIPLY
-    //$ keypad_subtract {
+    //? if <26.3 {
     val KEY_NUMPAD_SUBTRACT: Int = InputConstants.getKey("key.keyboard.keypad.subtract").value
-    //$}
+    //?} else {
+    /*const val KEY_NUMPAD_SUBTRACT: Int = SDLScancode.SDL_SCANCODE_KP_MINUS
+    *///?}
     const val KEY_NUMPAD_ADD: Int = InputConstants.KEY_ADD
     const val KEY_NUMPAD_ENTER: Int = InputConstants.KEY_NUMPADENTER
     const val KEY_NUMPAD_EQUAL: Int = InputConstants.KEY_NUMPADEQUALS
 
     const val KEY_PRINT_SCREEN: Int = InputConstants.KEY_PRINTSCREEN
     const val KEY_PAUSE: Int = InputConstants.KEY_PAUSE
-    //$ menu_key {
+    //? if <26.3 {
     val KEY_MENU: Int = InputConstants.getKey("key.keyboard.menu").value
-    //$}
+    //?} else {
+    /*const val KEY_MENU: Int = SDLScancode.SDL_SCANCODE_APPLICATION
+    *///?}
 
     const val MOUSE_LEFT: Int = -100
     const val MOUSE_RIGHT: Int = -99

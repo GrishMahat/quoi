@@ -240,11 +240,14 @@ object LeapManager : EventListener {
 
         val useKey = mc.options.keyUse.key
         mc.options.keyUse.isDown = when (useKey.type) {
-            //$ use_key_state {
+            //? if <26.3 {
             InputConstants.Type.MOUSE -> Mouse.isButtonDown(useKey.value)
             InputConstants.Type.KEYSYM -> Keyboard.isKeyDown(useKey.value)
             InputConstants.Type.SCANCODE -> false
-            //$}
+            //?} else {
+            /*InputConstants.Type.MOUSE -> Mouse.isSDLButtonDown(useKey.value)
+            InputConstants.Type.KEYBOARD -> Keyboard.isKeyDown(useKey.value)
+            *///?}
         }
     }
 

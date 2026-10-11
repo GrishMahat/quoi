@@ -9,23 +9,27 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import quoi.module.impl.render.RenderOptimiser;
-//$ fire_render_import {
+//? if <26.2 {
 import net.minecraft.client.renderer.MultiBufferSource;
-//$}
+//?}
 
 @Mixin(ScreenEffectRenderer.class)
 public class ScreenEffectRendererMixin {
 
     @Inject(
-            //$ fire_render_target {
+            //? if <26.2 {
             method = "renderFire",
-            //$}
+            //?} else {
+            /*method = "submitFire",
+            *///?}
             at = @At("HEAD"),
             cancellable = true
     )
-    //$ fire_render_handler {
+    //? if <26.2 {
     private static void onRenderFire(PoseStack poseStack, MultiBufferSource multiBufferSource, TextureAtlasSprite textureAtlasSprite, CallbackInfo ci) {
-    //$}
+    //?} else {
+    /*private static void onRenderFire(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, TextureAtlasSprite textureAtlasSprite, CallbackInfo ci) {
+    *///?}
         if (RenderOptimiser.should(RenderOptimiser.getHideFire())) ci.cancel();
     }
 }

@@ -1,4 +1,3 @@
-import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.jvm.tasks.Jar
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
@@ -41,22 +40,24 @@ kotlin.sourceSets.named("main") {
     kotlin.exclude(rendererSources)
 }
 sourceSets.named("main") {
-    java.exclude(when {
-        sc.current.parsed < "26.2" -> listOf(
-            "quoi/mixins/GuiMixin.java",
-            "quoi/mixins/ItemInHandRendererMixin.java",
-            "quoi/mixins/GuiGraphicsMixin.java",
-            "quoi/mixins/HudMixin.java",
-            "quoi/mixins/accessors/GuiGraphicsExtractorAccessor.java",
-            "quoi/mixins/FirstPersonHandsAndItemsMixin.java",
-        )
-        sc.current.parsed < "26.3" -> listOf(
-            "quoi/mixins/LegacyGuiMixin.java",
-            "quoi/mixins/FirstPersonHandsAndItemsMixin.java",
-            "quoi/mixins/ItemInHandRendererMixin.java",
-        )
-        else -> listOf("quoi/mixins/LegacyGuiMixin.java", "quoi/mixins/LegacyItemInHandRendererMixin.java")
-    })
+    java.exclude(
+        when {
+            sc.current.parsed < "26.2" -> listOf(
+                "quoi/mixins/GuiMixin.java",
+                "quoi/mixins/ItemInHandRendererMixin.java",
+                "quoi/mixins/GuiGraphicsMixin.java",
+                "quoi/mixins/HudMixin.java",
+                "quoi/mixins/accessors/GuiGraphicsExtractorAccessor.java",
+                "quoi/mixins/FirstPersonHandsAndItemsMixin.java",
+            )
+            sc.current.parsed < "26.3" -> listOf(
+                "quoi/mixins/LegacyGuiMixin.java",
+                "quoi/mixins/FirstPersonHandsAndItemsMixin.java",
+                "quoi/mixins/ItemInHandRendererMixin.java",
+            )
+            else -> listOf("quoi/mixins/LegacyGuiMixin.java", "quoi/mixins/LegacyItemInHandRendererMixin.java")
+        }
+    )
 }
 
 version = "$modVersion+$mcVersion"
@@ -112,10 +113,10 @@ loom {
     runs {
         named("client") {
             generateRunConfig.set(true)
-            runDirectory.set(layout.projectDirectory.dir("run"))
+            runDirectory.set(layout.projectDirectory.dir(providers.gradleProperty("run_directory").orElse("run").get()))
             jvmArguments.addAll(
                 "-Dmixin.debug.export=true",
-                "-Ddevauth.enabled=true",
+                "-Ddevauth.enabled=${providers.gradleProperty("devauth_enabled").orElse("true").get()}",
                 "-Ddevauth.account=${providers.gradleProperty("devauth_account").orElse("main").get()}",
                 "-XX:+AllowEnhancedClassRedefinition",
                 "-XX:+IgnoreUnrecognizedVMOptions",
@@ -131,6 +132,14 @@ loom {
 }
 
 tasks {
+    register<Sync>("collectJar") {
+        group = "build"
+        description = "Collects this Minecraft version's JAR in the root build/libs directory."
+        outputs.upToDateWhen { false }
+        from(named<Jar>("jar").flatMap { it.archiveFile })
+        into(rootProject.layout.buildDirectory.dir("libs/${sc.current.project}"))
+    }
+
     processResources {
         val properties = listOf(
             "mod_id",

@@ -53,13 +53,13 @@ jobs:
           cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
       - name: Build Mod
-        run: ./gradlew build --build-cache --configuration-cache --stacktrace
+        run: ./gradlew buildAll --build-cache --configuration-cache --stacktrace
 
       - name: Upload Minecraft 26.1 JAR
         if: ${{ !cancelled() && (github.event_name != 'pull_request' || failure()) }}
         uses: actions/upload-artifact@v7.0.1
         with:
-          path: versions/26.1.x/build/libs/quoi-*.jar
+          path: build/libs/26.1.x/quoi-*.jar
           if-no-files-found: error
           archive: false
           retention-days: 90
@@ -68,7 +68,7 @@ jobs:
         if: ${{ !cancelled() && (github.event_name != 'pull_request' || failure()) }}
         uses: actions/upload-artifact@v7.0.1
         with:
-          path: versions/26.2/build/libs/quoi-*.jar
+          path: build/libs/26.2/quoi-*.jar
           if-no-files-found: error
           archive: false
           retention-days: 90
@@ -77,7 +77,7 @@ jobs:
         if: ${{ !cancelled() && (github.event_name != 'pull_request' || failure()) }}
         uses: actions/upload-artifact@v7.0.1
         with:
-          path: versions/26.3/build/libs/quoi-*.jar
+          path: build/libs/26.3/quoi-*.jar
           if-no-files-found: error
           archive: false
           retention-days: 90
@@ -86,7 +86,7 @@ jobs:
         if: ${{ !cancelled() && (github.event_name != 'pull_request' || failure()) }}
         uses: actions/upload-artifact@v7.0.1
         with:
-          path: versions/26.4/build/libs/quoi-*.jar
+          path: build/libs/26.4/quoi-*.jar
           if-no-files-found: error
           archive: false
           retention-days: 90

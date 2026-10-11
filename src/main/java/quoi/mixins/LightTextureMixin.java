@@ -17,7 +17,7 @@ import static quoi.module.impl.render.RenderOptimiser.should;
 @Mixin(LightmapRenderStateExtractor.class)
 public class LightTextureMixin {
 
-    //$ ambient_light_hook {
+    //? if <26.2 {
     @ModifyExpressionValue(
             method = "extract",
             at = @At(
@@ -28,5 +28,35 @@ public class LightTextureMixin {
     private float getAmbientLight(float original) {
         return should(RenderOptimiser.getFullBright()) ? 15.0f : original;
     }
-    //$}
+    //?} else if <26.3 {
+    /*@ModifyExpressionValue(
+            method = "extract",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/util/ARGB;vector3fFromRGB24(I)Lorg/joml/Vector3f;"
+            ),
+            slice = @Slice(
+                    from = @At(
+                            value = "FIELD",
+                            target = "Lnet/minecraft/world/attribute/EnvironmentAttributes;AMBIENT_LIGHT_COLOR:Lnet/minecraft/world/attribute/EnvironmentAttribute;"
+                    )
+            )
+    )
+    private Vector3f getAmbientLight(Vector3f original) {
+        return should(RenderOptimiser.getFullBright()) ? new Vector3f(15.0f) : original;
+    }
+    *///?} else {
+    /*@WrapOperation(
+            method = "extract",
+            at = @At(
+                    value = "FIELD",
+                    target = "Lnet/minecraft/client/renderer/state/LightmapRenderState;ambientColor:Lorg/joml/Vector3fc;",
+                    opcode = Opcodes.PUTFIELD
+            ),
+            require = 1
+    )
+    private void setAmbientLight(LightmapRenderState state, Vector3fc color, Operation<Void> original) {
+        original.call(state, should(RenderOptimiser.getFullBright()) ? new Vector3f(15.0f) : color);
+    }
+    *///?}
 }

@@ -13,18 +13,22 @@ import quoi.utils.StringUtils.noControlCodes
 import quoi.utils.skyblock.item.ItemUtils.lore
 import quoi.utils.skyblock.player.PlayerUtils.rightClick
 import quoi.utils.skyblock.player.SwapManager
-//$ punch_packet_import {
+//? if <26.3 {
 import net.minecraft.network.protocol.game.ServerboundSwingPacket
-//$}
+//?} else {
+/*import net.minecraft.network.protocol.game.ServerboundPunchPacket
+*///?}
 
 object AutoAttune : ToggleableGroup(BlazeSlayer, "Auto attune") {
     private var lastSwap = -1L
 
     init {
-        //$ punch_packet_event {
+        //? if <26.3 {
         on<PacketEvent.Sent, ServerboundSwingPacket> {
             if (packet.hand != InteractionHand.MAIN_HAND) return@on
-        //$}
+        //?} else {
+        /*on<PacketEvent.Sent, ServerboundPunchPacket> {
+        *///?}
             if (System.currentTimeMillis() - lastSwap < 400L) return@on
             if (BlazeSlayer.attune == null) return@on
 

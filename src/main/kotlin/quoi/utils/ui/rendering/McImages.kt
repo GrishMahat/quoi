@@ -1,5 +1,7 @@
 package quoi.utils.ui.rendering
 
+//~ texture_resources
+
 import com.mojang.blaze3d.platform.NativeImage
 import java.io.FileNotFoundException
 import net.minecraft.client.renderer.texture.DynamicTexture

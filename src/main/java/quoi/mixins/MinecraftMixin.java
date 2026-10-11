@@ -42,27 +42,32 @@ public class MinecraftMixin {
             method = "startAttack()Z",
             at = @At(
                     value = "INVOKE",
-                    //$ attack_swing_target {
+                    //? if <26.3 {
                     target = "Lnet/minecraft/client/player/LocalPlayer;swing(Lnet/minecraft/world/InteractionHand;)V"
-                    //$}
+                    //?} else {
+                    /*target = "Lnet/minecraft/client/player/LocalPlayer;swing(Lnet/minecraft/world/InteractionHand;Lnet/minecraft/world/item/component/SwingAnimation;Z)Z"
+                    *///?}
             )
     )
-    //$ attack_swing_handler {
+    //? if <26.3 {
     private void redirectSwing(LocalPlayer instance, InteractionHand hand) {
-    //$}
+    //?} else {
+    /*private boolean redirectSwing(LocalPlayer instance, InteractionHand hand, SwingAnimation animation, boolean sendToSwingingEntity) {
+    *///?}
         if (cancelSwing) {
             cancelSwing = false;
-            //$ cancel_attack_swing {
-            // Empty.
-            //$}
+            //? if >=26.3 {
+            /*return false;
+            *///?}
         } else {
-            //$ send_attack_swing {
+            //? if <26.3 {
             instance.swing(hand);
-            //$}
+            //?} else {
+            /*return instance.swing(hand, animation, sendToSwingingEntity);
+            *///?}
         }
     }
-    //$ minecraft_screen_hook {
-
+    //? if <26.2 {
     @Inject(
             method = "setScreen",
             at = @At("HEAD"),
@@ -72,5 +77,5 @@ public class MinecraftMixin {
         if (ContainerManager.onSetScreen(screen)) ci.cancel();
 
     }
-    //$}
+    //?}
 }

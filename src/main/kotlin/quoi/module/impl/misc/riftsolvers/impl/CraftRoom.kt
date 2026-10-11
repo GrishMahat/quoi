@@ -24,9 +24,9 @@ import quoi.utils.render.drawFilledBox
 import quoi.utils.render.drawWireFrameBox
 import quoi.utils.scaledHeight
 import quoi.utils.scaledWidth
-//$ slime_import {
+//? if <26.2 {
 import net.minecraft.world.entity.monster.Slime
-//$}
+//?}
 
 object CraftRoom : ToggleableGroup(MirrorverseSolvers, "Craft room") {
     private val mobs by switch("Show mobs")
@@ -42,12 +42,17 @@ object CraftRoom : ToggleableGroup(MirrorverseSolvers, "Craft room") {
             val entities = getEntities<LivingEntity>(craftRoomArea) { !it.isDeadOrDying && it != player }
 
             entities.forEach { entity ->
-                //$ craft_room_entity_colors {
+                //? if <26.2 {
                 val colour = when (entity) {
                     is Zombie -> Colour.BROWN
                     is Slime -> Colour.GREEN
                     is CaveSpider -> Colour.WHITE
-                //$}
+                //?} else {
+                /*val colour = when {
+                    entity is Zombie -> Colour.BROWN
+                    net.minecraft.world.entity.EntityType.getKey(entity.type).path == "slime" -> Colour.GREEN
+                    entity is CaveSpider -> Colour.WHITE
+                *///?}
                     else -> return@forEach
                 }
 

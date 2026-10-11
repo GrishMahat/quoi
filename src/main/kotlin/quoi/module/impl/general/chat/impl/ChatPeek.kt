@@ -20,13 +20,13 @@ object ChatPeek : ToggleableGroup(
     fun isDown(): Boolean = running && this.peekKey.isDown()
 
     @JvmStatic
-    //$ chat_display_mode {
+    //? if <26.2 {
     fun displayMode(mode: ChatComponent.DisplayMode): ChatComponent.DisplayMode {
         return if (isDown()) ChatComponent.DisplayMode.FOREGROUND else mode
     }
 
     @JvmStatic
-    //$}
+    //?}
     fun scroll(amount: Int) {
         mc.gui.chat.scrollChat(if (Keyboard.Modifier.isShiftDown) amount else amount * 7)
     }
