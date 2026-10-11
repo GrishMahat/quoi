@@ -44,9 +44,6 @@ class MultiSelectComponent<T>(
             selected.addAll(value.selected)
         }
 
-    val selectedValues: Set<T>
-        get() = selected.toSet()
-
     operator fun contains(value: T): Boolean = selected.contains(value)
 
     fun any(predicate: (T) -> Boolean): Boolean = selected.any(predicate)

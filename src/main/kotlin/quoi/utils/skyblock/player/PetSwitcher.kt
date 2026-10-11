@@ -1,7 +1,6 @@
 package quoi.utils.skyblock.player
 
 import net.minecraft.world.item.ItemStack
-import quoi.QuoiMod.mc
 import quoi.annotations.Init
 import quoi.api.commands.QuoiCommand
 import quoi.api.commands.internal.GreedyString

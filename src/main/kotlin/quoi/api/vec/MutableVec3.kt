@@ -3,7 +3,6 @@ package quoi.api.vec
 import net.minecraft.core.BlockPos
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
-import quoi.utils.BlockPos
 import quoi.utils.sq
 import kotlin.math.sqrt
 
@@ -14,7 +13,6 @@ data class MutableVec3(var x: Double, var y: Double, var z: Double) {
     constructor(pos: BlockPos) : this(pos.x.toDouble(), pos.y.toDouble(), pos.z.toDouble())
 
     fun immutable() = Vec3(x, y, z)
-    fun toBlockPos() = BlockPos(x, y, z)
 
     fun inside(aabb: AABB): Boolean =
         x >= aabb.minX && x <= aabb.maxX &&

@@ -8,7 +8,6 @@ import quoi.QuoiMod.logger
 import quoi.utils.ChatUtils
 import quoi.utils.skyblock.player.container.ContainerOptions
 import net.minecraft.world.item.ItemStack
-import quoi.utils.skyblock.item.ItemUtils.loreString
 import quoi.utils.skyblock.player.container.CONTAINER_ZERO
 import quoi.utils.skyblock.player.container.IContainerSettings
 
@@ -131,18 +130,9 @@ class ContainerTaskBuilder(val force: Boolean) {
 
     fun pickup(slot: MenuSlot, button: Int = 0, timeout: Int = 20, failureMessage: String = "Timed out finding item") =
         click(slot, button, ContainerInput.PICKUP, timeout, failureMessage) // right/left click
-    fun pickupAll(slot: MenuSlot) = click(slot, 0, ContainerInput.PICKUP_ALL) // double click
-
-    fun throwOne(slot: MenuSlot) = click(slot, 0, ContainerInput.THROW) // q
-    fun throwAll(slot: MenuSlot) = click(slot, 1, ContainerInput.THROW) // ctrl + q
 
     fun quickMove(target: MenuSlot) = click(target, 0, ContainerInput.QUICK_MOVE) // shift click
     fun swap(target: MenuSlot, hotbarSlot: Int) = click(target, hotbarSlot, ContainerInput.SWAP) // keys 1 to 9
-
-    fun moveSlot(from: MenuSlot, to: MenuSlot, button: Int = 0) { // move from one slot to another
-        pickup(from, button)
-        pickup(to, button)
-    }
 
     /**
      * Awaits for container to open before proceeding
@@ -228,16 +218,6 @@ class ContainerTaskBuilder(val force: Boolean) {
         skipIf = block
         return this
     }
-
-    /**
-     * skips the action if the item's name contains [text]
-     */
-    fun <T : ItemAction> T.unlessName(text: String): T = unless { it.displayName.string.contains(text) }
-
-    /**
-     * skips the action if the item's lore contains [text]
-     */
-    fun <T : ItemAction> T.unlessLore(text: String): T = unless { it.loreString?.contains(text) == true }
 }
 
 /**

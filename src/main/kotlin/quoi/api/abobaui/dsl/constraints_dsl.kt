@@ -56,10 +56,6 @@ inline val Constraint.Position.alignCentre: Alignment.Centre
 inline val Constraint.Position.alignOpposite: Alignment.Opposite
     get() = Alignment.Opposite(this)
 
-inline val Constraint.Position.alignBottom: Alignment.Relative
-    get() = Alignment.Relative(this, 1.0f)
-
-
 /**
  * Shortened version of [Positions], for a much more appealing look.
  */

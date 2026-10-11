@@ -1,6 +1,5 @@
 package quoi.api.customtriggers.conditions
 
-import quoi.api.abobaui.constraints.impl.size.Copying
 import quoi.api.abobaui.dsl.*
 import quoi.api.abobaui.elements.ElementScope
 import quoi.api.customtriggers.*

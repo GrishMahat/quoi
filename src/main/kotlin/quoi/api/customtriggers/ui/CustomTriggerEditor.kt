@@ -16,7 +16,6 @@ import quoi.api.abobaui.elements.impl.Scrollable
 import quoi.api.abobaui.elements.impl.Scrollable.Companion.scroll
 import quoi.api.abobaui.elements.impl.Text
 import quoi.api.abobaui.elements.impl.Text.Companion.maxWidth
-import quoi.api.abobaui.elements.impl.Text.Companion.textSupplied
 import quoi.api.abobaui.elements.impl.popup
 import quoi.api.abobaui.elements.impl.refreshableGroup
 import quoi.api.colour.Colour

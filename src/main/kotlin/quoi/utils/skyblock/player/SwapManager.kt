@@ -65,8 +65,6 @@ object SwapManager : EventListener, Shortcuts {
         }
     }
 
-    fun swapByName(name: String) = findAndSwap(name) { it.displayName.string.contains(name, true) }
-
     fun swapByLore(lore: String) = findAndSwap(lore) { it.loreString.noControlCodes.contains(lore, true) }
 
     fun swapById(vararg skyblockIds: String) = findAndSwap(*skyblockIds) { stack ->

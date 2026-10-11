@@ -113,8 +113,6 @@ object Floor7 : EventListener, Shortcuts {
 
     fun inStage(vararg stages: Stage): Boolean = getStage() in stages
 
-    fun inStageAt(vararg stages: Stage, player: AbstractClientPlayer? = mc.player): Boolean = player != null && getStageAt(player) in stages
-
     private fun updateState(newPhase: Phase? = null, newStage: Stage? = null) {
         val oldPhase = phase
         val oldStage = stage

@@ -22,7 +22,6 @@ import quoi.utils.Scheduler.scheduleTask
 import quoi.utils.StringUtils.noControlCodes
 import quoi.utils.skyblock.player.PlayerUtils
 import quoi.utils.skyblock.player.SwapManager
-import quoi.utils.ui.hud.impl.TextHud
 import kotlin.math.roundToLong
 
 object WitherCloak : Module(

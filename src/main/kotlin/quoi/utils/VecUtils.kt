@@ -2,11 +2,8 @@ package quoi.utils
 
 import kotlin.math.*
 import net.minecraft.core.BlockPos
-import net.minecraft.world.entity.Entity
-import net.minecraft.world.level.ClipContext
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.BlockHitResult
-import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.Vec3
 import net.minecraft.world.phys.shapes.Shapes
 import quoi.QuoiMod.mc
@@ -382,19 +379,6 @@ fun getArrowOrigin(from: Vec3, yaw: Float, isTerminator: Boolean): Vec3 {
             from.z - sin(r) * 0.16
         )
     }
-}
-
-fun isPathClear(from: Vec3, target: Vec3): Boolean {
-    val result = level.clip(
-        ClipContext(
-            from,
-            target,
-            ClipContext.Block.COLLIDER,
-            ClipContext.Fluid.NONE,
-            player as Entity
-        )
-    )
-    return result.type == HitResult.Type.MISS
 }
 
 fun getVisiblePoint(from: Vec3, to: BlockPos, block: (Vec3) -> BlockPos? = { rayCast(from, it).pos }): Vec3? {

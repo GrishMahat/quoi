@@ -7,14 +7,11 @@ import net.minecraft.world.entity.EquipmentSlot
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.item.ItemStack
-import net.minecraft.world.level.ClipContext
 import net.minecraft.world.phys.AABB
-import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.Vec3
 import quoi.QuoiMod.mc
 import quoi.annotations.Init
 import quoi.api.colour.Colour
-import quoi.utils.skyblock.player.PlayerUtils.eyePosition
 
 @Init
 object EntityUtils {
@@ -51,53 +48,11 @@ object EntityUtils {
     inline val LivingEntity.chestplate: ItemStack
         get() = getItemBySlot(EquipmentSlot.CHEST)
 
-    inline val LivingEntity.leggings: ItemStack
-        get() = getItemBySlot(EquipmentSlot.LEGS)
-
-    inline val LivingEntity.boots: ItemStack
-        get() = getItemBySlot(EquipmentSlot.FEET)
-
     fun Entity.distanceTo(x: Double, y: Double, z: Double) = sqrt(distanceToSqr(x, y, z))
 
     fun Entity.distanceTo(vec: Vec3) = distanceTo(vec.x, vec.y, vec.z)
 
     fun Entity.distanceTo(pos: BlockPos) = distanceTo(pos.x.toDouble(), pos.y.toDouble(), pos.z.toDouble())
-
-    fun Entity.isVisibleToPlayer(): Boolean {
-        val player = mc.player ?: return false
-        val level = mc.level ?: return false
-        val eyePos = player.eyePosition()
-        val box = boundingBox.inflate(0.1)
-
-        if (box.contains(eyePos)) return true
-
-        val centerX = (box.minX + box.maxX) * 0.5
-        val centerY = (box.minY + box.maxY) * 0.5
-        val centerZ = (box.minZ + box.maxZ) * 0.5
-
-        // Sample a few points across the hitbox so partially exposed entities still count as visible.
-        val targets = arrayOf(
-            Vec3(centerX, centerY, centerZ),
-            Vec3(centerX, box.maxY - 0.1, centerZ),
-            Vec3(centerX, box.minY + 0.1, centerZ),
-            Vec3(box.minX + 0.1, centerY, centerZ),
-            Vec3(box.maxX - 0.1, centerY, centerZ),
-            Vec3(centerX, centerY, box.minZ + 0.1),
-            Vec3(centerX, centerY, box.maxZ - 0.1)
-        )
-
-        return targets.any { target ->
-            level.clip(
-                ClipContext(
-                    eyePos,
-                    target,
-                    ClipContext.Block.COLLIDER,
-                    ClipContext.Fluid.NONE,
-                    player
-                )
-            ).type == HitResult.Type.MISS
-        }
-    }
 
     // https://github.com/MeteorDevelopment/meteor-client/blob/6409c29693a8df6428aa8044212fe02f47e3a02f/src/main/java/meteordevelopment/meteorclient/utils/entity/EntityUtils.java#L186
     val Entity.colourFromDistance: Colour

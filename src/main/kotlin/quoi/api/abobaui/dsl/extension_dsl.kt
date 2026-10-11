@@ -11,7 +11,6 @@ import quoi.api.colour.blue
 import quoi.api.colour.colour
 import quoi.api.colour.getRGBA
 import quoi.api.colour.green
-import quoi.api.colour.multiply
 import quoi.api.colour.red
 import quoi.api.colour.toHSB
 import quoi.utils.ThemeManager.theme
@@ -82,24 +81,6 @@ fun ElementScope<*>.draggable(
         redraw()
         false
     }
-}
-
-/**
- * Extension for [Block],
- * where the color gets darkened whenever the mouse is hovering over the element.
- *
- * It will mutate the color to a [Colour.Animated],
- * where first color is the original color, and the second is a darker version.
- */
-fun ElementScope<Block>.hoverEffect(
-    factor: Float,
-    duration: Float = 0.2.seconds,
-    style: Animation.Style = Animation.Style.Linear
-) {
-    val before = element.colour!!
-    val hover = Colour.Animated(from = before, to = colour { before.rgb.multiply(factor = factor) })
-    element.colour = hover
-    onMouseEnterExit { hover.animate(duration, style) }
 }
 
 fun ElementScope<Block>.tonalHover(

@@ -6,7 +6,6 @@ import com.mojang.blaze3d.platform.NativeImage
 import com.mojang.blaze3d.systems.RenderSystem
 import java.nio.ByteBuffer
 import kotlin.math.floor
-import kotlin.math.max
 import net.minecraft.client.renderer.texture.DynamicTexture
 import org.lwjgl.stb.STBTTFontinfo
 import org.lwjgl.stb.STBTruetype.*

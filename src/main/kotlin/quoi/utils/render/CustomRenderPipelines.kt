@@ -6,7 +6,6 @@ import com.mojang.blaze3d.pipeline.DepthStencilState
 import com.mojang.blaze3d.pipeline.RenderPipeline
 import com.mojang.blaze3d.platform.CompareOp
 import com.mojang.blaze3d.vertex.DefaultVertexFormat
-import java.util.Optional
 import net.minecraft.client.renderer.RenderPipelines
 //? if <26.2 {
 import com.mojang.blaze3d.vertex.VertexFormat

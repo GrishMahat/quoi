@@ -32,9 +32,7 @@ import quoi.utils.EntityUtils.getEntities
 import quoi.utils.StringUtils.noControlCodes
 import quoi.utils.skyblock.PartyUtils
 import java.util.*
-import kotlin.math.ceil
 import kotlin.math.floor
-import kotlin.math.roundToLong
 
 /**
  * modified OdinFabric (BSD 3-Clause)
@@ -70,17 +68,11 @@ object Dungeon : EventListener, Shortcuts {
     inline val secretPercentage: Float
         get() = dungeonStats.secretsPercent
 
-    inline val totalSecrets: Int
-        get() = if (secretCount == 0 || secretPercentage == 0f) 0 else floor(100 / secretPercentage * secretCount + 0.5).toInt()
-
     inline val deathCount: Int
         get() = dungeonStats.deaths
 
     inline val cryptCount: Int
         get() = dungeonStats.crypts
-
-    inline val openRoomCount: Int
-        get() = dungeonStats.openedRooms
 
     inline val completedRoomCount: Int
         get() = dungeonStats.completedRooms
@@ -96,9 +88,6 @@ object Dungeon : EventListener, Shortcuts {
 
     inline val puzzleCount: Int
         get() = dungeonStats.puzzleCount
-
-    inline val dungeonTime: String
-        get() = dungeonStats.elapsedTime
 
     var dungeonTeammates: ArrayList<DungeonPlayer> = ArrayList(5)
         private set
@@ -172,16 +161,6 @@ object Dungeon : EventListener, Shortcuts {
                 100
             ) + getBonusScore + 100
         }
-
-    inline val neededSecretsAmount: Int
-        get() =
-            floor?.let {
-                ceil(
-                    (totalSecrets * it.secretPercentage) * (40 - getBonusScore + (deathCount * 2 - 1).coerceAtLeast(
-                        0
-                    )) / 40f
-                ).toInt()
-            } ?: 0
 
     inline val warpCooldown: Long
         get() = (enterTime - System.currentTimeMillis()).coerceAtLeast(0L)
@@ -327,15 +306,6 @@ object Dungeon : EventListener, Shortcuts {
     fun getMageCooldownMultiplier(): Double {
         return if (currentDungeonPlayer.clazz != DungeonClass.Mage) 1.0
         else 1 - 0.25 - (floor(currentDungeonPlayer.clazzLvl / 2.0) / 100) * if (dungeonTeammates.count { it.clazz == DungeonClass.Mage } == 1) 2 else 1
-    }
-
-    /**
-     * Gets the new ability cooldown after mage cooldown reductions.
-     * @param baseSeconds The base cooldown of the ability in seconds. Eg 10
-     * @return The new time
-     */
-    fun getAbilityCooldown(baseSeconds: Long): Long {
-        return (baseSeconds * getMageCooldownMultiplier()).roundToLong()
     }
 
     private val tablistRegex = Regex("^\\[(\\d+)] (?:\\[\\w+] )*(\\w+) .*?\\((\\w+)(?: (\\w+))*\\)$")

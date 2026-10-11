@@ -41,11 +41,3 @@ fun Number.lerp(a: Double, b: Double): Double {
     val t = this.toDouble().coerceIn(0.0, 1.0)
     return a + (b - a) * t
 }
-
-fun Number.lerpAngle(a: Double, b: Double): Double {
-    var diff = (b - a) % 360.0
-    if (diff < -180.0) diff += 360.0
-    if (diff > 180.0) diff -= 360.0
-    val t = this.toDouble().coerceIn(0.0, 1.0)
-    return a + diff * t
-}

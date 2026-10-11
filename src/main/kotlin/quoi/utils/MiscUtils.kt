@@ -1,7 +1,6 @@
 package quoi.utils
 
 import quoi.QuoiMod.mc
-import kotlin.reflect.KClass
 
 inline val sf get() = mc.window.guiScale
 inline val width get() = mc.window.width
@@ -18,10 +17,6 @@ inline val inGame get() = mc.level != null && mc.player != null
 
 fun Any?.equalsOneOf(vararg options: Any?): Boolean {
     return options.any { this == it }
-}
-
-fun Any?.isOneOf(vararg types: KClass<*>): Boolean {
-    return types.any { it.isInstance(this) }
 }
 
 inline fun <K, V> MutableMap<K, V>.removeIf(predicate: (K, V) -> Boolean) {

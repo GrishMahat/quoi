@@ -9,7 +9,6 @@ import kotlin.math.hypot
 import kotlin.math.ln
 import kotlin.math.pow
 import kotlin.math.sin
-import kotlin.math.sqrt
 import net.minecraft.client.KeyMapping
 import net.minecraft.client.player.LocalPlayer
 import net.minecraft.core.BlockPos
@@ -248,13 +247,6 @@ object MovementUtils : EventListener, Shortcuts {
 
     val LocalPlayer.isMoving get() = deltaMovement.x != 0.0 || deltaMovement.z != 0.0 || input.hasForwardImpulse()
 
-    val LocalPlayer.hasMovementInput: Boolean
-        get() = mc.options.keyUp.isDown ||
-                mc.options.keyDown.isDown ||
-                mc.options.keyLeft.isDown ||
-                mc.options.keyRight.isDown ||
-                mc.options.keyJump.isDown
-
     fun KeyMapping.hold(ticks: Int) {
         isDown = true
         scheduleTask(ticks) {
@@ -269,32 +261,16 @@ object MovementUtils : EventListener, Shortcuts {
         mc.options.keyRight.isDown = false
         mc.options.keyJump.isDown = false
         mc.options.keySprint.isDown = false
-        mc.options.keyJump.isDown = false
     }
 
     private const val DRAG = 0.546000082
     private const val FRICTION = 0.45399991799999995
     private const val STOP_VELOCITY = 0.003
-    private const val ACCEL = 0.098
-
-    fun futureVel(ticks: Int, speed: Double) =
-        DRAG.pow(ticks) * ACCEL * speed
-
-    fun inputDist(speed: Double, sneak: Boolean): Double {
-        val s = if (sneak) speed * 0.3 else speed
-        val t = inputTicks(s)
-        return (ACCEL * s * (1.0 - DRAG.pow(t))) / FRICTION
-    }
 
     fun stepVelSq(vx: Double, vz: Double, ax: Double, az: Double): Double {
         val nx = (vx + ax) * DRAG
         val nz = (vz + az) * DRAG
         return nx * nx + nz * nz
-    }
-
-    fun stopTicks(dx: Float, dz: Float): Int {
-        val mag = sqrt(dx * dx + dz * dz).toDouble()
-        return if (mag <= STOP_VELOCITY) 0 else ceil(ln(STOP_VELOCITY / mag) / ln(DRAG)).toInt()
     }
 
     fun slideDist(vel: Vec2): Double {
@@ -310,7 +286,4 @@ object MovementUtils : EventListener, Shortcuts {
 
     fun slideVec(vx: Number, vz: Number) =
         slideVec(Vec2(vx.toFloat(), vz.toFloat()))
-
-    private fun inputTicks(speed: Double) =
-        ceil(ln(STOP_VELOCITY / (ACCEL * speed)) / ln(DRAG)).toInt()
 }

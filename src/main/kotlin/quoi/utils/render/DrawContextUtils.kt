@@ -23,7 +23,6 @@ import quoi.api.colour.Colour
 import quoi.utils.ChatUtils.literal
 import quoi.utils.connection
 import quoi.utils.rad
-import quoi.utils.ui.data.Gradient
 import net.minecraft.util.Mth.wrapDegrees
 
 object DrawContextUtils {
@@ -45,55 +44,10 @@ object DrawContextUtils {
         pose().popMatrix()
     }
 
-    fun GuiGraphicsExtractor.gradientRect(
-        x: Int,
-        y: Int,
-        width: Int,
-        height: Int,
-        colourStart: Int,
-        colourEnd: Int,
-        direction: Gradient = Gradient.TopToBottom,
-    ) {
-        if (direction == Gradient.TopToBottom) {
-            fillGradient(x, y, x + width, y + height, colourStart, colourEnd)
-        } else {
-            withMatrix(x + width / 2f, y + height / 2f) {
-                pose().rotate((-90).rad)
-
-                val halfWidth = width / 2
-                val halfHeight = height / 2
-                fillGradient(-halfHeight, -halfWidth, halfHeight, halfWidth, colourStart, colourEnd)
-            }
-        }
-    }
-
     fun GuiGraphicsExtractor.rect(x: Number, y: Number, width: Int, height: Int, colour: Int) {
         withMatrix(x, y) {
             fill(0, 0, width, height, colour)
         }
-    }
-
-    fun GuiGraphicsExtractor.hollowRect(x: Int, y: Int, width: Int, height: Int, thickness: Int, colour: Int) {
-        fill(x, y, x + width, y + thickness, colour)
-        fill(x, y + height - thickness, x + width, y + height, colour)
-        fill(x, y + thickness, x + thickness, y + height - thickness, colour)
-        fill(x + width - thickness, y + thickness, x + width, y + height - thickness, colour)
-    }
-
-    fun GuiGraphicsExtractor.dashedRect(
-        x: Int,
-        y: Int,
-        width: Int,
-        height: Int,
-        color: Int,
-        lineWidth: Int = 1,
-        dashLength: Int = 5,
-        gapLength: Int = 3
-    ) {
-        drawDashedLine(x, y, x + width, y, color, lineWidth, dashLength, gapLength)
-        drawDashedLine(x, y + height, x + width, y + height, color, lineWidth, dashLength, gapLength)
-        drawDashedLine(x, y, x, y + height, color, lineWidth, dashLength, gapLength)
-        drawDashedLine(x + width, y, x + width, y + height, color, lineWidth, dashLength, gapLength)
     }
 
     fun GuiGraphicsExtractor.drawLine(
@@ -118,37 +72,6 @@ object DrawContextUtils {
                 pose().mul(Matrix3x2f().identity().rotate(atan2(dy, dx)))
                 fill(0, -half, ceil(hypot(dx, dy)).toInt(), half, color)
             }
-        }
-    }
-
-    fun GuiGraphicsExtractor.drawDashedLine(
-        x1: Int,
-        y1: Int,
-        x2: Int,
-        y2: Int,
-        color: Int,
-        lineWidth: Int = 1,
-        dashLength: Int = 5,
-        gapLength: Int = 3
-    ) {
-        val dx = x2 - x1
-        val dy = y2 - y1
-        val totalLength = hypot(dx.toDouble(), dy.toDouble())
-        val angle = atan2(dy.toDouble(), dx.toDouble())
-
-        var drawn = 0.0
-        while (drawn < totalLength) {
-            val start = drawn
-            val end = minOf(drawn + dashLength, totalLength)
-
-            val sx = x1 + cos(angle) * start
-            val sy = y1 + sin(angle) * start
-            val ex = x1 + cos(angle) * end
-            val ey = y1 + sin(angle) * end
-
-            drawLine(sx.toFloat(), sy.toFloat(), ex.toFloat(), ey.toFloat(), color, lineWidth.toFloat())
-
-            drawn += dashLength + gapLength
         }
     }
 

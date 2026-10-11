@@ -21,7 +21,6 @@ import net.minecraft.client.renderer.RenderPipelines
 import net.minecraft.client.renderer.state.gui.GuiElementRenderState
 import net.minecraft.client.renderer.texture.DynamicTexture
 import org.joml.Matrix3x2f
-import org.joml.Matrix3x2fc
 import org.joml.Vector2f
 import quoi.QuoiMod.mc
 import quoi.mixins.accessors.GuiGraphicsExtractorAccessor

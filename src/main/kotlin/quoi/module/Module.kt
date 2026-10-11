@@ -78,14 +78,8 @@ abstract class Module(
         return setting
     }
 
-    fun getSettingByName(name: String?): Setting<*>? {
-        for (setting in settings) {
-            if (setting.jsonName.equals(name, true) /*|| setting.name.equals(name, true)*/) {
-                return setting
-            }
-        }
-        return null
-    }
+    fun getSettingByName(name: String?): Setting<*>? =
+        settings.firstOrNull { it.jsonName.equals(name, true) }
 
     enum class Tag(val desc: String = "") {
         NONE,

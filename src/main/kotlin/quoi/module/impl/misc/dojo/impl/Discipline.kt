@@ -3,8 +3,6 @@ package quoi.module.impl.misc.dojo.impl
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.monster.zombie.Zombie
 import net.minecraft.world.item.Items
-import quoi.api.colour.Colour
-import quoi.api.colour.withAlpha
 import quoi.api.events.EntityEvent
 import quoi.api.events.RenderEvent
 import quoi.api.events.core.on

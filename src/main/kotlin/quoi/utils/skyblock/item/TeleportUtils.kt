@@ -46,19 +46,6 @@ object TeleportUtils : Shortcuts {
 
     fun getEtherwarpDirection(to: BlockPos, dist: Double = 61.0) = getEtherwarpDirection(player.eyePosition(true), to, dist)
 
-    fun getTransmissionDirection(from: Vec3, to: BlockPos, dist: Double = 12.0): Direction? {
-        if (from.distanceToSqr(to.vec3) > (dist + 2) * (dist + 2)) return null
-
-        val visibleVec = getVisiblePoint(from, to) { vec ->
-            val n = vec.normalize()
-            predictTransmission(from.x, from.y, from.z, n.x, n.y, n.z, dist).pos
-        } ?: return null
-
-        return getDirection(from, visibleVec)
-    }
-
-    fun getTransmissionDirection(to: BlockPos, dist: Double = 12.0) = getTransmissionDirection(player.eyePosition(false), to, dist)
-
     /**
      * based on noammaddons' InstantTransmissionHelper which is based on rsm's EtherUtils which is based on soshimee's zph algorithm
      * https://github.com/Noamm9/NoammAddons/blob/master/src/main/kotlin/com/github/noamm9/utils/items/InstantTransmissionHelper.kt#L99

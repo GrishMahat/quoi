@@ -17,7 +17,6 @@ import quoi.module.Module
 import quoi.module.settings.UIComponent.Companion.childOf
 import quoi.module.settings.impl.KeybindComponent
 import quoi.module.settings.impl.MapSetting
-import quoi.utils.ChatUtils
 import quoi.utils.ChatUtils.button
 import quoi.utils.ChatUtils.literal
 import quoi.utils.ChatUtils.modMessage

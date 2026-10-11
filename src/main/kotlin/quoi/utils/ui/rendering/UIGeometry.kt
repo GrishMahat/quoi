@@ -50,12 +50,6 @@ object UIGeometry {
         ))
     }
 
-    /** Outline of a full circle as x,y pairs. */
-    fun circleOutline(cx: Float, cy: Float, radius: Float): FloatArray {
-        val segments = max(8, arcSegments(radius) * 4)
-        return circleOutlineFixedSegments(cx, cy, radius, segments)
-    }
-
     /** Circle outline with a caller-supplied segment count for concentric AA bands. */
     fun circleOutlineFixedSegments(cx: Float, cy: Float, radius: Float, segments: Int): FloatArray {
         val segments = max(8, segments)
@@ -99,21 +93,6 @@ object UIGeometry {
             i += 2
         }
         return out
-    }
-
-    /**
-     * Converts an outline into a closed stroke band of quads with the given [thickness],
-     * centred on the outline (like NanoVG strokes). Returns packed quads (8 floats each).
-     *
-     * Coincident consecutive points (which pill-shaped outlines produce where adjacent
-     * arcs meet) are removed first: a zero-length edge has no normal, and feeding it to
-     * the miter maths produced huge spikes at the seam.
-     */
-    fun strokeToQuads(outline: FloatArray, thickness: Float): FloatArray {
-        val outline = dedupeClosedOutline(outline)
-        val outer = offsetClosedOutline(outline, thickness * 0.5f)
-        val inner = offsetClosedOutline(outline, thickness * -0.5f)
-        return bandToQuads(inner, outer)
     }
 
     /**
@@ -235,27 +214,6 @@ object UIGeometry {
         }
         return out
     }
-
-    /**
-     * Outline of a rounded rectangle uniformly expanded outwards by [amount]
-     * (used together with [bandToQuads]). Same point count as the source outline as long
-     * as the same corner radii (+amount) and dimensions are used.
-     */
-    fun expandedRoundedRectOutline(
-        x: Float, y: Float, w: Float, h: Float,
-        tl: Float, bl: Float, br: Float, tr: Float,
-        amount: Float,
-    ): FloatArray = roundedRectOutlineFixedSegments(
-        x - amount, y - amount, w + 2 * amount, h + 2 * amount,
-        tl + amount, bl + amount, br + amount, tr + amount,
-        // segment counts must match the inner outline for banding
-        intArrayOf(
-            segmentsFor(tl, w, h),
-            segmentsFor(tr, w, h),
-            segmentsFor(br, w, h),
-            segmentsFor(bl, w, h),
-        )
-    )
 
     fun segmentsFor(radius: Float, w: Float, h: Float): Int {
         val r = max(clampRadius(radius, w), clampRadius(radius, h))

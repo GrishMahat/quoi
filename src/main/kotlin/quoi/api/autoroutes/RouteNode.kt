@@ -1,7 +1,6 @@
 package quoi.api.autoroutes
 
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext
-import net.minecraft.client.player.LocalPlayer
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import quoi.api.colour.Colour

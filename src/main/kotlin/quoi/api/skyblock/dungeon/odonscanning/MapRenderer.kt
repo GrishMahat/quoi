@@ -1,33 +1,24 @@
 package quoi.api.skyblock.dungeon.odonscanning
 
 import kotlin.jvm.optionals.getOrNull
-import net.minecraft.client.gui.components.PlayerFaceExtractor
 import net.minecraft.network.protocol.game.ClientboundMapItemDataPacket
-import net.minecraft.resources.Identifier
 import net.minecraft.world.level.saveddata.maps.MapDecorationTypes
-import quoi.QuoiMod.MOD_ID
 import quoi.QuoiMod.mc
-import quoi.api.abobaui.constraints.Constraint
 import quoi.api.abobaui.constraints.impl.positions.Centre
-import quoi.api.abobaui.constraints.impl.size.Bounding
 import quoi.api.abobaui.constraints.impl.size.Copying
 import quoi.api.abobaui.dsl.at
 import quoi.api.abobaui.dsl.constrain
 import quoi.api.abobaui.dsl.minus
 import quoi.api.abobaui.dsl.onClick
 import quoi.api.abobaui.dsl.onMouseEnterExit
-import quoi.api.abobaui.dsl.percent
 import quoi.api.abobaui.dsl.plus
 import quoi.api.abobaui.dsl.px
 import quoi.api.abobaui.dsl.radius
 import quoi.api.abobaui.dsl.seconds
 import quoi.api.abobaui.dsl.size
-import quoi.api.abobaui.dsl.withScale
-import quoi.api.abobaui.elements.Element
 import quoi.api.abobaui.elements.ElementScope
 import quoi.api.abobaui.elements.impl.Block.Companion.outline
 import quoi.api.abobaui.elements.impl.Text.Companion.shadow
-import quoi.api.abobaui.elements.impl.Text.Companion.textSupplied
 import quoi.api.abobaui.elements.impl.refreshableGroup
 import quoi.api.animations.Animation
 import quoi.api.colour.Colour
@@ -46,12 +37,7 @@ import quoi.module.impl.dungeon.autoclear.impl.InteractiveMap
 import quoi.module.impl.dungeon.autoclear.pathToDoor
 import quoi.module.impl.dungeon.autoclear.pathToRoom
 import quoi.utils.StringUtils.width
-import quoi.utils.equalsOneOf
 import quoi.utils.level
-import quoi.utils.rad
-import quoi.utils.render.DrawContextUtils.drawImage
-import quoi.utils.render.DrawContextUtils.rect
-import quoi.utils.skyblock.item.ItemUtils.skyblockId
 import quoi.utils.ui.rendering.Font
 import quoi.utils.ui.rendering.NVGRenderer
 import quoi.utils.ui.rendering.NVGRenderer.defaultFont
@@ -68,8 +54,6 @@ object MapRenderer {
     var refreshShit = 0
         private set
 
-    private val WHITE_MARKER = Identifier.fromNamespaceAndPath(MOD_ID, "white_marker.png")
-    private val GREEN_MARKER = Identifier.fromNamespaceAndPath(MOD_ID, "green_marker.png")
 
     fun refresh() {
         refreshShit++
@@ -150,87 +134,11 @@ object MapRenderer {
                         renderTiles(new, room)
                         renderName(new, room)
                     }
-//                    if (config.icons) renderIcons(new, dynamicW, dynamicH) // todo
                 }
             }
 
             watch({ refreshShit }) {
                 refreshable.refresh()
-            }
-        }
-    }
-
-    private fun ElementScope<*>.renderIcons(config: MapConfig, width: Float, height: Float) {
-        val (mapScale, _, font) = config
-        val icon = config.icon
-        val (scale, heads, ownHead, border, borderColour, classColour, thickness, name, whenLeap, nameScale) = icon
-//        ui.debug = true
-        watch({ Dungeon.dungeonTeammates.size }) {
-            refresh()
-        }
-
-        Dungeon.dungeonTeammates.forEach { player ->
-            val self = player.name == mc.player?.name?.string
-            val useHead = heads && (!self || ownHead)
-
-            val (w0, h0) = if (useHead) 20f to 20f else 14f to 20f
-
-            val w = w0 * scale
-            val h = h0 * scale
-            val t = if (border && useHead) thickness.toFloat() * 2 else 0f
-
-            val x = object : Constraint.Position {
-                override fun calculatePos(element: Element, horizontal: Boolean): Float {
-                    val pos = player.position().first * mapScale - (w + t) // / 2f
-                    return pos.coerceIn(0f, width - (w + t) + w - 1)
-                }
-            }
-            val z = object : Constraint.Position {
-                override fun calculatePos(element: Element, horizontal: Boolean): Float {
-                    val pos = player.position().second * mapScale - (h + t) // / 2f
-                    return pos.coerceIn(0f, height - (h + t) + h - 1)
-                }
-            }
-
-            column(constrain(x, z, Bounding, Bounding)) {
-                object : Element(size(w.px, h.px)) {
-                    init { usingCtx = true }
-
-                    override fun drawCtx() {
-                        if (player.isDead) return
-                        parent?.redraw()
-                        val w = w.toInt()
-                        val h = h.toInt()
-
-                        withScale {
-                            ctx.pose().translate(w / 2f, h / 2f)
-                            ctx.pose().rotate((180.0 + player.yaw()).rad)
-                            ctx.pose().translate(-w / 2f, -h / 2f)
-                            when {
-                                self && !useHead -> ctx.drawImage(GREEN_MARKER, 0, 0, w, h)
-                                useHead -> player.playerSkin?.let {
-                                    val col = if (classColour) player.clazz.colour else borderColour
-
-                                    if (border) {
-                                        ctx.rect(w - t / 2, h - t / 2, w + t.toInt(), h + t.toInt(), col.rgb)
-                                    }
-                                    PlayerFaceExtractor.extractRenderState(ctx, it, w, h, w)
-                                } ?: ctx.drawImage(WHITE_MARKER, 0, 0, w, h)
-                                else -> ctx.drawImage(WHITE_MARKER, 0, 0, w, h)
-                            }
-                        }
-                    }
-                }.add()
-
-                if (name && !self) textSupplied(
-                    supplier = {
-                        val holdingLeap = mc.player?.mainHandItem?.skyblockId?.equalsOneOf("INFINITE_SPIRIT_LEAP", "SPIRIT_LEAP") == true
-                        if (!whenLeap || holdingLeap) player.name else "  "
-                    },
-                    font = font,
-                    size = (18f * nameScale).px,
-                    pos = at((-50).percent)
-                )
             }
         }
     }

@@ -21,8 +21,6 @@ sealed interface TickerStep {
 class Ticker(private val steps: ArrayDeque<TickerStep>) {
     private var currentWaitTicks = 0
 
-    internal fun copy(): List<TickerStep> = steps.toList()
-
     fun tick(): Boolean {
         try {
             if (currentWaitTicks > 0) {
@@ -83,10 +81,6 @@ class TickerScope {
 
     fun cancel(): Nothing {
         throw TickerCancelledException()
-    }
-
-    fun addSteps(other: Ticker) {
-        steps.addAll(other.copy())
     }
 
     fun scope(): Ticker = Ticker(steps)

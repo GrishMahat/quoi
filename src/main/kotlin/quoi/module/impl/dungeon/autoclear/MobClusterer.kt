@@ -15,29 +15,6 @@ object MobClusterer {
      * @return A list of [MobCluster]s, each representing one hyperion strike.
      */
     fun cluster(mobs: List<LivingEntity>): List<MobCluster> {
-//        val clusters = mutableListOf<MobCluster>()
-//
-//        for (mob in mobs) {
-//            val mobPos = mob.position()
-//
-//            val existing = clusters.firstOrNull { cluster ->
-//                cluster.seed.distanceTo(mobPos) <= HYPE_AOE
-//            }
-//
-//            if (existing != null) {
-//                existing.mobs.add(mob)
-//            } else {
-//                clusters.add(
-//                    MobCluster(
-//                        seed = mobPos,
-//                        mobs = mutableListOf(mob)
-//                    )
-//                )
-//            }
-//        }
-//
-//        return clusters
-
         val clusters = mutableListOf<MobCluster>()
 
         for (mob in mobs) {

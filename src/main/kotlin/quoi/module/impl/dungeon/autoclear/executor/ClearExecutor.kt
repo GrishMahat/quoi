@@ -14,7 +14,6 @@ import quoi.api.pathfinding.impl.EtherwarpPathfinder
 import quoi.api.vec.MutableVec3
 import quoi.api.world.Direction
 import quoi.module.impl.dungeon.autoclear.executor.nodes.ClearEtherNode
-import quoi.module.impl.dungeon.autoclear.executor.nodes.ClearHypeNode
 import quoi.module.impl.dungeon.autoclear.toEther
 import quoi.utils.ChatUtils.modMessage
 import quoi.utils.player
@@ -27,8 +26,6 @@ object ClearExecutor : EventListener {
 
     private var syncDelay = 0
     private var compDelay = 0
-    private var globalDelay = 0
-    private var hypeDelay = 0
 
     var active = false
         private set
@@ -78,8 +75,6 @@ object ClearExecutor : EventListener {
             val curr = activeNode is ClearEtherNode
             val next = nodes?.firstOrNull() is ClearEtherNode
 
-//            println(curr || next)
-
             if (curr || next) input.shift = true
         }
 
@@ -87,8 +82,6 @@ object ClearExecutor : EventListener {
             nodes = null
             syncDelay = 0
             compDelay = 0
-            globalDelay = 0
-            hypeDelay = 0
             position = null
             pendingInteract = null
             active = false
@@ -113,10 +106,6 @@ object ClearExecutor : EventListener {
 
             clearPath(p.map { it.toEther() }, onComplete)
         }
-    }
-
-    fun testPath(to: BlockPos, config: PathConfig = PathConfig()) {
-
     }
 
     fun clearPath(path: List<ClearNode>, onComplete: (() -> Unit)? = null) {
@@ -149,14 +138,8 @@ object ClearExecutor : EventListener {
         active = true
         activeNode = node
 
-        if (node is ClearHypeNode && hypeDelay > 0) return
-
         if (node.execute(playerPos)) {
             clearNodes.remove(node)
-
-            if (node is ClearHypeNode) {
-                hypeDelay = 3
-            }
 
             if (clearNodes.isEmpty()) {
                 nodes = null
@@ -181,13 +164,10 @@ object ClearExecutor : EventListener {
             active = false
             activeNode = null
         }
-        if (globalDelay > 0) globalDelay--
-        if (hypeDelay > 0) hypeDelay--
     }
 
     private fun canNext(): Boolean {
         if (syncDelay != 0) return false
-        if (globalDelay > 0) return false
         if (nodes.isNullOrEmpty()) return false
 
         if (compDelay == 0) active = false

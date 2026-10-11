@@ -6,7 +6,6 @@ import quoi.api.abobaui.dsl.*
 import quoi.api.abobaui.elements.ElementScope
 import quoi.api.customtriggers.TriggerContext
 import quoi.config.TypeName
-import quoi.utils.ThemeManager.theme
 import net.minecraft.core.BlockPos
 import net.minecraft.world.phys.AABB
 import quoi.api.customtriggers.numberField

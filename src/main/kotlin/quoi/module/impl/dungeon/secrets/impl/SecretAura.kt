@@ -32,7 +32,6 @@ import quoi.module.settings.UIComponent.Companion.childOf
 import quoi.module.settings.UIComponent.Companion.visibleIf
 import quoi.module.settings.group.ToggleableGroup
 import quoi.utils.*
-import quoi.utils.EntityUtils.getEntities
 import quoi.utils.WorldUtils.state
 import quoi.utils.skyblock.player.SwapManager
 import quoi.utils.skyblock.player.SwapResult

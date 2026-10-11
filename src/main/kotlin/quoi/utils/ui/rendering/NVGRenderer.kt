@@ -20,7 +20,6 @@ import java.io.File
 import java.nio.ByteBuffer
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.round
 
 /**
  * modified OdinFabric (BSD 3-Clause)
@@ -43,7 +42,6 @@ object NVGRenderer {
     private val fontBounds = FloatArray(4)
 
     private val images = HashMap<Image, NVGImage>()
-    private val nvgImages = HashMap<Pair<Int, Pair<Int, Int>>, Int>()
 
     private var scissor: Scissor? = null
 
@@ -309,55 +307,10 @@ object NVGRenderer {
         }
     }
 
-    fun textShadow(text: String, x: Float, y: Float, size: Float, color: Int, font: Font) {
-        nvgFontFaceId(vg, getFontID(font))
-        nvgFontSize(vg, size)
-        color(-16777216)
-        nvgFillColor(vg, nvgColor)
-        nvgText(vg, round(x + 3f), round(y + 3f), text)
-
-        color(color)
-        nvgFillColor(vg, nvgColor)
-        nvgText(vg, round(x), round(y), text)
-    }
-
     fun textWidth(text: String, size: Float, font: Font): Float {
         nvgFontSize(vg, size)
         nvgFontFaceId(vg, getFontID(font))
         return nvgTextBounds(vg, 0f, 0f, text, fontBounds)
-    }
-
-    fun drawWrappedString(
-        text: String,
-        x: Float,
-        y: Float,
-        w: Float,
-        size: Float,
-        color: Int,
-        font: Font,
-        lineHeight: Float = 1f
-    ) {
-        nvgFontSize(vg, size)
-        nvgFontFaceId(vg, getFontID(font))
-        nvgTextLineHeight(vg, lineHeight)
-        color(color)
-        nvgFillColor(vg, nvgColor)
-        nvgTextBox(vg, x, y, w, text)
-    }
-
-    fun wrappedTextBounds(
-        text: String,
-        w: Float,
-        size: Float,
-        font: Font,
-        lineHeight: Float = 1f
-    ): FloatArray {
-        val bounds = FloatArray(4)
-        nvgFontSize(vg, size)
-        nvgFontFaceId(vg, getFontID(font))
-        nvgTextLineHeight(vg, lineHeight)
-        nvgTextBoxBounds(vg, 0f, 0f, w, text, bounds)
-        return bounds // [minX, minY, maxX, maxY]
     }
 
     fun wrapText(text: String, maxWidth: Float, size: Float, font: Font): List<String> {
@@ -379,13 +332,6 @@ object NVGRenderer {
             lines.add(currentLine)
         }
         return lines
-    }
-
-    fun createNVGImage(textureId: Int, textureWidth: Int, textureHeight: Int): Int {
-        val key = textureId to (textureWidth to textureHeight)
-        return nvgImages.getOrPut(key) {
-            nvglCreateImageFromHandle(vg, textureId, textureWidth, textureHeight, NVG_IMAGE_NEAREST or NVG_IMAGE_NODELETE)
-        }
     }
 
     fun image(image: Int, textureWidth: Float, textureHeight: Float, subX: Float, subY: Float, subW: Float, subH: Float, x: Float, y: Float, w: Float, h: Float, radius: Float) {
@@ -532,9 +478,4 @@ object NVGRenderer {
 
     private data class NVGImage(var count: Int, val nvg: Int)
     private data class NVGFont(val id: Int, val buffer: ByteBuffer)
-}
-
-object TextureTracker {
-    @JvmStatic
-    var previousBoundTexture = -1
 }

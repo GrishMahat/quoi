@@ -1,6 +1,5 @@
 package quoi.utils.skyblock.player.interact
 
-import kotlin.math.ceil
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket
@@ -34,37 +33,8 @@ class MineTarget(
         private set
     private var doStop = false
 
-    private var ticksMined = 0
-    private var customDelta = -1f
-    private var lastProgress = 0f
-
     var progress = 0f
-        @Internal set(value) {
-            if (custom) {
-                val diff = value - lastProgress
-                if (diff > 0 && ticksMined > 0) {
-                    customDelta = value / ticksMined
-                }
-                lastProgress = value
-            }
-            field = value
-        }
-
-    val ticksRemaining: Int // todo maybe make actual calc based on mining speed for custom
-        get() {
-            if (finished || progress >= 1f) return 0
-
-            val delta = if (custom) {
-                if (customDelta <= 0f) return -1
-                customDelta
-            } else {
-                pos.state.getDestroyProgress(player, level, pos)
-            }
-
-            if (delta <= 0f) return -1
-
-            return ceil((1f - progress) / delta).toInt()
-        }
+        @Internal set
 
     private var item: ItemStack = ItemStack.EMPTY
 
@@ -119,8 +89,6 @@ class MineTarget(
 
     fun onTick(cd: Int) {
         if (finished) return
-
-        if (started) ticksMined++
 
         val hitResult = pos.getHitResult() ?: return abort()
         if (player.eyePosition().distanceToSqr(hitResult.location) > 20.25) return abort()
