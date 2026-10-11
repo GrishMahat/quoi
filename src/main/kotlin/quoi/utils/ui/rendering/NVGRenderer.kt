@@ -29,6 +29,8 @@ import kotlin.math.round
  */
 object NVGRenderer {
 
+    private val formattingSplitPattern = Regex("(?=${FORMATTING_CODE_PATTERN.pattern})")
+
     private val nvgPaint = NVGPaint.malloc()
     private val nvgColor = NVGColor.malloc()
     private val nvgColor2: NVGColor = NVGColor.malloc()
@@ -249,7 +251,7 @@ object NVGRenderer {
         var underline = false
         var strike = false
 
-        val list = text.split(Regex("(?=${FORMATTING_CODE_PATTERN.pattern})"))
+        val list = text.split(formattingSplitPattern)
 
         for (string in list) {
             var text = string

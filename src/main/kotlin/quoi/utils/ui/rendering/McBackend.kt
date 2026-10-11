@@ -164,14 +164,14 @@ class McBackend : RendererBackend {
     }
 
     override fun rect(x: Float, y: Float, w: Float, h: Float, color: Int, tl: Float, bl: Float, br: Float, tr: Float) {
-        // the historical renderer extended fills by half a pixel vertically
-        val outline = UIGeometry.dedupeClosedOutline(
-            UIGeometry.roundedRectOutline(x, y, w, h + 0.5f, tl, bl, br, tr)
-        )
         // Axis-aligned sharp rectangles already land exactly on the pixel grid. Keep
         // them exactly inside their element bounds; scissor conversion rounds outwards
         // separately, so no geometry overdraw is needed to avoid clipped edge pixels.
         if (tl <= 0f && bl <= 0f && br <= 0f && tr <= 0f) {
+            // the historical renderer extended fills by half a pixel vertically
+            val outline = UIGeometry.dedupeClosedOutline(
+                UIGeometry.roundedRectOutline(x, y, w, h + 0.5f, tl, bl, br, tr)
+            )
             emitQuads(UIGeometry.fanToQuads(outline), color)
             return
         }

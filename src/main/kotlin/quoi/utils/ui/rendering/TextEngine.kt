@@ -1,5 +1,7 @@
 package quoi.utils.ui.rendering
 
+import quoi.utils.FormattingCodes
+
 /**
  * Pure (Minecraft-independent) text helpers: legacy §/& formatting-code parsing and
  * word wrapping. Extracted from the renderer so they can be unit tested and shared
@@ -11,7 +13,7 @@ object TextEngine {
 
     private val SPLIT_PATTERN = Regex("(?=${FORMATTING_CODE.pattern})")
 
-    fun stripCodes(text: String): String = FORMATTING_CODE.replace(text, "")
+    fun stripCodes(text: String): String = FormattingCodes.strip(text)
 
     data class Segment(val text: String, val color: Int, val underline: Boolean, val strike: Boolean)
 

@@ -172,19 +172,19 @@ object UIGeometry {
     fun dedupeClosedOutline(outline: FloatArray): FloatArray {
         val pointCount = outline.size / 2
         if (pointCount < 2) return outline
-        val out = ArrayList<Float>(outline.size)
+        val out = FloatArray(pointCount * 2)
+        var size = 0
         for (i in 0 until pointCount) {
             val x = outline[i * 2]
             val y = outline[i * 2 + 1]
-            if (out.size >= 2 && abs(out[out.size - 2] - x) < 1e-4f && abs(out[out.size - 1] - y) < 1e-4f) continue
-            out.add(x)
-            out.add(y)
+            if (size >= 2 && abs(out[size - 2] - x) < 1e-4f && abs(out[size - 1] - y) < 1e-4f) continue
+            out[size++] = x
+            out[size++] = y
         }
-        if (out.size >= 4 && abs(out[0] - out[out.size - 2]) < 1e-4f && abs(out[1] - out[out.size - 1]) < 1e-4f) {
-            out.removeAt(out.size - 1)
-            out.removeAt(out.size - 1)
+        if (size >= 4 && abs(out[0] - out[size - 2]) < 1e-4f && abs(out[1] - out[size - 1]) < 1e-4f) {
+            size -= 2
         }
-        return out.toFloatArray()
+        return if (size == out.size) out else out.copyOf(size)
     }
 
     /** A single quad for a line from (x1,y1) to (x2,y2) with the given [thickness]. */
@@ -273,15 +273,16 @@ object UIGeometry {
         val rxBR = clampRadius(br, w); val ryBR = clampRadius(br, h)
         val rxTR = clampRadius(tr, w); val ryTR = clampRadius(tr, h)
 
-        val points = ArrayList<Float>(64)
-        cornerFixed(points, x + rxTL, y + ryTL, rxTL, ryTL, 180f, segments[0])
-        cornerFixed(points, x + w - rxTR, y + ryTR, rxTR, ryTR, 270f, segments[1])
-        cornerFixed(points, x + w - rxBR, y + h - ryBR, rxBR, ryBR, 0f, segments[2])
-        cornerFixed(points, x + rxBL, y + h - ryBL, rxBL, ryBL, 90f, segments[3])
-        return points.toFloatArray()
+        val pointCount = (0..3).sumOf { max(0, segments[it]) + 1 }
+        val points = FloatArray(pointCount * 2)
+        var offset = cornerFixed(points, 0, x + rxTL, y + ryTL, rxTL, ryTL, 180f, segments[0])
+        offset = cornerFixed(points, offset, x + w - rxTR, y + ryTR, rxTR, ryTR, 270f, segments[1])
+        offset = cornerFixed(points, offset, x + w - rxBR, y + h - ryBR, rxBR, ryBR, 0f, segments[2])
+        cornerFixed(points, offset, x + rxBL, y + h - ryBL, rxBL, ryBL, 90f, segments[3])
+        return points
     }
 
-    private fun cornerFixed(out: MutableList<Float>, cx: Float, cy: Float, rx: Float, ry: Float, startDeg: Float, segments: Int) {
+    private fun cornerFixed(out: FloatArray, offset: Int, cx: Float, cy: Float, rx: Float, ry: Float, startDeg: Float, segments: Int): Int {
         if (segments <= 0) {
             // sharp corner: emit the corner point once; offset centre back to the corner
             val sx = when (startDeg) {
@@ -290,14 +291,16 @@ object UIGeometry {
             val sy = when (startDeg) {
                 180f -> cy - ry; 270f -> cy - ry; else -> cy + ry
             }
-            out.add(sx); out.add(sy)
-            return
+            out[offset] = sx; out[offset + 1] = sy
+            return offset + 2
         }
+        var offset = offset
         for (i in 0..segments) {
             val angle = Math.toRadians(startDeg + 90.0 * i / segments)
-            out.add(cx + (rx * cos(angle)).toFloat())
-            out.add(cy + (ry * sin(angle)).toFloat())
+            out[offset++] = cx + (rx * cos(angle)).toFloat()
+            out[offset++] = cy + (ry * sin(angle)).toFloat()
         }
+        return offset
     }
 
     /**

@@ -11,30 +11,31 @@ object CachedSphere {
     val indices: IntArray
 
     init {
-        val temp = Array(RADIUS_SQ + 1) { mutableListOf<Long>() }
+        indices = IntArray(RADIUS_SQ + 2)
         for (x in -RADIUS..RADIUS) {
             for (y in -RADIUS..RADIUS) {
                 for (z in -RADIUS..RADIUS) {
                     val dist = x * x + y * y + z * z
                     if (dist > RADIUS_SQ) continue
-                    temp[dist].add(BlockPos.asLong(x, y, z))
+                    indices[dist + 1]++
                 }
             }
         }
 
-        indices = IntArray(RADIUS_SQ + 2)
-        var totalSize = 0
-        for (dist in 0..RADIUS_SQ) {
-            indices[dist] = totalSize
-            totalSize += temp[dist].size
+        for (i in 1 until indices.size) {
+            indices[i] += indices[i - 1]
         }
-        indices[RADIUS_SQ + 1] = totalSize
 
-        table = LongArray(totalSize)
-        var cursor = 0
-        for (list in temp) {
-            for (packedRel in list) {
-                table[cursor++] = packedRel
+        table = LongArray(indices.last())
+        val offsets = indices.copyOf()
+        // Keep the original x/y/z order within each squared-distance bucket.
+        for (x in -RADIUS..RADIUS) {
+            for (y in -RADIUS..RADIUS) {
+                for (z in -RADIUS..RADIUS) {
+                    val dist = x * x + y * y + z * z
+                    if (dist > RADIUS_SQ) continue
+                    table[offsets[dist]++] = BlockPos.asLong(x, y, z)
+                }
             }
         }
     }

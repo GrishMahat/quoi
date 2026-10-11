@@ -15,17 +15,19 @@ object StringUtils {
     val FORMATTING_CODE_PATTERN = Regex("[§&][0-9a-fk-or]", RegexOption.IGNORE_CASE)
 
     val String?.noControlCodes: String
-        get() = this?.let { FORMATTING_CODE_PATTERN.replace(it, "") } ?: ""
+        get() = this?.let { FormattingCodes.strip(it) } ?: ""
 
-    val Component.formattedString: String get() = buildString {
-        val rgbMap = ChatFormatting.entries
+    private val rgbMap by lazy {
+        ChatFormatting.entries
             //? if <26.2 {
             .mapNotNull { it.color?.let { color -> color to it } }
             //?} else {
             /*.mapNotNull { formatting -> net.minecraft.network.chat.TextColor.fromLegacyFormat(formatting)?.getValue()?.let { it to formatting } }
             *///?}
             .toMap()
+    }
 
+    val Component.formattedString: String get() = buildString {
         visit<Unit>({ style, content ->
             //? if <26.2 {
             style.color?.value?.let { rgbMap[it]?.let(::append) }
