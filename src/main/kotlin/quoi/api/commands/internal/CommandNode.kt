@@ -1,14 +1,14 @@
 package quoi.api.commands.internal
 
-import quoi.utils.ChatUtils.literal
-import quoi.utils.ChatUtils.modMessage
-import quoi.utils.StringUtils.trim
 import com.mojang.brigadier.context.CommandContext
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource
 import net.minecraft.network.chat.ClickEvent
 import net.minecraft.network.chat.HoverEvent
 import net.minecraft.network.chat.MutableComponent
 import net.minecraft.network.chat.Style
+import quoi.utils.ChatUtils.literal
+import quoi.utils.ChatUtils.modMessage
+import quoi.utils.StringUtils.trim
 
 @Suppress("UNCHECKED_CAST")
 abstract class CommandNode<T : CommandNode<T>>(val name: String) {
@@ -87,9 +87,11 @@ abstract class CommandNode<T : CommandNode<T>>(val name: String) {
                         hover.append("§7- ${it.getUsage()}\n")
                     }
 
-                    line.append(literal("§7<§a...§7>").withStyle(
-                        Style.EMPTY.withHoverEvent(HoverEvent.ShowText(hover.trim()))
-                    ))
+                    line.append(
+                        literal("§7<§a...§7>").withStyle(
+                            Style.EMPTY.withHoverEvent(HoverEvent.ShowText(hover.trim()))
+                        )
+                    )
                 } else {
                     line.append(cmd.getUsage())
                 }
@@ -97,7 +99,7 @@ abstract class CommandNode<T : CommandNode<T>>(val name: String) {
                 line.append(" §8:§r ${cmd.description}")
 
                 line.withStyle(
-                    Style.EMPTY.withClickEvent(ClickEvent.SuggestCommand(cmd.path()))
+                    Style.EMPTY.withClickEvent(ClickEvent.SuggestCommand("/${cmd.path()}"))
                 )
 
                 message.append(line).append("\n")

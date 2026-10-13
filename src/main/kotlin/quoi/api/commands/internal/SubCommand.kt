@@ -1,8 +1,5 @@
 package quoi.api.commands.internal
 
-import quoi.api.commands.parsers.ArgumentParser
-import quoi.api.commands.parsers.TypeParser
-import quoi.utils.ChatUtils.modMessage
 import com.mojang.brigadier.builder.LiteralArgumentBuilder
 import com.mojang.brigadier.builder.RequiredArgumentBuilder
 import com.mojang.brigadier.context.CommandContext
@@ -10,6 +7,9 @@ import net.fabricmc.fabric.api.client.command.v2.ClientCommands
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource
 import net.minecraft.commands.SharedSuggestionProvider
+import quoi.api.commands.parsers.ArgumentParser
+import quoi.api.commands.parsers.TypeParser
+import quoi.utils.ChatUtils.modMessage
 import java.lang.reflect.Type
 
 class SubCommand(
@@ -23,7 +23,7 @@ class SubCommand(
 
     private val parser: ArgumentParser = ArgumentParser(lambda)
 
-    override fun path() = "/$path $name"
+    override fun path() = "$path $name"
 
     fun suggests(argName: String, supplier: () -> Any): SubCommand {
         val key = if (argName.isEmpty()) {
@@ -61,7 +61,7 @@ class SubCommand(
         if (subcommands.isNotEmpty()) addHelp()
 
         subcommands.forEach { (name, overloads) ->
-            val subLiteral =  literal(name)
+            val subLiteral = literal(name)
             overloads.forEach { it.attachTo(subLiteral) }
             node.then(subLiteral)
         }
