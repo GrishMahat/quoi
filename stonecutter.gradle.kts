@@ -72,6 +72,10 @@ stonecutter parameters {
         replace("it.textureView", "it.textureView()")
     }
 
+    replacements.string(current.parsed >= "26.4-snapshot-4") {
+        replace("SoundEvents.CAT_AMBIENT_BABY", "SoundEvents.BABY_CAT_SOUND_SET.ambientSound().get()")
+    }
+
     // Registry families replace the individual colored and weathered constants.
     replacements.string(gui) {
         val colors = mapOf(
