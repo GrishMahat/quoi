@@ -45,6 +45,8 @@ object AutoClicker: Module(
 
     private var leftJob: Job? = null
     private var rightJob: Job? = null
+    private var leftBlockedUntilRelease = false
+    private var rightBlockedUntilRelease = false
     private var lastHeldSlot = -1
     private var isMining = false
 
@@ -64,17 +66,23 @@ object AutoClicker: Module(
     private fun shouldAutoClick(isLeft: Boolean): Boolean {
         val enabled = if (isLeft) leftClick else rightClick
         val keybind = if (isLeft) leftClickKeybind else rightClickKeybind
-        return this.enabled && enabled && keybind.isDown() && shouldClick(isLeft)
+        val blocked = if (isLeft) leftBlockedUntilRelease else rightBlockedUntilRelease
+        return this.enabled && enabled && !blocked && keybind.isDown() && shouldClick(isLeft)
     }
 
     private val lookingAtBreakable get() = breakBlocks && player.isLookingAtBreakable
 
     override fun onDisable() {
         reset()
+        leftBlockedUntilRelease = false
+        rightBlockedUntilRelease = false
         super.onDisable()
     }
 
     init {
+        leftClickKeybind.onRelease = { leftBlockedUntilRelease = false }
+        rightClickKeybind.onRelease = { rightBlockedUntilRelease = false }
+
         val autoclicker = command.sub("autoclicker").description("Auto Clicker module settings.")
 
         autoclicker.sub("add") { button: String ->
@@ -117,9 +125,15 @@ object AutoClicker: Module(
         on<TickEvent.End> {
             val currentSlot = player.inventory.selectedSlot
             if (lastHeldSlot == -1) lastHeldSlot = currentSlot
-            if (stopOnSwap && currentSlot != lastHeldSlot) reset()
+            if (stopOnSwap && currentSlot != lastHeldSlot) {
+                reset()
+                leftBlockedUntilRelease = leftClickKeybind.isDown()
+                rightBlockedUntilRelease = rightClickKeybind.isDown()
+            }
 
             lastHeldSlot = currentSlot
+            if (!leftClickKeybind.isDown()) leftBlockedUntilRelease = false
+            if (!rightClickKeybind.isDown()) rightBlockedUntilRelease = false
 
             if (mc.screen != null) {
                 reset()
@@ -137,6 +151,8 @@ object AutoClicker: Module(
 
         on<WorldEvent.Change> {
             reset()
+            leftBlockedUntilRelease = false
+            rightBlockedUntilRelease = false
         }
     }
 
