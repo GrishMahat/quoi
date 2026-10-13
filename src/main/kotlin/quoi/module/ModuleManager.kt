@@ -58,6 +58,7 @@ object ModuleManager : EventListener {
             SimonSays,
             TerminalAura,
             CrystalAura,
+            Relics,
             TickTimers,
             AutoInvincibility,
             InvincibilityTimer,

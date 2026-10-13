@@ -109,6 +109,8 @@ Use [actions tab](https://github.com/jcnlk/quoi/actions) to download (you need t
   - Adds a triggerbot and hides useless levers.
 - **P4 Platform Highlight**
   - Marks the 3x3 area to mine after Goldor dies.
+- **Relics**
+  - Adds relic look, a triggerbot and an aura for both pickup and placement.
 - **Simon Says**
   - Shows the sequence and can complete the device automatically.
 - **Terminal Aura**
