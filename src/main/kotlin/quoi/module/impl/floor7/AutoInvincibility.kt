@@ -1,12 +1,12 @@
 package quoi.module.impl.floor7
 
-import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.launch
 import net.minecraft.world.item.Items
-import quoi.QuoiMod.scope
 import quoi.api.events.ChatEvent
 import quoi.api.events.WorldEvent
+import quoi.api.events.core.asyncScope
 import quoi.api.events.core.on
+import quoi.api.events.core.wait
 import quoi.api.skyblock.SkyblockPlayer
 import quoi.api.skyblock.SkyblockPlayer.InvincibilityType
 import quoi.api.skyblock.SkyblockPlayer.Mask
@@ -17,7 +17,6 @@ import quoi.api.skyblock.location.Island
 import quoi.module.Module
 import quoi.module.settings.UIComponent.Companion.childOf
 import quoi.utils.ChatUtils.modMessage
-import quoi.utils.Scheduler.wait
 import quoi.utils.skyblock.item.ItemUtils.skyblockId
 import quoi.utils.skyblock.player.EquipmentSwapper
 import quoi.utils.skyblock.player.PetSwitcher
@@ -102,7 +101,7 @@ object AutoInvincibility : Module(
     private fun startPhoenixProcWatch() {
         val watchId = ++phoenixWatchId
 
-        scope.launch(mc.asCoroutineDispatcher()) {
+        asyncScope.launch {
             wait(100, server = true)
 
             if (watchId != phoenixWatchId || Dungeon.isDead || !isPhoenixEquipped()) return@launch
@@ -115,7 +114,7 @@ object AutoInvincibility : Module(
         if (Dungeon.isDead || swapping) return
 
         swapping = true
-        scope.launch(mc.asCoroutineDispatcher()) {
+        asyncScope.launch {
             try {
                 wait(swapDelay, server = true)
 
@@ -137,7 +136,7 @@ object AutoInvincibility : Module(
 
         val swapId = ++phoenixSwapId
         swapping = true
-        scope.launch(mc.asCoroutineDispatcher()) {
+        asyncScope.launch {
             try {
                 wait(swapDelay, server = true)
 
@@ -202,7 +201,7 @@ object AutoInvincibility : Module(
         val swapId = phoenixSwapId
         val watchId = phoenixWatchId
 
-        scope.launch(mc.asCoroutineDispatcher()) {
+        asyncScope.launch {
             while (swapping || PetSwitcher.isBusy()) {
                 wait(1)
             }

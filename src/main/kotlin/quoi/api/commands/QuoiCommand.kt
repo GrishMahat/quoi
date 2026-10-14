@@ -6,15 +6,16 @@ import net.minecraft.network.protocol.game.ClientboundSystemChatPacket
 import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.Vec3
 import quoi.QuoiMod.mc
-import quoi.QuoiMod.scope
 import quoi.api.commands.internal.BaseCommand
 import quoi.api.commands.internal.GreedyString
 import quoi.api.events.TickEvent
 import quoi.api.events.WorldEvent
 import quoi.api.events.core.EventDispatcher
 import quoi.api.events.core.EventListener
+import quoi.api.events.core.asyncScope
 import quoi.api.events.core.on
 import quoi.api.events.core.until
+import quoi.api.events.core.wait
 import quoi.api.skyblock.SkyblockPlayer
 import quoi.api.skyblock.SkyblockPlayer.InvincibilityType
 import quoi.api.skyblock.SkyblockPlayer.Mask
@@ -32,7 +33,6 @@ import quoi.utils.ChatUtils.literal
 import quoi.utils.ChatUtils.modMessage
 import quoi.utils.LegacyIdMapper
 import quoi.utils.Scheduler.scheduleLoop
-import quoi.utils.Scheduler.wait
 import quoi.utils.WorldUtils
 import quoi.utils.WorldUtils.day
 import quoi.utils.addVec
@@ -85,7 +85,7 @@ object QuoiCommand : EventListener {
                 if (count <= 0) return@invoke modMessage("&cProvide a positive number of death ticks.")
 
                 modMessage("&eStarting $count death ticks.")
-                scope.launch {
+                asyncScope.launch {
                     repeat(count) {
                         wait(60)
 

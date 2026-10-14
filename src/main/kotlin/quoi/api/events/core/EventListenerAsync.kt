@@ -2,6 +2,7 @@ package quoi.api.events.core
 
 import kotlinx.coroutines.*
 import net.minecraft.network.protocol.Packet
+import quoi.QuoiMod
 import quoi.QuoiMod.mc
 import quoi.api.events.PacketEvent
 import quoi.api.events.TickEvent
@@ -54,8 +55,8 @@ val EventListener.asyncScope: CoroutineScope
 
         CoroutineScope(
             job +
-            CoroutineExceptionHandler { _, t -> if (t !is ListenerInactiveException) t.printStackTrace() } +
-            ActiveStateInterceptor(mc.asCoroutineDispatcher(), listener)
+                    CoroutineExceptionHandler { _, t -> if (t !is ListenerInactiveException) t.printStackTrace() } +
+                    ActiveStateInterceptor(mc.asCoroutineDispatcher(), listener)
         )
     }!!
 
@@ -88,24 +89,29 @@ inline fun <reified T : Event> EventListener.onAsync(
 }
 
 /**
- * Suspends execution for [ticks] amount
+ * Suspends for [ticks] client or observed server ticks on the coroutine's dispatcher.
+ * Client waits count tick starts. Tick counting is independent of the listener's area.
  */
-suspend fun EventListener.wait(ticks: Int) {
+suspend fun EventListener.wait(ticks: Int, server: Boolean = false) {
     if (ticks <= 0) return
-    var remaining = ticks
 
     suspendCancellableCoroutine { cont ->
-        val subscription = until<TickEvent.Start> {
-            remaining--
-            if (remaining <= 0) {
-                if (cont.isActive) cont.resume(Unit)
-                true
-            } else {
-                false
+        var remaining = ticks
+        val settled = AtomicBoolean()
+        val eventClass = if (server) TickEvent.Server::class.java else TickEvent.Start::class.java
+        val subscription = Subscription<Event>(QuoiMod, eventClass, 0) {
+            if (--remaining <= 0 && settled.compareAndSet(false, true)) {
+                unregister()
+                cont.resume(Unit)
             }
         }
 
-        cont.invokeOnCancellation { subscription.unregister() }
+        cont.invokeOnCancellation {
+            settled.set(true)
+            subscription.unregister()
+        }
+        EventManager.register(subscription)
+        if (settled.get()) subscription.unregister()
     }
 }
 

@@ -3,19 +3,19 @@ package quoi.module.impl.general
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import net.minecraft.client.KeyMapping
-import quoi.QuoiMod
 import quoi.api.abobaui.dsl.px
 import quoi.api.abobaui.elements.impl.Text.Companion.shadow
 import quoi.api.abobaui.elements.impl.Text.Companion.textSupplied
 import quoi.api.colour.Colour
 import quoi.api.commands.internal.GreedyString
 import quoi.api.events.*
+import quoi.api.events.core.asyncScope
 import quoi.api.events.core.on
+import quoi.api.events.core.wait
 import quoi.api.skyblock.dungeon.Dungeon
 import quoi.module.Module
 import quoi.module.settings.impl.ListSetting
 import quoi.utils.ChatUtils.modMessage
-import quoi.utils.Scheduler.wait
 import quoi.utils.skyblock.player.HotbarItem
 import quoi.utils.skyblock.player.HotbarPreset
 import quoi.utils.skyblock.player.HotbarSwapperUtils
@@ -169,7 +169,7 @@ object AutoHotbar : Module(
         if (!enabled || isSwapping || swapJob?.isActive == true) return
         if (!requirementsMet(preset)) return
 
-        swapJob = QuoiMod.scope.launch {
+        swapJob = asyncScope.launch {
             try {
                 waitUntilNotInTerminal()
 

@@ -1,15 +1,15 @@
 package quoi.module.impl.general
 
 import kotlinx.coroutines.launch
-import quoi.QuoiMod.scope
 import quoi.api.events.PartyEvent
 import quoi.api.events.WorldEvent
+import quoi.api.events.core.asyncScope
 import quoi.api.events.core.on
+import quoi.api.events.core.wait
 import quoi.api.skyblock.SkyblockPlayer
 import quoi.api.skyblock.dungeon.enums.DungeonClass
 import quoi.module.Module
 import quoi.utils.ChatUtils.command
-import quoi.utils.Scheduler.wait
 import quoi.utils.skyblock.PartyUtils
 
 /**
@@ -47,7 +47,7 @@ object AutoKick : Module(
     private fun requestKick(name: String, partyMessage: String? = null) {
         if (name == player.gameProfile.name || !pendingKicks.add(name)) return
 
-        scope.launch {
+        asyncScope.launch {
             try {
                 kick(name, partyMessage)
             } finally {
@@ -57,7 +57,6 @@ object AutoKick : Module(
     }
 
     private suspend fun kick(name: String, partyMessage: String?) {
-        wait(0, server = true)
         if (!shouldKick(name)) return
 
         val oldLeader = PartyUtils.partyLeader

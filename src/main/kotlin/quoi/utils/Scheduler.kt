@@ -2,7 +2,6 @@ package quoi.utils
 
 import quoi.QuoiMod.mc
 import quoi.api.events.TickEvent
-import kotlinx.coroutines.CompletableDeferred
 import quoi.api.events.core.EventListener
 import quoi.api.events.core.on
 
@@ -69,32 +68,5 @@ object Scheduler : EventListener {
         val task = Task(interval, interval, cb)
         addTask(task, server)
         return task
-    }
-
-    /**
-     * Suspends for [ticks] client or observed server ticks.
-     * Server waits always resume on the client thread, including waits with a non-positive delay.
-     */
-    suspend fun wait(ticks: Int = 1, server: Boolean = false) {
-        if (ticks <= 0) {
-            if (server) awaitClientThread()
-            return
-        }
-
-        val deferred = CompletableDeferred<Unit>()
-
-        scheduleTask(ticks, server = server) {
-            deferred.complete(Unit)
-        }
-
-        deferred.await()
-    }
-
-    private suspend fun awaitClientThread() {
-        if (mc.isSameThread) return
-
-        val deferred = CompletableDeferred<Unit>()
-        mc.submit { deferred.complete(Unit) }
-        deferred.await()
     }
 }

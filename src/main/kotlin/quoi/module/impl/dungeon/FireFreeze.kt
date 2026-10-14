@@ -2,7 +2,6 @@ package quoi.module.impl.dungeon
 
 import kotlinx.coroutines.launch
 import net.minecraft.world.phys.Vec3
-import quoi.QuoiMod.scope
 import quoi.api.abobaui.dsl.ms
 import quoi.api.abobaui.elements.impl.Text.Companion.shadow
 import quoi.api.abobaui.elements.impl.Text.Companion.textSupplied
@@ -10,13 +9,14 @@ import quoi.api.colour.Colour
 import quoi.api.events.ChatEvent
 import quoi.api.events.TickEvent
 import quoi.api.events.WorldEvent
+import quoi.api.events.core.asyncScope
 import quoi.api.events.core.on
+import quoi.api.events.core.wait
 import quoi.api.skyblock.location.Island
 import quoi.api.skyblock.location.invoke
 import quoi.module.Module
 import quoi.module.settings.UIComponent.Companion.childOf
 import quoi.utils.ChatUtils.modMessage
-import quoi.utils.Scheduler.wait
 import quoi.utils.StringUtils.toFixed
 import quoi.utils.ThemeManager.theme
 import quoi.utils.getDirection
@@ -116,7 +116,7 @@ object FireFreeze : Module(
                 stopReposition()
                 if (autoUse && player.position().distanceToSqr(autoUsePosition) <= 25.0) {
                     autoTriggered = true
-                    scope.launch {
+                    asyncScope.launch {
                         val swapped = SwapManager.swapById("FIRE_FREEZE_STAFF")
                         if (!swapped.success) {
                             modMessage("§cCould not find Fire Freeze Staff in your hotbar.")
