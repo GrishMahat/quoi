@@ -248,6 +248,7 @@ Use [actions tab](https://github.com/jcnlk/quoi/actions) to download (you need t
   - Highlights players through walls.
 - **Render Optimiser**
   - Controls text shadows, fog, entity visibility, particles, overlays, and full bright.
+  - **Container dim** - Adjusts the dark overlay behind inventories and container menus. Set to 0% to remove it.
 - **Revert Master Stars**
   - Restores the old red Master Star display.
 - **Trajectories**
