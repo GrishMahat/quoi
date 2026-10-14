@@ -1,126 +1,33 @@
 package quoi.module
 
+import io.github.classgraph.ClassGraph
+import quoi.QuoiMod.logger
 import quoi.api.events.GuiEvent
 import quoi.api.events.KeyEvent
 import quoi.api.events.MouseEvent
 import quoi.api.events.core.EventListener
 import quoi.api.events.core.on
 import quoi.api.input.Keybinds
-import quoi.module.impl.dungeon.*
-import quoi.module.impl.dungeon.autoclear.impl.*
-import quoi.module.impl.dungeon.puzzlesolvers.PuzzleSolvers
-import quoi.module.impl.dungeon.secrets.Secrets
-import quoi.module.impl.floor7.*
-import quoi.module.impl.general.*
-import quoi.module.impl.mining.*
-import quoi.module.impl.misc.*
-import quoi.module.impl.misc.catmode.CatMode
-import quoi.module.impl.general.chat.Chat
-import quoi.module.impl.misc.dojo.Dojo
-import quoi.module.impl.general.inventory.Inventory
-import quoi.module.impl.mining.glacitetunnels.GlaciteTunnels
-import quoi.module.impl.misc.riftsolvers.MirrorverseSolvers
-import quoi.module.impl.misc.slayers.Slayers
-import quoi.module.impl.render.*
-import quoi.module.impl.render.clickgui.ClickGui
 import quoi.module.settings.impl.KeybindComponent
 
 object ModuleManager : EventListener {
     val modules = mutableListOf<Module>()
 
     fun initialise() {
-        modules += listOf(
-            ClickGui,
-            // DUNGEON
-            LeapMenu,
-            AutoDoorOpener,
-            DungeonAbilities,
-            DungeonBreaker,
-            FireFreeze,
-            DungeonESP,
-            Splits,
-            Secrets,
-            PuzzleSolvers,
-            InteractiveMap,
-            DungeonMap,
-            AutoRoutes,
-            BloodCamp,
-            WarpCooldown,
-            AutoCroesus,
-
-            // FLOOR 7
-            ArrowAlign,
-            AutoLeap,
-            BarrierBoom,
-            FuckDiorite,
-            LightsDevice,
-            P4PlatformHighlight,
-            SimonSays,
-            TerminalAura,
-            CrystalAura,
-            Relics,
-            TickTimers,
-            AutoInvincibility,
-            InvincibilityTimer,
-            WitherCloak,
-
-            // MISC
-            Test,
-            CatMode,
-            ChocolateFactory,
-            CustomTriggers,
-            MirrorverseSolvers,
-            AutoCarnival,
-            GreatSpook,
-            Slayers,
-            Dojo,
-
-            // GENERAL
-            AutoSprint,
-            PlayerDisplay,
-            Tweaks,
-            AntiNick,
-            AutoBookCombine,
-            AutoClicker,
-            AutoGFS,
-            AutoHotbar,
-            AutoJoinSkyBlock,
-            AutoKick,
-            AutoLoadout,
-            AutoSell,
-            AutoWardrobe,
-            Chat,
-            EscrowFix,
-            Inventory,
-            PetKeybinds,
-            Titles,
-            WardrobeKeybinds,
-
-            // RENDER
-            NameTags,
-            RenderOptimiser,
-            CustomMainMenu,
-            NickHider,
-            RevertMasterStars,
-            HidePlayers,
-            InfoHud,
-            PlayerESP,
-            Trajectories,
-            EtherwarpOverlay,
-            Waypoints,
-            ItemAnimations,
-
-            // MINING
-            CrystalHollowsMap,
-            CrystalHollowsScanner,
-            CommissionDisplay,
-            GlaciteTunnels,
-            MineshaftESP,
-            GrieferTracker,
-            NoGemstoneDesync,
-            GhostESP,
-            AbilityAlert,
-        )
+        ClassGraph()
+            .enableClassInfo()
+            .acceptPackages("quoi.module.impl")
+            .overrideClassLoaders(Module::class.java.classLoader)
+            .scan()
+            .use { scan ->
+                scan.getSubclasses(Module::class.java.name)
+                    .filter { !it.isAbstract }
+                    .sortedBy { it.name }
+                    .forEach { classInfo ->
+                        val clazz = classInfo.loadClass(Module::class.java)
+                        modules += clazz.getField("INSTANCE").get(null) as Module
+                    }
+            }
 
         modules.filter { it.alwaysActive }.forEach { it.onEnable() }
 
@@ -129,6 +36,8 @@ object ModuleManager : EventListener {
                 module.register(KeybindComponent("Key bind", it, desc = "Toggles the module"))
             }
         }
+
+        logger.info("Loaded ${modules.size} modules.")
 
         on<KeyEvent.Press> { invokeKeybind(key, true) }
         on<KeyEvent.Release> { invokeKeybind(key, false) }
