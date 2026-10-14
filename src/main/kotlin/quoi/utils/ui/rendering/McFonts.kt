@@ -1,6 +1,6 @@
-package quoi.utils.ui.rendering
-
 //~ texture_resources
+
+package quoi.utils.ui.rendering
 
 import com.mojang.blaze3d.platform.NativeImage
 import com.mojang.blaze3d.systems.RenderSystem

@@ -1,8 +1,6 @@
 package quoi.module.impl.render.clickgui
 
-import com.mojang.blaze3d.Blaze3D
 import java.net.URI
-import net.minecraft.util.Util
 import quoi.annotations.AlwaysActive
 import quoi.annotations.Internal
 import quoi.api.abobaui.AbobaUI
@@ -69,6 +67,12 @@ import quoi.utils.ui.onHover
 import quoi.utils.ui.rendering.NVGRenderer
 import quoi.utils.ui.rendering.NVGRenderer.defaultFont
 import quoi.utils.ui.screens.UIScreen.Companion.open
+
+//? if <26.3 {
+import net.minecraft.util.Util
+//?} else {
+/*import com.mojang.blaze3d.Blaze3D
+*///?}
 
 @AlwaysActive
 @OptIn(Internal::class)

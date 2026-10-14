@@ -1,13 +1,9 @@
 package quoi.module.impl.render
 
-import com.mojang.blaze3d.Blaze3D
-import java.io.File
 import net.fabricmc.fabric.api.client.screen.v1.Screens
 import net.minecraft.client.gui.components.AbstractWidget
 import net.minecraft.client.gui.screens.TitleScreen
-import net.minecraft.util.Util
 import quoi.api.colour.Colour
-import quoi.api.colour.withAlpha
 import quoi.api.events.GuiEvent
 import quoi.api.events.TickEvent
 import quoi.api.events.core.on
@@ -16,6 +12,13 @@ import quoi.module.settings.UIComponent.Companion.childOf
 import quoi.module.settings.impl.SelectorComponent
 import quoi.ui.CustomMainMenuScreen
 import quoi.utils.StringUtils.noControlCodes
+import java.io.File
+
+//? if <26.3 {
+import net.minecraft.util.Util
+//?} else {
+/*import com.mojang.blaze3d.Blaze3D
+*///?}
 
 object CustomMainMenu : Module(
     "Custom Main Menu",
@@ -47,21 +50,19 @@ object CustomMainMenu : Module(
         "Copyright Mojang AB. Do not distribute!",
     )
 
-    val backgroundFolder = File(mc.gameDirectory, "config/quoi!/images").apply { mkdirs() }
-    private val backgroundOptions = mutableListOf(VANILLA_BACKGROUND)
-    private var backgroundSnapshot = emptyList<String>()
-    private var refreshTicks = 0
+    private val backgroundFolder = File(mc.gameDirectory, "config/quoi!/images").apply { mkdirs() }
+    private var lastBackgroundRefresh = 0L
 
     val backgroundImage: SelectorComponent<String> by selector(
         "Background image",
         VANILLA_BACKGROUND,
-        backgroundOptions,
+        listOf(VANILLA_BACKGROUND),
         desc = "Images from config/quoi!/images."
     )
     val autoMenuColour by switch("Auto menu colour", true, desc = "Picks the menu colour from the custom background image.")
     val menuColour by colourPicker(
         "Menu colour",
-        Colour.RGB(255, 204, 134).withAlpha(255),
+        Colour.RGB(255, 204, 134),
         desc = "Accent colour for custom main menu buttons and overlays."
     )
     private val openBackgroundsFolder by button("Open backgrounds folder") {
@@ -74,14 +75,9 @@ object CustomMainMenu : Module(
         .childOf(::showP3SimButton)
 
     init {
-        refreshBackgroundOptions(force = true)
+        refreshBackgroundOptions()
 
-        on<TickEvent.End> {
-            if (++refreshTicks >= 20) {
-                refreshTicks = 0
-                refreshBackgroundOptions()
-            }
-        }
+        on<TickEvent.End> { refreshBackgroundOptions() }
 
         on<GuiEvent.Open.Post> {
             if (screen !is TitleScreen) return@on
@@ -104,21 +100,22 @@ object CustomMainMenu : Module(
         return File(backgroundFolder, selected).takeIf { it.isFile }
     }
 
-    private fun refreshBackgroundOptions(force: Boolean = false) {
+    private fun refreshBackgroundOptions() {
+        val now = System.currentTimeMillis()
+        if (now - lastBackgroundRefresh < 1000) return
+        lastBackgroundRefresh = now
+
         val files = backgroundFolder.listFiles()
             ?.filter { it.isFile && it.extension.lowercase() in SUPPORTED_BACKGROUND_EXTENSIONS }
             ?.map { it.name }
             ?.sortedWith(String.CASE_INSENSITIVE_ORDER)
             ?: emptyList()
-        if (!force && files == backgroundSnapshot) return
+        val options = listOf(VANILLA_BACKGROUND) + files
+        if (options == backgroundImage.options) return
 
         val previous = backgroundImage.selected
-        backgroundSnapshot = files
-        backgroundOptions.clear()
-        backgroundOptions += VANILLA_BACKGROUND
-        backgroundOptions += files
-        backgroundImage.options = backgroundOptions
-        backgroundImage.selected = if (previous in backgroundOptions) previous else VANILLA_BACKGROUND
+        backgroundImage.options = options
+        backgroundImage.selected = previous
     }
 
     private fun isExternalTitleButton(widget: AbstractWidget): Boolean {
