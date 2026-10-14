@@ -71,6 +71,7 @@ object ModuleManager : EventListener {
             CustomTriggers,
             MirrorverseSolvers,
             AutoCarnival,
+            GreatSpook,
             Slayers,
             Dojo,
 

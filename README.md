@@ -203,6 +203,11 @@ Use [actions tab](https://github.com/jcnlk/quoi/actions) to download (you need t
   - **Swiftness** - Moves between green wool targets automatically.
   - **Control** - Predicts the skeleton's position, with auto aim and centring.
   - **Tenacity** - Shows fireball trajectories and impact areas.
+- **Great Spook**
+  - Triggers its solvers and spawn title directly from chat messages.
+  - Automatically answers Quick Maths and Public Speaking in all chat and signs Commitment Phobia's document.
+  - Configures each auto solver separately, with an answer delay in client ticks that defaults to zero.
+  - Shows a Primal Fear spawn title, with an option to hide it in dungeons.
 - **Mirrorverse Solvers**
   - Adds overlays and automation for the Rift's Mirrorverse.
   - **Lava Maze** - Walks the maze route automatically.
