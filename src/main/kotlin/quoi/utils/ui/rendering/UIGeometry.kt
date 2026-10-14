@@ -16,6 +16,66 @@ import kotlin.math.sqrt
  */
 object UIGeometry {
 
+    /** Clip both triangles of each GUI quad, interpolating UVs and vertex colours. */
+    fun clipQuads(vertices: FloatArray, colors: IntArray, rect: FloatArray): Pair<FloatArray, IntArray> {
+        if (rect[2] <= rect[0] || rect[3] <= rect[1]) return FloatArray(0) to IntArray(0)
+        val output = ArrayList<Float>(vertices.size)
+        val outputColors = ArrayList<Int>(colors.size)
+        fun emit(vertex: ClipVertex) {
+            output.add(vertex.x); output.add(vertex.y); output.add(vertex.u); output.add(vertex.v)
+            outputColors.add(vertex.color)
+        }
+        for (offset in colors.indices step 4) {
+            val quad = (0..3).map { i ->
+                val p = (offset + i) * 4
+                ClipVertex(vertices[p], vertices[p + 1], vertices[p + 2], vertices[p + 3], colors[offset + i])
+            }
+            if (quad.all { it.x >= rect[0] && it.x <= rect[2] && it.y >= rect[1] && it.y <= rect[3] }) {
+                quad.forEach(::emit)
+                continue
+            }
+            for (triangle in listOf(listOf(quad[0], quad[1], quad[2]), listOf(quad[0], quad[2], quad[3]))) {
+                var polygon = triangle
+                for (edge in 0..3) {
+                    if (polygon.isEmpty()) break
+                    val axis = edge % 2
+                    val boundary = rect[edge]
+                    val keepGreater = edge < 2
+                    fun coordinate(v: ClipVertex) = if (axis == 0) v.x else v.y
+                    fun inside(v: ClipVertex) = if (keepGreater) coordinate(v) >= boundary else coordinate(v) <= boundary
+                    val clipped = ArrayList<ClipVertex>()
+                    var previous = polygon.last()
+                    for (next in polygon) {
+                        if (inside(previous) != inside(next)) {
+                            val t = (boundary - coordinate(previous)) / (coordinate(next) - coordinate(previous))
+                            val intersection = previous.interpolate(next, t)
+                            clipped.add(if (axis == 0) intersection.copy(x = boundary) else intersection.copy(y = boundary))
+                        }
+                        if (inside(next)) clipped.add(next)
+                        previous = next
+                    }
+                    polygon = clipped
+                }
+                for (i in 1 until polygon.size - 1) {
+                    emit(polygon[0]); emit(polygon[i]); emit(polygon[i + 1]); emit(polygon[i + 1])
+                }
+            }
+        }
+        return output.toFloatArray() to outputColors.toIntArray()
+    }
+
+    private data class ClipVertex(val x: Float, val y: Float, val u: Float, val v: Float, val color: Int) {
+        fun interpolate(other: ClipVertex, t: Float): ClipVertex {
+            var blended = 0
+            for (shift in intArrayOf(0, 8, 16, 24)) {
+                val a = (color ushr shift) and 255
+                val b = (other.color ushr shift) and 255
+                blended = blended or ((a + (b - a) * t).toInt().coerceIn(0, 255) shl shift)
+            }
+            return ClipVertex(x + (other.x - x) * t, y + (other.y - y) * t, u + (other.u - u) * t, v + (other.v - v) * t, blended)
+        }
+    }
+
     /**
      * Segments used to approximate a 90° arc of the given pixel radius, using NanoVG's
      * adaptive curve division with a 0.25px tessellation tolerance:

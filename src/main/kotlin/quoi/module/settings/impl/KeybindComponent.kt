@@ -18,10 +18,13 @@ import quoi.api.input.Keyboard.modifierCodes
 import quoi.api.input.Mouse
 import quoi.api.input.CursorShape
 import quoi.api.input.Keybinds
+import quoi.config.KeyCodeAdapter
 import quoi.module.settings.Saving
 import quoi.module.settings.UIComponent
 import quoi.utils.ThemeManager.theme
 import quoi.utils.ui.cursor
+
+private val keyCodeAdapter = KeyCodeAdapter()
 
 class KeybindComponent(
     name: String,
@@ -51,25 +54,24 @@ class KeybindComponent(
     }
 
     override fun write(): JsonElement = JsonObject().apply {
-        addProperty("key", value.key)
+        add("keyName", keyCodeAdapter.toJsonTree(value.key))
         if (value.modifiers.isNotEmpty()) {
             val mods = JsonArray()
-            value.modifiers.forEach { mods.add(it) }
+            value.modifiers.forEach { mods.add(keyCodeAdapter.toJsonTree(it)) }
             add("modifiers", mods)
         }
     }
 
     override fun read(element: JsonElement) {
-        if (element.isJsonObject) {
-            val obj = element.asJsonObject
-            value.key = obj.get("key").asInt
-            value.modifiers.clear()
-            obj.get("modifiers")?.asJsonArray?.forEach {
-                value.modifiers.add(it.asInt)
-            }
-        } else if (element.isJsonPrimitive) { // legacy
-            value.key = element.asInt
-            value.modifiers.clear()
+        if (!element.isJsonObject || !element.asJsonObject.has("keyName")) {
+            value.clear()
+            return
+        }
+        val obj = element.asJsonObject
+        value.key = keyCodeAdapter.fromJsonTree(obj.get("keyName"))
+        value.modifiers.clear()
+        obj.get("modifiers")?.asJsonArray?.forEach {
+            value.modifiers.add(keyCodeAdapter.fromJsonTree(it))
         }
     }
 

@@ -1,5 +1,7 @@
 package quoi.api.customtriggers.triggers
 
+import com.google.gson.annotations.JsonAdapter
+import com.google.gson.annotations.SerializedName
 import quoi.api.abobaui.constraints.impl.size.Copying
 import quoi.api.abobaui.dsl.*
 import quoi.api.abobaui.elements.ElementScope
@@ -11,10 +13,15 @@ import quoi.utils.ui.cursor
 import quoi.api.input.Keyboard
 import quoi.api.input.Keybinds
 import quoi.config.TypeName
+import quoi.config.KeyCodeAdapter
 import quoi.utils.ThemeManager.theme
 
 @TypeName("key_pressed")
-class KeyTrigger(var key: Int = Keybinds.KEY_NONE) : Trigger {
+class KeyTrigger(
+    @field:SerializedName("keyName")
+    @field:JsonAdapter(KeyCodeAdapter::class)
+    var key: Int = Keybinds.KEY_NONE
+) : Trigger {
     override val eventKind get() = TriggerContext.Kind.KEY
 
     override fun validationError() = if (key == Keybinds.KEY_NONE) "Choose a key or mouse button." else null

@@ -46,8 +46,13 @@ object PetKeybinds : Module(
     private val fastMode by switch("Fast mode", desc = "Blocks movement and input only while the Pets menu data is being read.")
 
     private val advanced by text("Keybinds")
-    private val petKeys = (1..9).map { i ->
-        KeybindComponent("Pet $i", Keybinds.KEY_0 + i, "Pet $i on the list.").childOf(::advanced).value
+    private val petKeys = listOf(
+        Keybinds.KEY_1, Keybinds.KEY_2, Keybinds.KEY_3,
+        Keybinds.KEY_4, Keybinds.KEY_5, Keybinds.KEY_6,
+        Keybinds.KEY_7, Keybinds.KEY_8, Keybinds.KEY_9,
+    ).mapIndexed { index, key ->
+        val i = index + 1
+        KeybindComponent("Pet $i", key, "Pet $i on the list.").childOf(::advanced).value
     }
 
     private val petsRegex = Regex(

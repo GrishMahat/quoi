@@ -26,8 +26,13 @@ object WardrobeKeybinds : Module(
     private val noUnequip by switch("Disable unequip", desc = "Prevents using a wardrobe keybind to unequip a wardrobe. Does not prevent unequip keybind or normal clicking.")
 
     private val advanced by text("Keybinds")
-    private val wardrobeKeys = (1..9).map { i ->
-        KeybindComponent("Slot $i", Keybinds.KEY_0 + i, "Slot $i on the menu.").childOf(::advanced).value
+    private val wardrobeKeys = listOf(
+        Keybinds.KEY_1, Keybinds.KEY_2, Keybinds.KEY_3,
+        Keybinds.KEY_4, Keybinds.KEY_5, Keybinds.KEY_6,
+        Keybinds.KEY_7, Keybinds.KEY_8, Keybinds.KEY_9,
+    ).mapIndexed { index, key ->
+        val i = index + 1
+        KeybindComponent("Slot $i", key, "Slot $i on the menu.").childOf(::advanced).value
     }
 
     private val wardrobeRegex = Regex("""^\((\d+)/(\d+)\) Armor Sets$""")

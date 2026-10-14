@@ -1,13 +1,13 @@
 package quoi.config
 
+import com.google.gson.*
 import quoi.QuoiMod.logger
 import quoi.QuoiMod.mc
 import quoi.api.events.GameEvent
-import quoi.module.ModuleManager
-import quoi.module.settings.Saving
-import com.google.gson.*
 import quoi.api.events.core.EventListener
 import quoi.api.events.core.once
+import quoi.module.ModuleManager
+import quoi.module.settings.Saving
 import java.io.File
 
 /**
@@ -18,6 +18,7 @@ import java.io.File
 object Config : EventListener {
 
     private val gson = GsonBuilder().setPrettyPrinting().create()
+    private var loaded = false
 
     private val configFile = File(mc.gameDirectory, "config/quoi!/quoi-config.json").apply {
         try {
@@ -34,9 +35,13 @@ object Config : EventListener {
     }
 
     fun load() {
+        loaded = false
         try {
-            with (configFile.bufferedReader().use { it.readText() }) {
-                if (isEmpty()) return
+            with(configFile.bufferedReader().use { it.readText() }) {
+                if (isEmpty()) {
+                    loaded = true
+                    return
+                }
 
                 val jsonElement = JsonParser.parseString(this)
                 val jsonArray = if (jsonElement.isJsonArray) jsonElement.asJsonArray else return
@@ -65,6 +70,7 @@ object Config : EventListener {
                         }
                     }
                 }
+                loaded = true
             }
         } catch (e: Exception) {
             println("Error loading config.\n${e.message}")
@@ -73,6 +79,7 @@ object Config : EventListener {
     }
 
     fun save() {
+        if (!loaded) return
         try {
             // reason doing this is better is that
             // using like a custom serializer leaves 'null' in settings that don't save

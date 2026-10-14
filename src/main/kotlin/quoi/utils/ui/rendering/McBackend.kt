@@ -329,18 +329,23 @@ class McBackend : RendererBackend {
             return
         }
 
-        val outline = UIGeometry.roundedRectOutline(x, y, w, h, tl, bl, br, tr)
-        val quads = UIGeometry.fanToQuads(outline)
+        val inner = roundedRectContour(x, y, w, h, tl, bl, br, tr, -AA_FRINGE * 0.5f)
+        val outer = roundedRectContour(x, y, w, h, tl, bl, br, tr, AA_FRINGE * 0.5f)
         beginBatch(RenderPipelines.GUI_TEXTURED, entry.texture, scissorStack.lastOrNull())
-        var i = 0
-        while (i < quads.size) {
-            val vx = quads[i]
-            val vy = quads[i + 1]
-            val u = if (w != 0f) (vx - x) / w else 0f
-            val v = if (h != 0f) (vy - y) / h else 0f
-            addVertex(vx, vy, u, v, multiplyAlpha(tint))
-            i += 2
+        fun emit(quads: FloatArray, fringe: Boolean) {
+            var i = 0
+            while (i < quads.size) {
+                val vx = quads[i]
+                val vy = quads[i + 1]
+                val u = if (w != 0f) (vx - x) / w else 0f
+                val v = if (h != 0f) (vy - y) / h else 0f
+                val color = if (fringe && i % 8 >= 4) tint and 0xffffff else tint
+                addVertex(vx, vy, u, v, multiplyAlpha(color))
+                i += 2
+            }
         }
+        emit(UIGeometry.fanToQuads(inner), false)
+        emit(UIGeometry.bandToQuads(inner, outer), true)
     }
 
     override fun registerImage(image: Image) = images.register(image)
@@ -473,6 +478,10 @@ class McBackend : RendererBackend {
         }
 
         if (bounds != null && bounds.width > 0 && bounds.height > 0) {
+            val vertices = pendingVerts.toFloatArray()
+            val colors = pendingCols.toIntArray()
+            val clipped = scissor?.let { UIGeometry.clipQuads(vertices, colors, it.rect) } ?: (vertices to colors)
+            if (clipped.first.isEmpty()) { resetBatch(); return }
             val textureSetup = pendingTexture?.let {
                 TextureSetup.singleTexture(it.textureView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR))
             } ?: TextureSetup.noTexture()
@@ -482,8 +491,8 @@ class McBackend : RendererBackend {
                     pendingPipeline ?: RenderPipelines.GUI,
                     textureSetup,
                     Matrix3x2f(basePose),
-                    pendingVerts.toFloatArray(),
-                    pendingCols.toIntArray(),
+                    clipped.first,
+                    clipped.second,
                     pendingTexture != null,
                     scissor?.screenRect,
                     bounds,
@@ -544,8 +553,8 @@ class McBackend : RendererBackend {
     /**
      * Window-px clip → GUI-pixel ScreenRectangle. Round outwards: nearest rounding can
      * move a clip edge inward by up to half a GUI pixel (1.5 physical px at scale 3),
-     * visibly shaving category edges and rounded top/bottom caps. Geometry still limits
-     * actual drawing at the precise window-pixel boundary.
+     * visibly shaving category edges and rounded top/bottom caps. flush() clips the
+     * vertex geometry at the precise window-pixel boundary before submission.
      */
     private fun toScreenRect(rect: FloatArray): ScreenRectangle? {
         // GuiRenderer only clamps the right and bottom edges before forwarding the
