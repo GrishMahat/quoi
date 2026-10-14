@@ -217,7 +217,7 @@ object AutoLeap : Module(
                 leapToConfigured(crystalName, crystalClass.selected)
             }
 
-            if (i4Leap && i4Auto && isAtPre4() && unformatted.startsWith("${player.name.string} completed a device!")) {
+            if (i4Leap && i4Auto && isAtPre4() && Floor7.inStage(Stage.S1) && unformatted.startsWith("${player.name.string} completed a device!")) {
                 leapToPre4Target()
             }
         }
