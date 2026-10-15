@@ -19,6 +19,6 @@ public class PlayerItemInHandLayerMixin {
             at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/item/ItemStackRenderState;submit(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;III)V")
     )
     private void quoi$itemAnimationsThirdPersonEyeItem(AvatarRenderState avatarRenderState, HumanoidArm humanoidArm, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, CallbackInfo ci) {
-        ItemAnimations.applyThirdPersonPlayerTransformations(poseStack, avatarRenderState.getUseItemStackForArm(humanoidArm), avatarRenderState.id);
+        ItemAnimations.applyThirdPersonPlayerTransformations(poseStack, avatarRenderState.id);
     }
 }

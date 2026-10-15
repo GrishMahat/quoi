@@ -28,6 +28,6 @@ public class ItemInHandLayerMixin {
     )
     private void quoi$itemAnimationsThirdPerson(ArmedEntityRenderState armedEntityRenderState, ItemStackRenderState itemStackRenderState, ItemStack itemStack, HumanoidArm humanoidArm, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, CallbackInfo ci) {
         if (!(armedEntityRenderState instanceof AvatarRenderState avatarRenderState)) return;
-        ItemAnimations.applyThirdPersonPlayerTransformations(poseStack, itemStack, avatarRenderState.id);
+        ItemAnimations.applyThirdPersonPlayerTransformations(poseStack, avatarRenderState.id);
     }
 }

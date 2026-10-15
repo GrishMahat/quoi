@@ -1,17 +1,14 @@
 package quoi.mixins;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
-import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.math.Axis;
 import net.minecraft.client.renderer.FirstPersonHandsAndItemsRenderer;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
 import net.minecraft.client.renderer.state.level.FirstPersonHandsAndItemsRenderState;
 import net.minecraft.client.renderer.state.level.PlayerRenderState;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.LivingEntity;
@@ -34,13 +31,6 @@ public abstract class ItemInHandRendererMixin {
     private float quoi$itemAnimationsSwing(float original, float frameInterp, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, PlayerRenderState playerState, FirstPersonHandsAndItemsRenderState state) {
         if (!ItemAnimations.INSTANCE.getEnabled()) return original;
 
-        if (state.mainHandItem.isEmpty() && !ItemAnimations.affectHand()) {
-            return original;
-        }
-        if (state.mainHandItem.has(DataComponents.MAP_ID) && !ItemAnimations.affectMap()) {
-            return original;
-        }
-
         return ItemAnimations.getSwingAnimation(frameInterp);
     }
 
@@ -49,7 +39,7 @@ public abstract class ItemInHandRendererMixin {
             at = @At(value = "FIELD", target = "Lnet/minecraft/client/renderer/state/level/FirstPersonHandsAndItemsRenderState;attackHand:Lnet/minecraft/world/InteractionHand;")
     )
     private InteractionHand quoi$itemAnimationsSwingHand(InteractionHand original, float frameInterp, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, PlayerRenderState playerState, FirstPersonHandsAndItemsRenderState state) {
-        LivingEntity.SwingDescription swing = ItemAnimations.getSwingDescription(null, state.mainHandItem);
+        LivingEntity.SwingDescription swing = ItemAnimations.getSwingDescription(null);
         return swing != null ? swing.hand() : original;
     }
 
@@ -58,7 +48,7 @@ public abstract class ItemInHandRendererMixin {
             at = @At(value = "FIELD", target = "Lnet/minecraft/client/renderer/entity/state/AvatarRenderState;currentSwing:Lnet/minecraft/world/entity/LivingEntity$SwingDescription;")
     )
     private LivingEntity.SwingDescription quoi$itemAnimationsSwingDescription(LivingEntity.SwingDescription original, PlayerRenderState playerState, FirstPersonHandsAndItemsRenderState state) {
-        return ItemAnimations.getSwingDescription(original, state.mainHandItem);
+        return ItemAnimations.getSwingDescription(original);
     }
 
     @Inject(
@@ -84,9 +74,7 @@ public abstract class ItemInHandRendererMixin {
     )
     private void quoi$itemAnimationsMainTransform(PlayerRenderState playerState, FirstPersonHandsAndItemsRenderState state, float partialTicks, float xRot, net.minecraft.world.InteractionHand hand, float attack, ItemStack itemStack, float inverseArmHeight, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int lightCoords, CallbackInfo ci) {
         if (hand != net.minecraft.world.InteractionHand.MAIN_HAND) return;
-        if (itemStack.isEmpty() && !ItemAnimations.affectHand()) return;
-        if (itemStack.has(DataComponents.MAP_ID) && !ItemAnimations.affectMap()) return;
-        ItemAnimations.applyTransformations(poseStack, itemStack);
+        ItemAnimations.applyTransformations(poseStack);
     }
 
     @Inject(
@@ -94,7 +82,6 @@ public abstract class ItemInHandRendererMixin {
             at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/FirstPersonHandsAndItemsRenderer;renderPlayerHand(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;ILnet/minecraft/world/entity/HumanoidArm;Lnet/minecraft/client/renderer/state/level/PlayerRenderState;)V")
     )
     private void quoi$itemAnimationsArmScale(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, float f, float g, HumanoidArm humanoidArm, PlayerRenderState playerState, CallbackInfo ci) {
-        if (!ItemAnimations.affectHand()) return;
         ItemAnimations.applyScale(poseStack);
     }
 
@@ -107,14 +94,6 @@ public abstract class ItemInHandRendererMixin {
         HumanoidArm arm = hand == net.minecraft.world.InteractionHand.MAIN_HAND ? avatar.mainArm : avatar.mainArm.getOpposite();
         ItemDisplayContext displayContext = arm == HumanoidArm.RIGHT ? ItemDisplayContext.FIRST_PERSON_RIGHT_HAND : ItemDisplayContext.FIRST_PERSON_LEFT_HAND;
         ItemAnimations.applyScale(poseStack, itemStack, displayContext);
-    }
-
-    @WrapWithCondition(
-            method = "submitHandsWithItems",
-            at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/PoseStack;rotateDegrees(Lcom/mojang/math/Axis;F)V")
-    )
-    private boolean quoi$itemAnimationsSway(PoseStack instance, Axis axis, float degrees) {
-        return !ItemAnimations.disableHandSway();
     }
 
     @ModifyVariable(
@@ -154,26 +133,10 @@ public abstract class ItemInHandRendererMixin {
     }
 
     @Inject(
-            method = "applyEatTransform",
-            at = @At(
-                    value = "INVOKE",
-                    target = "Ljava/lang/Math;pow(DD)D",
-                    shift = At.Shift.BEFORE
-            ),
-            cancellable = true
-    )
-    private void quoi$cancelEatTransform(PoseStack poseStack, float partialTicks, HumanoidArm humanoidArm, float useItemRemainingTicks, int useDuration, CallbackInfo ci) {
-        if (ItemAnimations.disableEat()){
-            ci.cancel();
-        }
-    }
-
-    @Inject(
             method = "renderMapHand",
             at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/FirstPersonHandsAndItemsRenderer;renderPlayerHand(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;ILnet/minecraft/world/entity/HumanoidArm;Lnet/minecraft/client/renderer/state/level/PlayerRenderState;)V")
     )
     private void quoi$mapScale1(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, HumanoidArm humanoidArm, PlayerRenderState playerState, CallbackInfo ci) {
-        if (!ItemAnimations.affectMap()) return;
         ItemAnimations.applyScale(poseStack);
     }
 
@@ -183,7 +146,6 @@ public abstract class ItemInHandRendererMixin {
     )
     private void quoi$mapScale2(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, ItemStack itemStack, boolean mainHand, FirstPersonHandsAndItemsRenderState state, CallbackInfo ci) {
         if (!ItemAnimations.INSTANCE.getEnabled()) return;
-        if (!ItemAnimations.affectMap()) return;
         poseStack.translate(64f, 64f, 0f);
         ItemAnimations.applyScale(poseStack);
         poseStack.translate(-64f, -64f, 0f);

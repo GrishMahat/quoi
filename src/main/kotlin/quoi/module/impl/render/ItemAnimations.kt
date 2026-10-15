@@ -4,14 +4,12 @@ import com.mojang.blaze3d.vertex.PoseStack
 import com.mojang.math.Axis
 import kotlin.math.pow
 import net.minecraft.client.renderer.entity.state.FishingHookRenderState
-import net.minecraft.core.component.DataComponents
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.effect.MobEffectUtil
 import net.minecraft.world.effect.MobEffects
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.entity.projectile.FishingHook
-import net.minecraft.world.item.BlockItem
 import net.minecraft.world.item.FishingRodItem
 import net.minecraft.world.item.ItemDisplayContext
 import net.minecraft.world.item.ItemStack
@@ -20,8 +18,6 @@ import quoi.api.events.TickEvent
 import quoi.api.events.core.on
 import quoi.module.Module
 import quoi.module.settings.Setting.Companion.json
-import quoi.utils.skyblock.item.ItemUtils.loreString
-import quoi.utils.skyblock.item.ItemUtils.skyblockId
 import quoi.utils.ui.settingFromK0
 
 // Kyleen
@@ -32,24 +28,17 @@ object ItemAnimations : Module(
     private var x by slider("X", 0.0f, -1.0f, 1.0f, 0.1)
     private var y by slider("Y", 0.0f, -1.0f, 1.0f, 0.1)
     private var z by slider("Z", 0.0f, -1.0f, 1.0f, 0.1)
-    private var blockYOffset by slider("Block Y Fix", 0.05f, -1.0f, 1.0f, 0.05)
     private var yaw by slider("Yaw", 0.0f, -180.0f, 180.0f, 1.0)
     private var pitch by slider("Pitch", 0.0f, -180.0f, 180.0f, 1.0)
     private var roll by slider("Roll", 0.0f, -180.0f, 180.0f, 1.0)
     private var scale by slider("Scale", 0.0, -4.0, 4.0, 0.1)
     private var swingSpeed by slider("Swing speed", 0.0, -4.0, 4.0, 0.1)
-    private val ignoreHand by switch("Ignore hand")
-    private val ignoreMap by switch("Ignore map")
     private val ignoreEffects by switch("Ignore effects")
     private val applyInThirdPerson by switch("Apply in third person").json("Third person")
     private val applyToOtherPlayers by switch("Apply to other players").json("Other players")
     private val noReequipReset by switch("No re-equip reset")
     private val inplaceSwing by switch("Swing in place")
     private val noSwing by switch("No swing animation")
-    private val noSwingTerm by switch("No term swing")
-    private val noSwingShortbow by switch("No shortbow swing")
-    private val noHandSway by switch("No hand sway")
-    private val noEatAnimation by switch("No eat animation")
     @Suppress("unused")
     private val reset by button("Reset") { resetSettings() }
 
@@ -83,7 +72,7 @@ object ItemAnimations : Module(
 
     private fun resetSettings() {
         setOf(
-            ::x, ::y, ::z, ::blockYOffset,
+            ::x, ::y, ::z,
             ::yaw, ::pitch,
             ::roll, ::scale, ::swingSpeed
         ).forEach { settingFromK0(it).reset() }
@@ -91,26 +80,7 @@ object ItemAnimations : Module(
 
     private fun calcSwingSpeed() = 2.0.pow(swingSpeed)
 
-    private fun disableSwingRotation(held: ItemStack?): Boolean {
-        if (!enabled) return false
-        if (noSwing) return true
-
-        if (!noSwingTerm && !noSwingShortbow) return false
-
-        if (held == null || held.isEmpty) return false
-
-        if (noSwingTerm) {
-            if (held.skyblockId == "TERMINATOR") return true
-        }
-
-        if (noSwingShortbow) {
-            if (held.loreString?.contains("Shortbow", ignoreCase = true) == true) return true
-        }
-
-        return false
-    }
-
-    private fun disableSwingRotation(): Boolean = disableSwingRotation(player.mainHandItem)
+    private fun disableSwingRotation(): Boolean = enabled && noSwing
 
     private fun getCurrentSwingDuration(): Int {
         if (ignoreEffects) return 6
@@ -122,11 +92,6 @@ object ItemAnimations : Module(
     }
 
     @JvmStatic fun disableReequip(): Boolean = enabled && noReequipReset
-    @JvmStatic fun disableHandSway(): Boolean = enabled && noHandSway
-    @JvmStatic fun disableEat(): Boolean = enabled && noEatAnimation
-
-    @JvmStatic fun affectHand(): Boolean = !ignoreHand
-    @JvmStatic fun affectMap(): Boolean = !ignoreMap
 
     @JvmStatic
     fun disableSwingTranslation(): Boolean {
@@ -139,7 +104,7 @@ object ItemAnimations : Module(
     }
 
     @JvmStatic
-    fun applyTransformations(pose: PoseStack, stack: ItemStack?) {
+    fun applyTransformations(pose: PoseStack) {
         if (!enabled) return
 
         //? if <26.3 {
@@ -152,19 +117,8 @@ object ItemAnimations : Module(
         pose.rotateDegrees(Axis.ZP, roll)
         *///?}
 
-        var renderY = y
-
-        if (stack != null && !stack.isEmpty) {
-            val item = stack.item
-            if (item is net.minecraft.world.item.PlayerHeadItem) {
-                renderY += (blockYOffset * 2.0f)
-            } else if (item is BlockItem) {
-                renderY += blockYOffset
-            }
-        }
-
-        if (x != 0.0f || renderY != 0.0f || z != 0.0f) {
-            pose.translate(x, renderY, z)
+        if (x != 0.0f || y != 0.0f || z != 0.0f) {
+            pose.translate(x, y, z)
         }
     }
 
@@ -206,21 +160,21 @@ object ItemAnimations : Module(
     }
 
     @JvmStatic
-    fun applyThirdPersonPlayerTransformations(pose: PoseStack, stack: ItemStack, playerId: Int) {
-        if (!shouldApplyThirdPerson(stack, playerId)) return
+    fun applyThirdPersonPlayerTransformations(pose: PoseStack, playerId: Int) {
+        if (!shouldApplyThirdPerson(playerId)) return
 
-        applyTransformations(pose, stack)
+        applyTransformations(pose)
         applyScale(pose)
     }
 
     @JvmStatic
     //? if <26.3 {
-    fun getThirdPersonSwingAnimation(current: Float, stack: ItemStack, playerId: Int): Float {
+    fun getThirdPersonSwingAnimation(current: Float, playerId: Int): Float {
     //?} else {
-    /*fun getThirdPersonSwingAnimation(current: Float, stack: ItemStack, playerId: Int, description: LivingEntity.SwingDescription?): Float {
+    /*fun getThirdPersonSwingAnimation(current: Float, playerId: Int, description: LivingEntity.SwingDescription?): Float {
     *///?}
-        if (!shouldApplyThirdPerson(stack, playerId)) return current
-        if (disableSwingRotation(stack)) return 0f
+        if (!shouldApplyThirdPerson(playerId)) return current
+        if (disableSwingRotation()) return 0f
 
         val pt = mc.deltaTracker.getGameTimeDeltaPartialTick(false)
         if (playerId == player.id) return getSwingAnimation(pt)
@@ -252,24 +206,22 @@ object ItemAnimations : Module(
         ((time - startTime) * speed / getCurrentSwingDuration()).toFloat()
     //? if >=26.3 {
     /*@JvmStatic
-    fun getThirdPersonSwingDescription(current: LivingEntity.SwingDescription?, stack: ItemStack, playerId: Int): LivingEntity.SwingDescription? {
-        if (!shouldApplyThirdPerson(stack, playerId)) return current
-        return if (playerId == player.id) getSwingDescription(current, stack)
+    fun getThirdPersonSwingDescription(current: LivingEntity.SwingDescription?, playerId: Int): LivingEntity.SwingDescription? {
+        if (!shouldApplyThirdPerson(playerId)) return current
+        return if (playerId == player.id) getSwingDescription(current)
         else thirdPersonSwings[playerId]?.description ?: current
     }
 
     @JvmStatic
-    fun getSwingDescription(current: LivingEntity.SwingDescription?, stack: ItemStack): LivingEntity.SwingDescription? {
-        if (!enabled || (stack.isEmpty && !affectHand()) || (stack.has(DataComponents.MAP_ID) && !affectMap())) return current
+    fun getSwingDescription(current: LivingEntity.SwingDescription?): LivingEntity.SwingDescription? {
+        if (!enabled) return current
         return if (swinging || prevAttackAnim > 0f) swingDescription ?: current else current
     }
     *///?}
 
-    private fun shouldApplyThirdPerson(stack: ItemStack, playerId: Int): Boolean {
+    private fun shouldApplyThirdPerson(playerId: Int): Boolean {
         return enabled &&
-            (if (playerId == player.id) applyInThirdPerson else applyToOtherPlayers) &&
-            (!stack.isEmpty || affectHand()) &&
-            (!stack.has(DataComponents.MAP_ID) || affectMap())
+            (if (playerId == player.id) applyInThirdPerson else applyToOtherPlayers)
     }
 
     @JvmStatic
