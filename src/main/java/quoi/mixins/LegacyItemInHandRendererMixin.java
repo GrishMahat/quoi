@@ -1,5 +1,6 @@
 package quoi.mixins;
 
+//~ item_in_hand
 import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
@@ -30,7 +31,8 @@ public abstract class LegacyItemInHandRendererMixin {
 
     @WrapOperation(
             method = "renderHandsWithItems",
-            at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/LocalPlayer;getAttackAnim(F)F")
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/LocalPlayer;getAttackAnim(F)F"),
+            require = 1
     )
     private float quoi$itemAnimationsSwing(LocalPlayer instance, float v, Operation<Float> original) {
         if (!ItemAnimations.INSTANCE.getEnabled()) return original.call(instance, v);
@@ -56,7 +58,8 @@ public abstract class LegacyItemInHandRendererMixin {
 
     @WrapOperation(
             method = "tick",
-            at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/LocalPlayer;getAttackStrengthScale(F)F")
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/LocalPlayer;getItemSwapScale(F)F"),
+            require = 1
     )
     private float quoi$itemAnimationsBob(LocalPlayer instance, float v, Operation<Float> original) {
         if (ItemAnimations.disableReequip() || ItemAnimations.disableSwingBob()) return 1f;
@@ -82,7 +85,8 @@ public abstract class LegacyItemInHandRendererMixin {
                     value = "INVOKE",
                     target = "Lnet/minecraft/client/renderer/ItemInHandRenderer;renderArmWithItem(Lnet/minecraft/client/player/AbstractClientPlayer;FFLnet/minecraft/world/InteractionHand;FLnet/minecraft/world/item/ItemStack;FLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;I)V",
                     ordinal = 0
-            )
+            ),
+            require = 1
     )
     private void quoi$itemAnimationsMainTransform(float f, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, LocalPlayer localPlayer, int i, CallbackInfo ci) {
         if (mainHandItem.isEmpty() && !ItemAnimations.affectHand()) return;
@@ -109,7 +113,8 @@ public abstract class LegacyItemInHandRendererMixin {
 
     @WrapWithCondition(
             method = "renderHandsWithItems",
-            at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/PoseStack;mulPose(Lorg/joml/Quaternionfc;)V")
+            at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/PoseStack;mulPose(Lorg/joml/Quaternionfc;)V"),
+            require = 1
     )
     private boolean quoi$itemAnimationsSway(PoseStack instance, Quaternionfc quaternionfc) {
         return !ItemAnimations.disableHandSway();
@@ -168,7 +173,8 @@ public abstract class LegacyItemInHandRendererMixin {
 
     @Inject(
             method = "renderMapHand",
-            at = @At(value = "INVOKE", target = "Lnet/minecraft/core/ClientAsset$Texture;texturePath()Lnet/minecraft/resources/ResourceLocation;")
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/core/ClientAsset$Texture;texturePath()Lnet/minecraft/resources/Identifier;"),
+            require = 1
     )
     private void quoi$mapScale1(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, HumanoidArm humanoidArm, CallbackInfo ci) {
         if (!ItemAnimations.affectMap()) return;
@@ -177,7 +183,8 @@ public abstract class LegacyItemInHandRendererMixin {
 
     @Inject(
             method = "renderMap",
-            at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/SubmitNodeCollector;submitCustomGeometry(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/RenderType;Lnet/minecraft/client/renderer/SubmitNodeCollector$CustomGeometryRenderer;)V")
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/SubmitNodeCollector;submitCustomGeometry(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/rendertype/RenderType;Lnet/minecraft/client/renderer/SubmitNodeCollector$CustomGeometryRenderer;)V"),
+            require = 1
     )
     private void quoi$mapScale2(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, ItemStack itemStack, CallbackInfo ci) {
         if (!ItemAnimations.INSTANCE.getEnabled()) return;

@@ -61,6 +61,11 @@ stonecutter parameters {
         replace("NVGSpecialRenderer.draw(ctx, 0, 0, ctx.guiWidth(), ctx.guiHeight())", "UIRenderer.frame(ctx)")
     }
 
+    replacements.string(gui, "item_in_hand") {
+        replace("renderHandsWithItems", "submitHandsWithItems")
+        replace("renderArmWithItem", "submitArmWithItem")
+    }
+
     replacements.string(current.parsed >= "26.4-snapshot-3", "texture_resources") {
         replace(
             "import net.minecraft.client.renderer.texture.DynamicTexture",
