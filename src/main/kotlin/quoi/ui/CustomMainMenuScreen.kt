@@ -63,9 +63,7 @@ class CustomMainMenuScreen(
         addButton("Singleplayer") { minecraft.setScreen(SelectWorldScreen(this)) }
         addButton("Multiplayer") { minecraft.setScreen(JoinMultiplayerScreen(this)) }
         if (CustomMainMenu.showHypixelButton) addButton("Join Hypixel") { joinServer("Hypixel", "mc.hypixel.net") }
-        if (CustomMainMenu.showP3SimButton) addButton("Join P3Sim") {
-            joinServer("P3Sim", if (CustomMainMenu.useEuP3SimServer) "eu.p3sim.net" else "p3sim.net")
-        }
+        if (CustomMainMenu.showP3SimButton) addButton("Join P3Sim") { joinServer("P3Sim", "p3sim.net") }
         //? if <26.3 {
         addButton("Options") { minecraft.setScreen(OptionsScreen(this, minecraft.options, false)) }
         //?} else {
@@ -192,8 +190,7 @@ class CustomMainMenuScreen(
             return file.inputStream().use { NativeImage.read(it) }
         }
 
-        val bufferedImage = ImageIO.read(file)
-            ?: error("Unsupported background image format: ${file.extension}")
+        val bufferedImage = ImageIO.read(file) ?: error("Unsupported background image format: ${file.extension}")
         val output = ByteArrayOutputStream()
         ImageIO.write(bufferedImage, "png", output)
         return ByteArrayInputStream(output.toByteArray()).use(NativeImage::read)

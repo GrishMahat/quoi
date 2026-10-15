@@ -8,7 +8,6 @@ import quoi.api.events.GuiEvent
 import quoi.api.events.TickEvent
 import quoi.api.events.core.on
 import quoi.module.Module
-import quoi.module.settings.UIComponent.Companion.childOf
 import quoi.module.settings.impl.SelectorComponent
 import quoi.ui.CustomMainMenuScreen
 import quoi.utils.StringUtils.noControlCodes
@@ -65,14 +64,14 @@ object CustomMainMenu : Module(
         Colour.RGB(255, 204, 134),
         desc = "Accent colour for custom main menu buttons and overlays."
     )
+
+    @Suppress("unused")
     private val openBackgroundsFolder by button("Open backgrounds folder") {
         runCatching { Util.getPlatform().openPath(backgroundFolder.toPath()) }
     }
     val dimAmount by slider("Background dim", 0.2f, 0f, 0.95f, 0.05f)
     val showHypixelButton by switch("Hypixel button", true, desc = "Shows a quick join button for Hypixel.")
     val showP3SimButton by switch("P3Sim button", true, desc = "Shows a quick join button for p3sim.net.")
-    val useEuP3SimServer by switch("Use EU server", false, desc = "Uses eu.p3sim.net for the P3Sim quick join button.")
-        .childOf(::showP3SimButton)
 
     init {
         refreshBackgroundOptions()
@@ -82,8 +81,7 @@ object CustomMainMenu : Module(
         on<GuiEvent.Open.Post> {
             if (screen !is TitleScreen) return@on
 
-            val extraButtons = Screens.getWidgets(screen)
-                .filter(::isExternalTitleButton)
+            val extraButtons = Screens.getWidgets(screen).filter(::isExternalTitleButton)
 
             // Replacing the screen while TitleScreen.init() is still on the stack leaves
             // the GUI state inconsistent. Defer it to the next client task instead.
