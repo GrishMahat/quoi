@@ -2,23 +2,23 @@ package quoi.module.impl.render
 
 import com.mojang.blaze3d.vertex.PoseStack
 import com.mojang.math.Axis
-import kotlin.math.pow
 import net.minecraft.client.renderer.entity.state.FishingHookRenderState
-import net.minecraft.world.InteractionHand
 import net.minecraft.world.effect.MobEffectUtil
 import net.minecraft.world.effect.MobEffects
-import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.entity.projectile.FishingHook
 import net.minecraft.world.item.FishingRodItem
 import net.minecraft.world.item.ItemDisplayContext
 import net.minecraft.world.item.ItemStack
-import net.minecraft.world.item.component.SwingAnimation
 import quoi.api.events.TickEvent
 import quoi.api.events.core.on
 import quoi.module.Module
 import quoi.module.settings.Setting.Companion.json
 import quoi.utils.ui.settingFromK0
+import kotlin.math.pow
+import net.minecraft.world.InteractionHand
+import net.minecraft.world.entity.LivingEntity
+import net.minecraft.world.item.component.SwingAnimation
 
 // Kyleen
 object ItemAnimations : Module(
@@ -39,6 +39,7 @@ object ItemAnimations : Module(
     private val noReequipReset by switch("No re-equip reset")
     private val inplaceSwing by switch("Swing in place")
     private val noSwing by switch("No swing animation")
+
     @Suppress("unused")
     private val reset by button("Reset") { resetSettings() }
 
@@ -46,6 +47,7 @@ object ItemAnimations : Module(
     private var swingTimeTick = 0
     private var attackAnim = 0f
     private var prevAttackAnim = 0f
+
     //? if >=26.3 {
     /*private var swingDescription: LivingEntity.SwingDescription? = null
     *///?}
@@ -100,7 +102,7 @@ object ItemAnimations : Module(
 
     @JvmStatic
     fun disableSwingBob(): Boolean {
-        return disableSwingTranslation() || disableSwingRotation()
+        return enabled && (inplaceSwing || noSwing || swingSpeed != 0.0)
     }
 
     @JvmStatic
@@ -170,9 +172,9 @@ object ItemAnimations : Module(
     @JvmStatic
     //? if <26.3 {
     fun getThirdPersonSwingAnimation(current: Float, playerId: Int): Float {
-    //?} else {
-    /*fun getThirdPersonSwingAnimation(current: Float, playerId: Int, description: LivingEntity.SwingDescription?): Float {
-    *///?}
+        //?} else {
+        /*fun getThirdPersonSwingAnimation(current: Float, playerId: Int, description: LivingEntity.SwingDescription?): Float {
+        *///?}
         if (!shouldApplyThirdPerson(playerId)) return current
         if (disableSwingRotation()) return 0f
 
@@ -186,11 +188,11 @@ object ItemAnimations : Module(
 
         val vanillaStartedSwing = current > 0f && (existingSwing == null || existingSwing.previousVanilla <= 0f || current < existingSwing.previousVanilla)
         val swing = if (vanillaStartedSwing && (existingProgress == null || existingProgress >= 0.5f))
-            //? if <26.3 {
+        //? if <26.3 {
             ThirdPersonSwing(currentTime, current).also { thirdPersonSwings[playerId] = it }
-            //?} else {
-            /*ThirdPersonSwing(currentTime, current, description).also { thirdPersonSwings[playerId] = it }
-            *///?}
+        //?} else {
+        /*ThirdPersonSwing(currentTime, current, description).also { thirdPersonSwings[playerId] = it }
+        *///?}
         else existingSwing ?: return current
 
         val progress = swing.progress(currentTime, speed)
@@ -221,7 +223,7 @@ object ItemAnimations : Module(
 
     private fun shouldApplyThirdPerson(playerId: Int): Boolean {
         return enabled &&
-            (if (playerId == player.id) applyInThirdPerson else applyToOtherPlayers)
+                (if (playerId == player.id) applyInThirdPerson else applyToOtherPlayers)
     }
 
     @JvmStatic
@@ -236,9 +238,9 @@ object ItemAnimations : Module(
     @JvmStatic
     //? if <26.3 {
     fun onSwing() {
-    //?} else {
-    /*fun onSwing(hand: InteractionHand, animation: SwingAnimation) {
-    *///?}
+        //?} else {
+        /*fun onSwing(hand: InteractionHand, animation: SwingAnimation) {
+        *///?}
         if (!enabled) return
         if (swinging && swingTimeTick >= 0 && (swingTimeTick * calcSwingSpeed()) < getCurrentSwingDuration() / 2) return
         swingTimeTick = -1
