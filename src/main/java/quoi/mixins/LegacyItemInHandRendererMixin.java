@@ -79,14 +79,6 @@ public abstract class LegacyItemInHandRendererMixin {
     }
 
     @Inject(
-            method = "renderPlayerArm",
-            at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/entity/EntityRenderDispatcher;getPlayerRenderer(Lnet/minecraft/client/player/AbstractClientPlayer;)Lnet/minecraft/client/renderer/entity/player/AvatarRenderer;")
-    )
-    private void quoi$itemAnimationsArmScale(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, float f, float g, HumanoidArm humanoidArm, CallbackInfo ci) {
-        ItemAnimations.applyScale(poseStack);
-    }
-
-    @Inject(
             method = "renderItem",
             at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/item/ItemStackRenderState;submit(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;III)V")
     )
@@ -128,15 +120,6 @@ public abstract class LegacyItemInHandRendererMixin {
     private void quoi$disableSwingTransGeneral(PoseStack instance, float f, float g, float h, Operation<Void> original) {
         if (ItemAnimations.disableSwingTranslation()) return;
         original.call(instance, f, g, h);
-    }
-
-    @Inject(
-            method = "renderMapHand",
-            at = @At(value = "INVOKE", target = "Lnet/minecraft/core/ClientAsset$Texture;texturePath()Lnet/minecraft/resources/Identifier;"),
-            require = 1
-    )
-    private void quoi$mapScale1(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, HumanoidArm humanoidArm, CallbackInfo ci) {
-        ItemAnimations.applyScale(poseStack);
     }
 
     @Inject(

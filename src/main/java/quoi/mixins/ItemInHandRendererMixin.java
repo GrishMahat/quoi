@@ -78,14 +78,6 @@ public abstract class ItemInHandRendererMixin {
     }
 
     @Inject(
-            method = "renderPlayerArm",
-            at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/FirstPersonHandsAndItemsRenderer;renderPlayerHand(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;ILnet/minecraft/world/entity/HumanoidArm;Lnet/minecraft/client/renderer/state/level/PlayerRenderState;)V")
-    )
-    private void quoi$itemAnimationsArmScale(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, float f, float g, HumanoidArm humanoidArm, PlayerRenderState playerState, CallbackInfo ci) {
-        ItemAnimations.applyScale(poseStack);
-    }
-
-    @Inject(
             method = "submitArmWithItem",
             at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/item/ItemStackRenderState;submit(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;III)V")
     )
@@ -130,14 +122,6 @@ public abstract class ItemInHandRendererMixin {
     private void quoi$disableSwingTransGeneral(PoseStack instance, float f, float g, float h, Operation<Void> original) {
         if (ItemAnimations.disableSwingTranslation()) return;
         original.call(instance, f, g, h);
-    }
-
-    @Inject(
-            method = "renderMapHand",
-            at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/FirstPersonHandsAndItemsRenderer;renderPlayerHand(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;ILnet/minecraft/world/entity/HumanoidArm;Lnet/minecraft/client/renderer/state/level/PlayerRenderState;)V")
-    )
-    private void quoi$mapScale1(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, HumanoidArm humanoidArm, PlayerRenderState playerState, CallbackInfo ci) {
-        ItemAnimations.applyScale(poseStack);
     }
 
     @Inject(
