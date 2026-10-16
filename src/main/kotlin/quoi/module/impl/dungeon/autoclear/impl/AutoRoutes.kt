@@ -1,6 +1,8 @@
 package quoi.module.impl.dungeon.autoclear.impl
 
 import net.minecraft.world.entity.ambient.Bat
+import net.minecraft.world.level.block.Blocks
+import net.minecraft.world.phys.EntityHitResult
 import quoi.api.autoroutes.AutoRoutesCommand
 import quoi.api.autoroutes.RouteNode
 import quoi.api.autoroutes.RouteRegistry
@@ -9,7 +11,9 @@ import quoi.api.colour.Colour
 import quoi.api.colour.withAlpha
 import quoi.api.events.*
 import quoi.api.events.core.on
+import quoi.api.skyblock.dungeon.odonscanning.ScanUtils
 import quoi.api.skyblock.dungeon.odonscanning.tiles.OdonRoom
+import quoi.api.skyblock.dungeon.odonscanning.tiles.RoomType
 import quoi.api.skyblock.location.Island
 import quoi.api.skyblock.location.invoke
 import quoi.api.vec.MutableVec3
@@ -26,6 +30,7 @@ import quoi.utils.*
 import quoi.utils.StringUtils.noControlCodes
 import quoi.utils.StringUtils.width
 import quoi.utils.render.DrawContextUtils.drawText
+import quoi.utils.skyblock.player.PlayerUtils
 import quoi.utils.skyblock.player.PlayerUtils.useItem
 
 object AutoRoutes : Module(
@@ -34,6 +39,7 @@ object AutoRoutes : Module(
     tag = Tag.BETA
 ) {
     val zeroTickDb by switch("Zero tick dungeon breaker")
+    private val pauseOnMimic by switch("Pause on mimic", true, desc = "Pauses the route and shows a title when opening a Mimic chest.")
     private val style by selector("Style", "Box", listOf("Box", "Filled box", "Cylinder"))
     private val thickness by slider("Thickness", 4f, 1f, 8f, 0.5f)
 
@@ -73,6 +79,7 @@ object AutoRoutes : Module(
 
     private var activeNode: RouteNode? = null
     private var forcedNode: RouteNode? = null
+    private var mimicNode: RouteNode? = null
 
     private var lastChainName: String? = null
     private var lastChainIndex: Int = -1
@@ -82,6 +89,7 @@ object AutoRoutes : Module(
 
         on<TickEvent.Start> {
             if (interactDelay > 0) interactDelay--
+            if (mimicNode != null) return@on
 
             pendingInteract?.let {
                 player.useItem(it)
@@ -122,14 +130,17 @@ object AutoRoutes : Module(
         }
 
         on<MouseEvent.Click> {
-            if (button != 0 || !state || executing) return@on
-            val pos = position ?: return@on
+            if (editMode || button != 0 || !state || executing) return@on
+            val pausedNode = mimicNode
+            if (pausedNode != null && mc.hitResult is EntityHitResult) return@on
+            val pos = if (pausedNode != null) player.position().mutable() else position ?: return@on
 
-            val nodes = roomNodes.filter { it.inside(pos) }.sortedByDescending { it.priority }
+            val nodes = (if (pausedNode != null) listOf(pausedNode) else roomNodes).filter { it.inside(pos) }.sortedByDescending { it.priority }
             if (nodes.isEmpty()) return@on
 
             val next = (nodes.indexOf(forcedNode) + 1) % nodes.size
             val node = nodes[next]
+            mimicNode = null
             forcedNode = node
             activeNode = node
 
@@ -151,11 +162,22 @@ object AutoRoutes : Module(
         on<DungeonEvent.Secret.Interact> {
             activeNode?.onSecret()
             interactDelay = 2
+
+            if (!pauseOnMimic || editMode || !blockState.`is`(Blocks.TRAPPED_CHEST)) return@on
+            if (ScanUtils.getRoomFromPos(blockPos.x, blockPos.z)?.data?.type == RoomType.TRAP) return@on
+            mimicNode = activeNode ?: return@on
+            pendingInteract = null
+            activeNode = null
+            forcedNode = null
+            position = null
+            executing = false
+            PlayerUtils.setTitle("§cMimic!", stayAlive = 60)
         }
         on<DungeonEvent.Secret.Item> { activeNode?.onSecret() }
         on<DungeonEvent.Secret.Bat> { activeNode?.onSecret() }
 
         on<DungeonEvent.Room.Enter> {
+            mimicNode = null
             batIds.clear()
             updateCache(room ?: return@on)
         }
@@ -181,6 +203,7 @@ object AutoRoutes : Module(
             activeNode = null
             executing = false
             forcedNode = null
+            mimicNode = null
             position = null
             pendingInteract = null
             batIds.clear()
@@ -191,6 +214,8 @@ object AutoRoutes : Module(
     }
 
     fun handleQueue(playerPos: MutableVec3) {
+        if (mimicNode != null) return
+
         val node = roomNodes
             .filter { it.inside(playerPos) && !it.triggered }
             .filter { n ->
@@ -212,7 +237,7 @@ object AutoRoutes : Module(
         if (activeNode != node) {
             activeNode = node
         }
-        
+
         if (interactDelay > 0) return
 
         if (!executing && !node.checkAwaits()) return
@@ -239,6 +264,7 @@ object AutoRoutes : Module(
         pendingInteract = null
         activeNode = null
         forcedNode = null
+        mimicNode = null
         position = null
         executing = false
     }
