@@ -14,6 +14,7 @@ import quoi.utils.getLook
 import quoi.utils.rayCastVec
 import quoi.utils.render.drawLine
 import quoi.utils.skyblock.item.ItemUtils.skyblockId
+import quoi.utils.skyblock.item.TeleportUtils.getEtherwarpLandingY
 import quoi.utils.skyblock.item.TeleportUtils.traverseVoxels
 import quoi.utils.skyblock.player.PlayerUtils.getEyeHeight
 import quoi.utils.skyblock.player.SwapManager
@@ -78,7 +79,7 @@ class EtherwarpNode : RouteNode() {
         AutoRoutes.queueInteract(dir)
 
         pos.x = ether.pos.x + 0.5
-        pos.y = ether.pos.y + 1.05
+        pos.y = getEtherwarpLandingY(ether.pos) + 0.05
         pos.z = ether.pos.z + 0.5
         return true
     }

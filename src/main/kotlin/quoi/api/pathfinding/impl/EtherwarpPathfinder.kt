@@ -20,6 +20,7 @@ import quoi.utils.blockPos
 import quoi.utils.distanceTo
 import quoi.utils.distanceToSqr
 import quoi.utils.skyblock.item.TeleportUtils.getEtherwarpDirection
+import quoi.utils.skyblock.item.TeleportUtils.getEtherwarpLandingY
 import quoi.utils.skyblock.item.TeleportUtils.traverseVoxels
 import kotlin.math.abs
 
@@ -177,7 +178,7 @@ object EtherwarpPathfinder : AbstractTeleportPathfinder<EtherwarpContext>() {
     override fun getSneak(): Boolean = true
 
     override fun getNodeY(ctx: EtherwarpContext, hit: BlockPos): Double =
-        hit.y + (if (ctx.offset) 1.05 else 1.0)
+        getEtherwarpLandingY(hit) + (if (ctx.offset) 0.05 else 0.0)
 
     override fun getDirection(from: Vec3, to: BlockPos, dist: Double): Direction? =
         getEtherwarpDirection(from, to, dist)
