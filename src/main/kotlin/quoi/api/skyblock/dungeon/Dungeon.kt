@@ -183,6 +183,7 @@ object Dungeon : EventListener, Shortcuts {
             expectingBloodUpdate = false
             leapTeammates = emptyList()
             dungeonTeammates.clear()
+            Puzzle.entries.forEach { it.status = null }
             puzzles.clear()
             floor = if (ClickGui.forceDungeons) ClickGui.dungeonFloor.selected
             else if (Location.onZapto) Floor.F7

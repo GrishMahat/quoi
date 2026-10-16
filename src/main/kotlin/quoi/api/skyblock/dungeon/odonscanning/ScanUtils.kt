@@ -21,6 +21,7 @@ import quoi.api.skyblock.dungeon.odonscanning.tiles.OdonDoor
 import quoi.api.skyblock.dungeon.odonscanning.tiles.OdonRoom
 import quoi.api.skyblock.dungeon.odonscanning.tiles.RoomData
 import quoi.api.skyblock.dungeon.odonscanning.tiles.RoomDataDeserializer
+import quoi.api.skyblock.dungeon.odonscanning.tiles.RoomState
 import quoi.api.skyblock.dungeon.odonscanning.tiles.RoomTile
 import quoi.api.skyblock.dungeon.odonscanning.tiles.RoomType
 import quoi.api.skyblock.dungeon.odonscanning.tiles.Rotations
@@ -124,6 +125,7 @@ object ScanUtils : EventListener, Shortcuts {
         }
 
         on<WorldEvent.Change> {
+            roomList.forEach { it.state = RoomState.UNDISCOVERED }
             passedRooms.clear()
             scannedRooms.clear()
             scannedDoors.clear()
