@@ -22,6 +22,7 @@ import quoi.api.skyblock.location.invoke
 import quoi.module.Module
 import quoi.module.impl.dungeon.autoclear.getLockedDoor
 import quoi.module.impl.dungeon.autoclear.pathToDoor
+import quoi.module.impl.dungeon.autoclear.pathToRoom
 import quoi.module.settings.UIComponent.Companion.childOf
 import quoi.module.settings.impl.KeybindComponent
 import quoi.utils.ChatUtils.modMessage
@@ -94,6 +95,16 @@ object InteractiveMap : Module(
     }
 
     private fun map() = aboba("quoi clear map") {
+        onClick {
+            active && !Dungeon.isDead && AutoRoutes.skipNode()
+        }
+        onClick(button = 1) {
+            if (!active || Dungeon.isDead) return@onClick false
+            val room = Dungeon.currentRoom ?: return@onClick false
+            pathToRoom(room, type = 1)
+            true
+        }
+
 //        val iconCfg = MapRenderer.IconConfig(
 //            scale = iconScale,
 //            heads = showHeads,
@@ -134,34 +145,60 @@ object InteractiveMap : Module(
             renderMap(config = cfg).element.constraints.x = Centre
 
             block(
-                constrain(x = Centre, w = (960f * infoScale).px.coerceAtMost(Copying), h = Bounding + 12.px),
+                constrain(x = Centre, w = (1240f * infoScale).px.coerceAtMost(Copying), h = Bounding + 12.px),
                 Colour.BLACK.withAlpha(0.8f),
                 6.radius()
             ) {
                 column(constrain(16.px, 12.px, Copying - 32.px), gap = 8.px) {
-                    text(
-                        string = "§bLeft click§f: Room / door   §7|   §bRight click§f: Route start",
-                        font = cfg.font,
-                        pos = at(x = Centre),
-                        size = (24f * infoScale).px
-                    ) {
-                        maxWidth(Copying)
-                    }.shadow = shadow
+                    val hintSize = (24f * infoScale).px
+                    val cellWidth = (Copying - 24.px) / 2.px
+                    val rightColumn = 50.percent + 12.px
 
-                    textSupplied(
-                        supplier = {
-                            val doorHint = if (lockedKey.value.key == Keybinds.KEY_NONE) "§fLocked door: §7Not bound"
-                            else "§b${lockedKey.getKeyName()}§f: Closest locked door"
-                            val closeHint = if (openKey.value.key == Keybinds.KEY_NONE) "Esc"
-                            else "${if (closeOn.index == 0) "Release " else ""}${openKey.getKeyName()} / Esc"
-                            "$doorHint   §7|   §b$closeHint§f: Close map"
-                        },
-                        font = cfg.font,
-                        pos = at(x = Centre),
-                        size = (24f * infoScale).px
-                    ).also {
-                        it.maxWidth(Copying)
-                        it.shadow = shadow
+                    listOf(
+                        listOf("§bLeft click room / door§f: Travel", "§bRight click room§f: Route start"),
+                        listOf("§bLeft click empty space§f: Continue route", "§bRight click empty space§f: Return to route start")
+                    ).forEach { hints ->
+                        group(constrain(w = Copying, h = hintSize)) {
+                            hints.forEachIndexed { index, hint ->
+                                text(
+                                    string = hint,
+                                    font = cfg.font,
+                                    pos = at(if (index == 0) 0.px else rightColumn, Centre),
+                                    size = hintSize
+                                ) {
+                                    maxWidth(cellWidth)
+                                }.shadow = shadow
+                            }
+                        }
+                    }
+
+                    group(constrain(w = Copying, h = hintSize)) {
+                        textSupplied(
+                            supplier = {
+                                if (lockedKey.value.key == Keybinds.KEY_NONE) "§7Locked door: Unbound"
+                                else "§b${lockedKey.getKeyName()}§f: Closest locked door"
+                            },
+                            font = cfg.font,
+                            pos = at(0.px, Centre),
+                            size = hintSize
+                        ).also {
+                            it.maxWidth(cellWidth)
+                            it.shadow = shadow
+                        }
+
+                        textSupplied(
+                            supplier = {
+                                val closeHint = if (openKey.value.key == Keybinds.KEY_NONE) "Esc"
+                                else "${if (closeOn.index == 0) "Release " else ""}${openKey.getKeyName()} / Esc"
+                                "§b$closeHint§f: Close map"
+                            },
+                            font = cfg.font,
+                            pos = at(rightColumn, Centre),
+                            size = hintSize
+                        ).also {
+                            it.maxWidth(cellWidth)
+                            it.shadow = shadow
+                        }
                     }
                 }
             }

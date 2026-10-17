@@ -121,6 +121,7 @@ object MapRenderer {
 
                             onClick {
                                 pathToDoor(door, InteractiveMap.faceDoorOnArrival)
+                                true
                             }
 
                             onMouseEnterExit {

@@ -170,34 +170,9 @@ object AutoRoutes : Module(
         }
 
         on<MouseEvent.Click> {
-            if (editMode || button != 0 || !state || executing) return@on
-            val pausedNode = mimicNode
-            if (pausedNode != null && mc.hitResult is EntityHitResult) return@on
-            val pos = if (pausedNode != null) player.position().mutable() else position ?: return@on
-
-            val nodes = (if (pausedNode != null) listOf(pausedNode) else roomNodes).filter { it.inside(pos) }.sortedByDescending { it.priority }
-            if (nodes.isEmpty()) return@on
-
-            val next = (nodes.indexOf(forcedNode) + 1) % nodes.size
-            val node = nodes[next]
-            mimicNode = null
-            forcedNode = node
-            floorSource = null
-            activeNode = node
-
-            executing = true
-            if (node.execute(pos)) {
-                node.triggered = true
-                node.chain?.let {
-                    lastChainName = it.name
-                    lastChainIndex = it.index
-                }
-                position = pos
-                executing = false
-            } else {
-                node.triggered = false
-                executing = true
-            }
+            if (button != 0 || !state) return@on
+            if (mimicNode != null && mc.hitResult is EntityHitResult) return@on
+            if (skipNode()) cancel()
         }
 
         on<DungeonEvent.Secret.Interact> {
@@ -260,6 +235,37 @@ object AutoRoutes : Module(
             lastChainName = null
             lastChainIndex = -1
         }
+    }
+
+    fun skipNode(): Boolean {
+        if (!active || editMode || executing || ClearExecutor.routing) return false
+        val pausedNode = mimicNode
+        val pos = if (pausedNode != null) player.position().mutable() else position ?: return false
+
+        val nodes = (if (pausedNode != null) listOf(pausedNode) else roomNodes).filter { it.inside(pos) }.sortedByDescending { it.priority }
+        if (nodes.isEmpty()) return false
+
+        val next = (nodes.indexOf(forcedNode) + 1) % nodes.size
+        val node = nodes[next]
+        mimicNode = null
+        forcedNode = node
+        floorSource = null
+        activeNode = node
+
+        executing = true
+        if (node.execute(pos)) {
+            node.triggered = true
+            node.chain?.let {
+                lastChainName = it.name
+                lastChainIndex = it.index
+            }
+            position = pos
+            executing = false
+        } else {
+            node.triggered = false
+            executing = true
+        }
+        return true
     }
 
     private fun nextNode(playerPos: MutableVec3, secretOnly: Boolean = false): RouteNode? =
