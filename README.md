@@ -44,6 +44,10 @@ Use [actions tab](https://github.com/jcnlk/quoi/actions) to download (you need t
   - Claims profitable Croesus chests, with profit estimates, chest keys, and optional Kismet rerolls.
 - **Auto Door Opener**
   - Opens nearby Wither and Blood doors with Aura or Triggerbot mode.
+- **Auto Blood Rush**
+  - Automates blood rushing after the dungeon starts. Can be stopped and resumed from your current position.
+  - **Doorcamp** - Travels to the closest locked Wither or Blood door and auras it until it opens, then continues to the next door.
+    - Works with the Interactive Map open and skips its own aura when Auto Door Opener is enabled.
 - **Auto Routes** (Beta)
   - Edits and runs dungeon routes for teleporting, item use, and block breaking through `/route`.
 - **Blood Camp**

@@ -34,6 +34,8 @@ import quoi.utils.skyblock.PartyUtils
 import java.util.*
 import kotlin.math.floor
 
+// TODO: fix score calc and other outdate stuff
+
 /**
  * modified OdinFabric (BSD 3-Clause)
  * copyright (c) 2025-2026 odtheking
@@ -49,6 +51,9 @@ object Dungeon : EventListener, Shortcuts {
 
     inline val inClear: Boolean
         get() = inDungeons && inGame && !inBoss
+
+    var hasStarted = false
+        private set
 
     var floor: Floor? = null
         private set
@@ -176,7 +181,12 @@ object Dungeon : EventListener, Shortcuts {
     init {
         ScanUtils.init()
 
+        on<DungeonEvent.Start> {
+            hasStarted = true
+        }
+
         on<WorldEvent.Change> {
+            hasStarted = false
             Blessing.entries.forEach { it.reset() }
             dungeonTeammatesNoSelf = emptyList()
             dungeonStats = DungeonStats()
@@ -219,7 +229,7 @@ object Dungeon : EventListener, Shortcuts {
                         val text = team.playerPrefix.string.noControlCodes + team.playerSuffix.string.noControlCodes
 
                         floorRegex.find(text)?.groupValues?.get(1)?.let {
-                            scope.launch(Dispatchers.IO) { isPaul = false /*hasBonusPaulScore()*/ } // fixme
+                            scope.launch(Dispatchers.IO) { isPaul = false }
                             val detectedFloor = Floor.valueOf(it)
                             if (floor != detectedFloor) {
                                 floor = detectedFloor
@@ -264,16 +274,13 @@ object Dungeon : EventListener, Shortcuts {
                         }
 
                         when (partyMessageRegex.find(message)?.groupValues?.get(1)?.lowercase() ?: return@on) {
-                            "mimic killed", "mimic slain", "mimic killed!",
-                            "mimic dead", "mimic dead!", $$"$skytils-dungeon-score-mimic$" -> // rip Skytils
+                            "mimic killed", "mimic slain", "mimic killed!", "mimic dead", "mimic dead!" ->
                                 dungeonStats.mimicKilled = true
 
-                            "prince killed", "prince slain", "prince killed!",
-                            "prince dead", "prince dead!", $$"$skytils-dungeon-score-prince$" -> // rip Skytils
+                            "prince killed", "prince slain", "prince killed!", "prince dead", "prince dead!" ->
                                 dungeonStats.princeKilled = true
 
-                            "bat killed", "bat slain", "bat killed!",
-                            "bat dead", "bat dead!", $$"$skytils-dungeon-score-bat$" -> // rip Skytils
+                            "bat killed", "bat slain", "bat killed!", "bat dead", "bat dead!" ->
                                 dungeonStats.batKilled = true
 
                             "blaze done!", "blaze done", "blaze puzzle solved!" ->
@@ -288,9 +295,7 @@ object Dungeon : EventListener, Shortcuts {
         }
 
         on<PacketEvent.Sent> {
-            when (packet) {
-                is ServerboundContainerClosePacket -> inTerminal = false
-            }
+            if (packet is ServerboundContainerClosePacket) inTerminal = false
         }
     }
 

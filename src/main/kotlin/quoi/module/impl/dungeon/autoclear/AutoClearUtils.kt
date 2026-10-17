@@ -85,11 +85,14 @@ private val canPath: Boolean
  */
 fun getLockedDoor(): OdonDoor? {
     val room = Dungeon.currentRoom ?: return null
-    val door = ScanUtils.scannedDoors
+    return ScanUtils.scannedDoors
         .filter { it.locked && it.type.equalsOneOf(DoorType.WITHER, DoorType.BLOOD) }
-        .minByOrNull { DungeonMapPathfinder.getDistToDoor(room, it, ignoreLocked = true) }
-        ?: return null
-    return door
+        .map { it to DungeonMapPathfinder.getDistToDoor(room, it) }
+        .filter { it.second != Int.MAX_VALUE }
+        .minWithOrNull(
+            compareBy<Pair<OdonDoor, Int>> { it.second }
+                .thenBy { player.position().distanceToSqr(Vec3(it.first.pos.x + 0.5, 69.0, it.first.pos.z + 0.5)) }
+        )?.first
 }
 
 /**
@@ -97,10 +100,13 @@ fun getLockedDoor(): OdonDoor? {
  *
  * @param door Destination door
  */
-fun pathToDoor(door: OdonDoor, faceOnArrival: Boolean = false) {
+fun pathToDoor(door: OdonDoor, faceOnArrival: Boolean = false, owner: Any? = null) {
     if (!canPath) return
-    val goal = DungeonMapPathfinder.getDoorPos(Dungeon.currentRoom!!, door)
-        ?: return modMessage("Could not find door coordinates")
+    val room = Dungeon.currentRoom ?: return
+    val goal = DungeonMapPathfinder.getDoorPos(room, door) ?: run {
+        modMessage("Could not find door coordinates")
+        return
+    }
 
     val onArrival = if (faceOnArrival) {
         {
@@ -109,7 +115,7 @@ fun pathToDoor(door: OdonDoor, faceOnArrival: Boolean = false) {
         }
     } else null
 
-    ClearExecutor.etherPath(to = goal, onComplete = onArrival)
+    ClearExecutor.etherPath(to = goal, owner = owner, onComplete = onArrival)
 }
 
 /**

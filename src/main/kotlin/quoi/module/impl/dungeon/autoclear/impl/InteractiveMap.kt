@@ -33,6 +33,7 @@ import quoi.utils.ui.screens.UIScreen.Companion.open
 /**
  * TODO:
  *  room queuing while auto routing
+ *  add map customization stuff
  */
 object InteractiveMap : Module(
     "Interactive Map",

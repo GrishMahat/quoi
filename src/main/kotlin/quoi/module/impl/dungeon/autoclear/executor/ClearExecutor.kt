@@ -33,6 +33,9 @@ object ClearExecutor : EventListener {
     var active = false
         private set
 
+    var owner: Any? = null
+        private set
+
     val routing: Boolean
         get() = pathJob?.isActive == true || !nodes.isNullOrEmpty() || pendingInteract != null || active || pendingCompletion != null
 
@@ -87,27 +90,19 @@ object ClearExecutor : EventListener {
         }
 
         on<WorldEvent.Change> {
-            pathJob?.cancel()
-            pathJob = null
-            nodes = null
-            syncDelay = 0
+            cancel()
             compDelay = 0
-            position = null
-            pendingInteract = null
-            active = false
-            activeNode = null
-            onComplete = null
-            pendingCompletion = null
         }
     }
 
-    fun etherPath(to: BlockPos, config: PathConfig = PathConfig(), onComplete: (() -> Unit)? = null) {
+    fun etherPath(to: BlockPos, config: PathConfig = PathConfig(), owner: Any? = null, onComplete: (() -> Unit)? = null) {
         cancel()
         if (player.at(to)) {
             onComplete?.invoke()
             return modMessage("Already there")
         }
 
+        this.owner = owner
         pathJob = scope.launch {
             val p = EtherwarpPathfinder.findDungeonPath(
                 from = player.position(),
@@ -117,12 +112,13 @@ object ClearExecutor : EventListener {
 
             ensureActive()
             mc.submit {
-                if (isActive) clearPath(p.map { it.toEther() }, onComplete)
+                if (isActive) clearPath(p.map { it.toEther() }, owner, onComplete)
             }.join()
         }
     }
 
-    fun clearPath(path: List<ClearNode>, onComplete: (() -> Unit)? = null) {
+    fun clearPath(path: List<ClearNode>, owner: Any? = null, onComplete: (() -> Unit)? = null) {
+        this.owner = owner
         nodes = path.toMutableList()
         position = null
         pendingInteract = null
@@ -140,7 +136,11 @@ object ClearExecutor : EventListener {
         nodes = null
         position = null
         pendingInteract = null
+        owner = null
+        syncDelay = 0
         compDelay = 2
+        active = false
+        activeNode = null
         onComplete = null
         pendingCompletion = null
     }

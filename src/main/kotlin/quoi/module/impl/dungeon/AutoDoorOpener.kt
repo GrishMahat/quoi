@@ -15,6 +15,7 @@ import quoi.api.skyblock.dungeon.odonscanning.tiles.OdonDoor
 import quoi.api.skyblock.location.Island
 import quoi.api.skyblock.location.invoke
 import quoi.module.Module
+import quoi.module.impl.dungeon.autoclear.impl.InteractiveMap
 import quoi.module.settings.UIComponent.Companion.visibleIf
 import quoi.utils.WorldUtils.state
 import quoi.utils.skyblock.player.interact.AuraManager
@@ -35,7 +36,7 @@ object AutoDoorOpener : Module(
 
     init {
         on<TickEvent.End> {
-            if (Dungeon.isDead || mc.screen != null && !inMenus) return@on
+            if (Dungeon.isDead || mc.screen != null && !inMenus && !InteractiveMap.mapOpen) return@on
 
             val now = System.currentTimeMillis()
             if (now - lastClick < retryDelay) return@on
