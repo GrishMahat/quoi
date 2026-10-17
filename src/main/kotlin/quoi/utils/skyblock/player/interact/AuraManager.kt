@@ -31,6 +31,9 @@ object AuraManager : EventListener, Shortcuts {
     private val blockTasks = mutableListOf<BlockInteract>()
     private var interactBlockCd = 0
 
+    val canInteractBlock: Boolean
+        get() = interactBlockCd == 0 && blockTasks.isEmpty()
+
     private val entityTasks = mutableListOf<EntityInteract>()
     private var interactEntityCd = 0
 

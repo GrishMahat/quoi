@@ -8,6 +8,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import quoi.api.events.PacketEvent;
+import quoi.api.events.core.EventDispatcher;
 
 // based on https://github.com/Noamm9/NoammAddons/blob/1.1.9/src/main/java/com/github/noamm9/mixin/MixinPacketProcessorListener.java
 @Mixin(targets = "net.minecraft.network.PacketProcessor$ListenerAndPacket")
@@ -15,6 +16,17 @@ public abstract class PacketProcessorListenerMixin {
     @Shadow
     @Final
     private Packet<?> packet;
+
+    @Inject(
+            method = "handle",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/network/protocol/Packet;handle(Lnet/minecraft/network/PacketListener;)V"
+            )
+    )
+    private void quoi$beforePacketHandled(CallbackInfo ci) {
+        EventDispatcher.onPacketProcessing(packet);
+    }
 
     @Inject(
             method = "handle",

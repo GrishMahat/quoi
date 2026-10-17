@@ -191,28 +191,28 @@ object Dungeon : EventListener, Shortcuts {
             isPaul = false
         }
 
+        on<PacketEvent.ReceivedPost, ClientboundPlayerInfoUpdatePacket> {
+            if (packet.actions().none {
+                    it.equalsOneOf(
+                        ClientboundPlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME,
+                        ClientboundPlayerInfoUpdatePacket.Action.ADD_PLAYER
+                    )
+                }) return@on
+            val tabListEntries = packet.entries()
+                .mapNotNull { it.displayName }
+                .ifEmpty { return@on }
+
+            val stringEntries = tabListEntries.map { it.string }
+            val colouredEntries = tabListEntries.map { it.string to Colour.RGB(it.siblings.lastOrNull()?.style?.color?.value ?: Colour.WHITE.rgb).withAlpha(1.0f) }
+
+            updateDungeonTeammates(colouredEntries)
+            updateDungeonStats(stringEntries)
+            getDungeonPuzzles(stringEntries)
+        }
+
         on<PacketEvent.Received> {
             with(packet) {
                 when (this) {
-                    is ClientboundPlayerInfoUpdatePacket -> {
-                        if (actions().none {
-                                it.equalsOneOf(
-                                    ClientboundPlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME,
-                                    ClientboundPlayerInfoUpdatePacket.Action.ADD_PLAYER
-                                )
-                            }) return@on
-                        val tabListEntries = entries()
-                            .mapNotNull { it.displayName }
-                            .ifEmpty { return@on }
-
-                        val stringEntries = tabListEntries.map { it.string }
-                        val colouredEntries = tabListEntries.map { it.string to Colour.RGB(it.siblings.lastOrNull()?.style?.color?.value ?: Colour.WHITE.rgb).withAlpha(1.0f) }
-
-                        updateDungeonTeammates(colouredEntries)
-                        updateDungeonStats(stringEntries)
-                        getDungeonPuzzles(stringEntries)
-                    }
-
                     is ClientboundSetPlayerTeamPacket -> {
                         val team = parameters.orElse(null) ?: return@on
 

@@ -15,6 +15,7 @@ import quoi.utils.aabb
 import quoi.utils.render.drawFilledBox
 import quoi.utils.render.drawWireFrameBox
 import quoi.utils.skyblock.item.ItemUtils.getBreakerCharges
+import quoi.utils.skyblock.item.ItemUtils.skyblockId
 import quoi.utils.skyblock.player.PlayerUtils
 import quoi.utils.skyblock.player.SwapManager
 import quoi.utils.skyblock.player.interact.AuraManager
@@ -27,6 +28,9 @@ class BreakerNode : RouteNode() {
     private var active = false
 
     @Transient
+    private var retryAt = 0
+
+    @Transient
     private var realBlocks = emptyList<BlockPos>()
 
     override val colour: Colour
@@ -35,8 +39,15 @@ class BreakerNode : RouteNode() {
     override val priority: Int
         get() = 150
 
+    val hasRemovedSupport: Boolean
+        get() {
+            val support = BlockPos.containing(pos.x, pos.y - 0.001, pos.z)
+            return support in realBlocks && level.isLoaded(support) && support.state.isAir
+        }
+
     override fun update(room: OdonRoom) {
         super.update(room)
+        retryAt = 0
         realBlocks = blocks.map { room.getRealCoords(it) }
     }
 
@@ -48,40 +59,41 @@ class BreakerNode : RouteNode() {
     override fun execute(pos: MutableVec3): Boolean {
         if (active) return false
         if (blocks.isEmpty()) return true
-        val breakerSlot = PlayerUtils.breakerSlot ?: return true
+        val toBreak = realBlocks.filter { pos -> level.isLoaded(pos) && !pos.state.isAir }
 
-        val toBreak = realBlocks.filter { pos ->
-            level.isLoaded(pos) &&
-                    !pos.state.isAir
-//            pos.distToCenterSqr(player.eyePosition()) <= 30.0
+        if (toBreak.isEmpty()) {
+            retryAt = 0
+            return true
         }
 
-        if (toBreak.isEmpty()) return true
+        val breakerSlot = PlayerUtils.breakerSlot ?: run {
+            val hasBreaker = (0..8).any { player.inventory.getItem(it).skyblockId == "DUNGEONBREAKER" }
+            return !hasBreaker
+        }
+
+        if (player.tickCount < retryAt) return false
 
         if (player.inventory.selectedSlot != breakerSlot) {
-            return !SwapManager.swapToSlot(breakerSlot).success
+            SwapManager.swapToSlot(breakerSlot)
+            return false
         }
 
         val initialCharges = getBreakerCharges(player.inventory.getItem(breakerSlot))
-        if (initialCharges == 0) return true
+        if (initialCharges == 0) return false
 
-        active = true
+        val batch = toBreak.take(initialCharges)
 
         if (AutoRoutes.zeroTickDb) {
-            toBreak.forEach { AuraManager.breakBlock(it, immediate = true) }
-            active = false
-            return true
+            batch.forEach { AuraManager.breakBlock(it, immediate = true) }
+            retryAt = player.tickCount + 10
         } else {
-            toBreak.forEachIndexed { i, pos ->
-                if (i >= initialCharges) {
-                    active = false
-                    return true
-                }
-                scheduleTask(i) { AuraManager.breakBlock(pos, immediate = true) }
+            active = true
+            batch.forEachIndexed { i, pos ->
+                scheduleTask(i + 1) { AuraManager.breakBlock(pos, immediate = true) }
             }
             scheduleTask(realBlocks.size) { active = false }
-            return false
         }
+        return false
     }
 
     override fun render(ctx: LevelRenderContext, style: String, colour: Colour, fillColour: Colour, activeColour: Colour, thickness: Float) {

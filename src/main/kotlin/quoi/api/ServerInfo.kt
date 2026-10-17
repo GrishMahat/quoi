@@ -42,12 +42,16 @@ object ServerInfo : EventListener {
     private var lastTickTime = System.currentTimeMillis()
     private val tickTimes = ArrayDeque<Long>()
 
+    @Volatile
     var currentTps: Float = 20.0f
         private set
+    @Volatile
     var averageTps: Float = 20.0f
         private set
+    @Volatile
     var minTps: Float = 20.0f
         private set
+    @Volatile
     var maxTps: Float = 20.0f
         private set
 
@@ -56,25 +60,29 @@ object ServerInfo : EventListener {
         // TPS
         //
         on<TickEvent.Server> {
-            val now = System.currentTimeMillis()
-            val dt = now - lastTickTime
-            lastTickTime = now
+            synchronized(tickTimes) {
+                val now = System.currentTimeMillis()
+                val dt = now - lastTickTime
+                lastTickTime = now
 
-            tickTimes.addLast(dt)
-            if (tickTimes.size > 100) tickTimes.removeFirst()
+                tickTimes.addLast(dt)
+                if (tickTimes.size > 100) tickTimes.removeFirst()
 
-            val total = tickTimes.sum()
-            averageTps = if (total > 0) (tickTimes.size * 1000f / total).coerceAtMost(20f) else 0f
+                val total = tickTimes.sum()
+                averageTps = if (total > 0) (tickTimes.size * 1000f / total).coerceAtMost(20f) else 0f
 
-            val tpsValues = tickTimes.map { (1000f / it).coerceAtMost(20f) }
-            currentTps = tpsValues.last()
-            minTps = tpsValues.minOrNull() ?: 20f
-            maxTps = tpsValues.maxOrNull() ?: 20f
+                val tpsValues = tickTimes.map { (1000f / it).coerceAtMost(20f) }
+                currentTps = tpsValues.last()
+                minTps = tpsValues.minOrNull() ?: 20f
+                maxTps = tpsValues.maxOrNull() ?: 20f
+            }
         }
 
         on<WorldEvent.Change> {
-            tickTimes.clear()
-            lastTickTime = System.currentTimeMillis()
+            synchronized(tickTimes) {
+                tickTimes.clear()
+                lastTickTime = System.currentTimeMillis()
+            }
         }
 
         //

@@ -13,33 +13,24 @@ import net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents
 import net.minecraft.client.multiplayer.ClientLevel
 import net.minecraft.network.protocol.Packet
 import net.minecraft.network.protocol.common.ClientboundPingPacket
-import net.minecraft.network.protocol.game.ClientboundRemoveEntitiesPacket
-import net.minecraft.network.protocol.game.ClientboundSoundPacket
-import net.minecraft.network.protocol.game.ClientboundSystemChatPacket
-import net.minecraft.network.protocol.game.ClientboundTakeItemEntityPacket
-import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket
+import net.minecraft.network.protocol.game.*
 import net.minecraft.resources.Identifier
 import net.minecraft.sounds.SoundEvents
 import net.minecraft.world.InteractionHand
-import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.item.ItemEntity
 import quoi.QuoiMod
 import quoi.QuoiMod.mc
-import quoi.api.events.ChatEvent
-import quoi.api.events.DungeonEvent
-import quoi.api.events.GameEvent
-import quoi.api.events.GuiEvent
-import quoi.api.events.PacketEvent
-import quoi.api.events.RenderEvent
-import quoi.api.events.ServerEvent
-import quoi.api.events.TickEvent
-import quoi.api.events.WorldEvent
-import quoi.api.input.Mouse
+import quoi.api.events.*
+//? if >=26.3 {
+/*import quoi.api.input.Mouse
+*///?}
 import quoi.api.skyblock.dungeon.Dungeon
 import quoi.api.skyblock.dungeon.Dungeon.dungeonItemDrops
 import quoi.utils.StringUtils.containsOneOf
 import quoi.utils.StringUtils.noControlCodes
 import quoi.utils.equalsOneOf
+import quoi.utils.skyblock.item.SuperboomCooldown
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Bridges fabric's own event hooks and packet handling.
@@ -50,6 +41,7 @@ object EventDispatcher {
 
     private var lastWorld: ClientLevel? = null
     private var tabLoaded = false
+    private val collectedItemIds = ConcurrentHashMap.newKeySet<Int>()
 
     init {
         ClientTickEvents.START_CLIENT_TICK.register {
@@ -73,6 +65,7 @@ object EventDispatcher {
         ClientLifecycleEvents.CLIENT_STOPPING.register { GameEvent.Unload().post() }
 
         ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE.register { _, _ ->
+            collectedItemIds.clear()
             WorldEvent.Change().post()
             totalTicks = 0
             tabLoaded = false
@@ -88,6 +81,7 @@ object EventDispatcher {
         }
 
         ClientPlayConnectionEvents.DISCONNECT.register { handler, _ ->
+            collectedItemIds.clear()
             WorldEvent.Change().post()
             ServerEvent.Disconnect(handler.serverData?.ip ?: "SinglePlayer").post()
         }
@@ -127,35 +121,45 @@ object EventDispatcher {
                 val string = text.string
                 if (packet.overlay) ChatEvent.ActionBar(string, text).post() else ChatEvent.Packet(string, string.noControlCodes, text).post()
             }
-            is ClientboundTakeItemEntityPacket -> {
-                if (mc.player == null || !Dungeon.inClear) return false
-                val itemEntity = mc.level?.getEntity(packet.itemId) as? ItemEntity ?: return false
-                if (itemEntity.item.hoverName.string.containsOneOf(dungeonItemDrops, true) && itemEntity.distanceTo(mc.player as Entity) <= 6)
-                    DungeonEvent.Secret.Item(itemEntity).post()
-                else false
-            }
-            is ClientboundRemoveEntitiesPacket -> {
-                if (mc.player == null || !Dungeon.inClear) return false
-                packet.entityIds.forEach { id ->
-                    val entity = mc.level?.getEntity(id) as? ItemEntity ?: return@forEach
-                    if (entity.item.hoverName.string.containsOneOf(dungeonItemDrops, true) && entity.distanceTo(mc.player as Entity) <= 6)
-                        DungeonEvent.Secret.Item(entity).post()
-                }
-                false
-            }
-            is ClientboundSoundPacket -> {
-                if (!Dungeon.inClear) return false
-                if (packet.sound.value().equalsOneOf(SoundEvents.BAT_HURT, SoundEvents.BAT_DEATH) && packet.volume == 0.1f)
-                    DungeonEvent.Secret.Bat(packet).post()
-                else false
-            }
             else -> false
         }
     }
 
     @JvmStatic
+    fun onPacketProcessing(packet: Packet<*>) {
+        if (packet !is ClientboundTakeItemEntityPacket && packet !is ClientboundRemoveEntitiesPacket && packet !is ClientboundSoundPacket) return
+        val player = mc.player ?: return
+        if (!Dungeon.inClear) return
+
+        when (packet) {
+            is ClientboundSoundPacket -> {
+                if (packet.sound.value().equalsOneOf(SoundEvents.BAT_HURT, SoundEvents.BAT_DEATH) && packet.volume == 0.1f)
+                    DungeonEvent.Secret.Bat(packet).post()
+            }
+            is ClientboundTakeItemEntityPacket -> {
+                val entity = mc.level?.getEntity(packet.itemId) as? ItemEntity ?: return
+                if (entity.item.hoverName.string.containsOneOf(dungeonItemDrops, true) &&
+                    (packet.playerId == player.id || entity.distanceTo(player) <= 6)
+                ) postItemSecret(entity)
+            }
+            is ClientboundRemoveEntitiesPacket -> packet.entityIds.forEach { id ->
+                val entity = mc.level?.getEntity(id) as? ItemEntity ?: return@forEach
+                if (entity.item.hoverName.string.containsOneOf(dungeonItemDrops, true) && entity.distanceTo(player) <= 6)
+                    postItemSecret(entity)
+            }
+        }
+    }
+
+    private fun postItemSecret(entity: ItemEntity): Boolean {
+        if (!collectedItemIds.add(entity.id)) return false
+        return DungeonEvent.Secret.Item(entity).post()
+    }
+
+    @JvmStatic
     fun onPacketSent(packet: Packet<*>): Boolean {
         if (PacketEvent.Sent(packet).post()) return true
+
+        SuperboomCooldown.onPacketSent(packet)
 
         return when (packet) {
             is ServerboundUseItemOnPacket -> {

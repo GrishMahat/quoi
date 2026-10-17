@@ -9,6 +9,7 @@ import quoi.config.TypeName
 import quoi.utils.addVec
 import quoi.utils.equalsOneOf
 import quoi.utils.skyblock.item.ItemUtils.skyblockId
+import quoi.utils.skyblock.item.SuperboomCooldown
 import quoi.utils.skyblock.item.TeleportUtils.getEtherPos
 import quoi.utils.skyblock.item.TeleportUtils.traverseVoxels
 import quoi.utils.skyblock.player.PlayerUtils.eyePosition
@@ -16,6 +17,7 @@ import quoi.utils.skyblock.player.PlayerUtils.getEyeHeight
 import quoi.utils.skyblock.player.RotationUtils.pitch
 import quoi.utils.skyblock.player.RotationUtils.yaw
 import quoi.utils.skyblock.player.SwapManager
+import quoi.utils.skyblock.player.SwapResult
 import quoi.utils.skyblock.player.interact.AuraManager
 
 @TypeName("boom")
@@ -53,14 +55,18 @@ class BoomNode : RouteNode() {
     override fun execute(pos: MutableVec3): Boolean {
         if (this.pos.distanceToSqr(player.position()) > 0.1) return false
         val block = if (::realTarget.isInitialized) { // rsa convert compat
-            traverseVoxels(this.pos, realTarget, true).pos
+            traverseVoxels(pos.immutable().addVec(y = getEyeHeight(true)), realTarget, true).pos
         } else {
             pos.immutable().addVec(y = getEyeHeight(true)).getEtherPos(realYaw, pitch, 6.0).pos
         } ?: return true
 
         if (!player.mainHandItem.skyblockId.equalsOneOf("INFINITE_SUPERBOOM_TNT", "SUPERBOOM_TNT")) {
-            return !SwapManager.swapById("INFINITE_SUPERBOOM_TNT", "SUPERBOOM_TNT").success
+            val swap = SwapManager.swapById("INFINITE_SUPERBOOM_TNT", "SUPERBOOM_TNT")
+            return swap == SwapResult.NOT_FOUND
         }
+        if (player.mainHandItem.skyblockId == "INFINITE_SUPERBOOM_TNT" && SuperboomCooldown.remainingMillis > 0L) return false
+        if (!AuraManager.canInteractBlock) return false
+
         AuraManager.interactBlock(block)
         return true
     }

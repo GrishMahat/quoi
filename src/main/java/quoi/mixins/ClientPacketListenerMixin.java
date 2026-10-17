@@ -38,6 +38,7 @@ public class ClientPacketListenerMixin {
     )
     private void quoi$handleBundledPacket(Packet<?> packet, PacketListener listener, Operation<Void> original) {
         if (EventDispatcher.onPacketReceived(packet)) return;
+        EventDispatcher.onPacketProcessing(packet);
         original.call(packet, listener);
         new PacketEvent.ReceivedPost(packet).post();
     }

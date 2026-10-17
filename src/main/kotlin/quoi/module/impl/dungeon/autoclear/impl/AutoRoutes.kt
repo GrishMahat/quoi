@@ -3,10 +3,13 @@ package quoi.module.impl.dungeon.autoclear.impl
 import net.minecraft.world.entity.ambient.Bat
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.phys.EntityHitResult
+import net.minecraft.world.phys.Vec3
 import quoi.api.autoroutes.AutoRoutesCommand
 import quoi.api.autoroutes.RouteNode
 import quoi.api.autoroutes.RouteRegistry
+import quoi.api.autoroutes.awaits.SecretAwait
 import quoi.api.autoroutes.nodes.BreakerNode
+import quoi.api.autoroutes.nodes.EtherwarpNode
 import quoi.api.colour.Colour
 import quoi.api.colour.withAlpha
 import quoi.api.events.*
@@ -73,16 +76,20 @@ object AutoRoutes : Module(
     val routeNodes: ConfigMap<String, MutableList<RouteNode>> by configMap("route_nodes.json")
     private var roomNodes: List<RouteNode> = emptyList()
     private var pendingInteract: Direction? = null
+    private var pendingEtherwarp: PendingEtherwarp? = null
     private var position: MutableVec3? = null
     private val batIds = hashSetOf<Int>()
     private var interactDelay = 0
 
     private var activeNode: RouteNode? = null
+    private var floorSource: BreakerNode? = null
     private var forcedNode: RouteNode? = null
     private var mimicNode: RouteNode? = null
 
     private var lastChainName: String? = null
     private var lastChainIndex: Int = -1
+
+    private data class PendingEtherwarp(val node: EtherwarpNode, val origin: Vec3, val floorSource: BreakerNode?, val chainName: String?, val chainIndex: Int)
 
     init {
         AutoRoutesCommand.register()
@@ -91,22 +98,49 @@ object AutoRoutes : Module(
             if (interactDelay > 0) interactDelay--
             if (mimicNode != null) return@on
 
-            pendingInteract?.let {
-                player.useItem(it)
+            pendingInteract?.let { queued ->
+                var direction = queued
+                val etherwarp = pendingEtherwarp
+                if (etherwarp != null && player.position() != etherwarp.origin) {
+                    pendingInteract = null
+                    pendingEtherwarp = null
+                    etherwarp.node.triggered = false
+                    lastChainName = etherwarp.chainName
+                    lastChainIndex = etherwarp.chainIndex
+                    floorSource = etherwarp.floorSource
+                    val actual = player.position().mutable()
+                    position = actual
+                    executing = true
+                    if (!etherwarp.node.inside(actual) && continuationFromBrokenFloor(actual)?.pos != etherwarp.node.pos) {
+                        floorSource = null
+                        position = null
+                        executing = false
+                        return@on
+                    }
+                    handleQueue(actual)
+                    direction = pendingInteract ?: return@on
+                }
+                player.useItem(direction)
                 pendingInteract = null
+                pendingEtherwarp = null
             }
 
             if (editMode || roomNodes.isEmpty() || ClearExecutor.active) {
                 position = null
                 executing = false
+                floorSource = null
                 return@on
             }
 
-            if (activeNode?.hasSecretAwait == true) {
-                EntityUtils.getEntities<Bat>(radius = 10.0) { it.maxHealth.equalsOneOf(100f, 200f, 400f, 800f) && it.id !in batIds }
+            val batListener = secretNode()
+            if (batListener != null) {
+                val listenerArea = if (batListener.inside(player.position().mutable())) null else batListener.pos.aabb(10.0)
+                EntityUtils.getEntities<Bat>(radius = 10.0) {
+                    it.maxHealth.equalsOneOf(100f, 200f, 400f, 800f) && it.id !in batIds && (listenerArea == null || it.boundingBox.intersects(listenerArea))
+                }
                     .forEach { bat ->
                         batIds.add(bat.id)
-                        activeNode?.onSecret()
+                        onSecret()
                     }
             }
 
@@ -114,13 +148,19 @@ object AutoRoutes : Module(
                 position = player.position().mutable()
             }
 
+            val continuation = continuationFromBrokenFloor(player.position().mutable())
             val desynced = roomNodes.any { it.inside() && it.triggered }
 
             if (!desynced) {
-                roomNodes.forEach { if (!it.inside()) it.triggered = false }
+                roomNodes.forEach {
+                    if (!it.inside() && it != continuation) {
+                        it.triggered = false
+                    }
+                }
                 position = player.position().mutable()
             }
 
+            if (continuation != null) position = player.position().mutable()
             handleQueue(position!!)
         }
 
@@ -142,6 +182,7 @@ object AutoRoutes : Module(
             val node = nodes[next]
             mimicNode = null
             forcedNode = node
+            floorSource = null
             activeNode = node
 
             executing = true
@@ -160,26 +201,32 @@ object AutoRoutes : Module(
         }
 
         on<DungeonEvent.Secret.Interact> {
-            activeNode?.onSecret()
+            onSecret()
             interactDelay = 2
 
             if (!pauseOnMimic || editMode || !blockState.`is`(Blocks.TRAPPED_CHEST)) return@on
             if (ScanUtils.getRoomFromPos(blockPos.x, blockPos.z)?.data?.type == RoomType.TRAP) return@on
             mimicNode = activeNode ?: return@on
             pendingInteract = null
+            pendingEtherwarp = null
             activeNode = null
+            floorSource = null
             forcedNode = null
             position = null
             executing = false
             PlayerUtils.setTitle("§cMimic!", stayAlive = 60)
         }
-        on<DungeonEvent.Secret.Item> { activeNode?.onSecret() }
-        on<DungeonEvent.Secret.Bat> { activeNode?.onSecret() }
+        on<DungeonEvent.Secret.Item> { onSecret() }
+        on<DungeonEvent.Secret.Bat> {
+            val node = secretNode()
+            if (node != null && !node.inside(player.position().mutable()) && !node.pos.aabb(10.0).contains(packet.x, packet.y, packet.z)) return@on
+            onSecret()
+        }
 
         on<DungeonEvent.Room.Enter> {
             mimicNode = null
             batIds.clear()
-            updateCache(room ?: return@on)
+            updateCache(room)
         }
 
         on<RenderEvent.World> {
@@ -201,11 +248,13 @@ object AutoRoutes : Module(
         on<WorldEvent.Change> {
             roomNodes = emptyList()
             activeNode = null
+            floorSource = null
             executing = false
             forcedNode = null
             mimicNode = null
             position = null
             pendingInteract = null
+            pendingEtherwarp = null
             batIds.clear()
 
             lastChainName = null
@@ -213,19 +262,24 @@ object AutoRoutes : Module(
         }
     }
 
-    fun handleQueue(playerPos: MutableVec3) {
-        if (mimicNode != null) return
-
-        val node = roomNodes
-            .filter { it.inside(playerPos) && !it.triggered }
+    private fun nextNode(playerPos: MutableVec3, secretOnly: Boolean = false): RouteNode? =
+        roomNodes
+            .filter { it.inside(playerPos) && !it.triggered && (!secretOnly || it.hasSecretAwait) }
             .filter { n ->
                 val c = n.chain ?: return@filter true
                 if (c.index == 0) return@filter true
                 c.name == lastChainName && c.index == lastChainIndex + 1
             }
-            .maxByOrNull { it.priority } ?: run {
+            .maxByOrNull { it.priority }
+
+    fun handleQueue(playerPos: MutableVec3) {
+        if (mimicNode != null) return
+
+        val selectionPos = continuationFromBrokenFloor(playerPos)?.pos?.mutable() ?: playerPos
+        val node = nextNode(selectionPos) ?: run {
 
             activeNode = null
+            floorSource = null
             executing = false
 
             if (roomNodes.none { it.inside() && it.triggered }) {
@@ -236,6 +290,7 @@ object AutoRoutes : Module(
 
         if (activeNode != node) {
             activeNode = node
+            executing = false
         }
 
         if (interactDelay > 0) return
@@ -245,6 +300,7 @@ object AutoRoutes : Module(
         executing = true
         if (node.execute(playerPos)) {
             node.triggered = true
+            if (node != floorSource) floorSource = null
             node.chain?.let {
                 lastChainName = it.name
                 lastChainIndex = it.index
@@ -258,26 +314,67 @@ object AutoRoutes : Module(
 
     fun queueInteract(dir: Direction) {
         pendingInteract = dir
+        pendingEtherwarp = null
+    }
+
+    fun queueEtherwarp(dir: Direction, node: EtherwarpNode, origin: Vec3) {
+        queueInteract(dir)
+        if (origin == player.position()) pendingEtherwarp = PendingEtherwarp(node, origin, floorSource, lastChainName, lastChainIndex)
     }
 
     override fun onDisable() {
         pendingInteract = null
+        pendingEtherwarp = null
         activeNode = null
+        floorSource = null
         forcedNode = null
         mimicNode = null
         position = null
         executing = false
     }
 
-    fun updateCache(room: OdonRoom) {
-        val nodes = routeNodes[room.name]
-        if (nodes.isNullOrEmpty()) return
-        nodes.forEach { it.update(room) }
+    fun updateCache(room: OdonRoom?) {
+        activeNode = null
+        floorSource = null
+        forcedNode = null
+        mimicNode = null
+        pendingInteract = null
+        pendingEtherwarp = null
+        position = null
+        executing = false
+        interactDelay = 0
+        lastChainName = null
+        lastChainIndex = -1
+
+        val nodes = room?.let { routeNodes[it.name] }.orEmpty()
+        if (room != null) nodes.forEach { it.update(room) }
         roomNodes = nodes
     }
 
+    private fun continuationFromBrokenFloor(playerPos: MutableVec3): BreakerNode? {
+        val source = floorSource ?: (activeNode as? BreakerNode)?.takeIf { executing || it.triggered } ?: return null
+        val inColumn = playerPos.y < source.pos.y && MutableVec3(playerPos.x, source.pos.y, playerPos.z).inside(source.aabb)
+        if (!inColumn || !source.hasRemovedSupport) {
+            floorSource = null
+            return null
+        }
+        floorSource = source
+        return source
+    }
+
+    private fun secretNode(): RouteNode? =
+        if (editMode || mimicNode != null || ClearExecutor.active) null
+        else nextNode(player.position().mutable(), secretOnly = true)
+            ?: activeNode?.takeIf { !it.triggered && it.hasSecretAwait }
+            ?: position?.takeIf { pendingInteract != null && activeNode is EtherwarpNode && activeNode?.triggered == true }
+                ?.let { nextNode(it, secretOnly = true) }
+
+    private fun onSecret() {
+        secretNode()?.onSecret()
+    }
+
     private val RouteNode.hasSecretAwait: Boolean
-        get() = this.awaits?.any { it.typeName.lowercase() == "secret" } == true
+        get() = this.awaits?.any { it is SecretAwait } == true
 
     private fun RouteNode.colour() = if (multicolour) colours[this.typeName]?.value ?: Colour.WHITE else AutoRoutes.colour
     private fun RouteNode.fillColour() = if (multicolour) fillColours[this.typeName]?.value ?: Colour.WHITE else fillColour

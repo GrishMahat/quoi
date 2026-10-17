@@ -8,6 +8,7 @@ import quoi.api.skyblock.dungeon.odonscanning.tiles.OdonRoom
 import quoi.api.vec.MutableVec3
 import quoi.config.TypeName
 import quoi.module.impl.dungeon.autoclear.impl.AutoRoutes
+import quoi.utils.aabb
 import quoi.utils.addVec
 import quoi.utils.getDirection
 import quoi.utils.getLook
@@ -18,6 +19,7 @@ import quoi.utils.skyblock.item.TeleportUtils.getEtherwarpLandingY
 import quoi.utils.skyblock.item.TeleportUtils.traverseVoxels
 import quoi.utils.skyblock.player.PlayerUtils.getEyeHeight
 import quoi.utils.skyblock.player.SwapManager
+import quoi.utils.skyblock.player.SwapResult
 
 @TypeName("etherwarp")
 class EtherwarpNode : RouteNode() {
@@ -68,15 +70,16 @@ class EtherwarpNode : RouteNode() {
         val to = actualTarget.add(direction.scale(0.001))
 
         val ether = traverseVoxels(from, to, true)
-        if (!ether.succeeded || ether.pos == null) return false//true
+        if (!ether.succeeded || ether.pos == null || !ether.pos.aabb.inflate(0.001).contains(actualTarget)) return false
 
         if (player.mainHandItem.skyblockId != "ASPECT_OF_THE_VOID") {
-            return !SwapManager.swapById("ASPECT_OF_THE_VOID").success
+            val swap = SwapManager.swapById("ASPECT_OF_THE_VOID")
+            return swap == SwapResult.NOT_FOUND
         }
 
         val dir = getDirection(from, actualTarget)
 
-        AutoRoutes.queueInteract(dir)
+        AutoRoutes.queueEtherwarp(dir, this, pos.immutable())
 
         pos.x = ether.pos.x + 0.5
         pos.y = getEtherwarpLandingY(ether.pos) + 0.05

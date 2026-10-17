@@ -47,7 +47,8 @@ class UseItemNode : RouteNode() {
         }
 
         if (player.inventory.selectedSlot != slot) {
-            return !SwapManager.swapToSlot(slot).success
+            SwapManager.swapToSlot(slot)
+            return false
         }
 
         AutoRoutes.queueInteract(Direction(realYaw, pitch))
