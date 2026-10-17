@@ -125,7 +125,7 @@ object AutoRoutes : Module(
                 pendingEtherwarp = null
             }
 
-            if (editMode || roomNodes.isEmpty() || ClearExecutor.active) {
+            if (editMode || roomNodes.isEmpty() || ClearExecutor.routing) {
                 position = null
                 executing = false
                 floorSource = null
@@ -363,7 +363,7 @@ object AutoRoutes : Module(
     }
 
     private fun secretNode(): RouteNode? =
-        if (editMode || mimicNode != null || ClearExecutor.active) null
+        if (editMode || mimicNode != null || ClearExecutor.routing) null
         else nextNode(player.position().mutable(), secretOnly = true)
             ?: activeNode?.takeIf { !it.triggered && it.hasSecretAwait }
             ?: position?.takeIf { pendingInteract != null && activeNode is EtherwarpNode && activeNode?.triggered == true }

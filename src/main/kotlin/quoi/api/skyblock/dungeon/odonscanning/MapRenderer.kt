@@ -265,8 +265,12 @@ object MapRenderer {
                         col.animate(0.15.seconds, style = Animation.Style.EaseOutQuint)
                         outlineCol.animate(0.15.seconds, style = Animation.Style.EaseOutQuint)
                     }
-                    onClick(nonSpecific = true) { (button) ->
-                        pathToRoom(room, comp, button)
+                    onClick {
+                        pathToRoom(room, comp, type = 0)
+                        true
+                    }
+                    onClick(button = 1) {
+                        pathToRoom(room, comp, type = 2)
                         true
                     }
                 }

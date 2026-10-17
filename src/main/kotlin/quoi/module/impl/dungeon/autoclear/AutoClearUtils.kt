@@ -117,13 +117,14 @@ fun pathToDoor(door: OdonDoor, faceOnArrival: Boolean = false) {
  *
  * @param room Destination room.
  * @param tile Specific room tile.
- * @param type Navigation type: 0 for a coordinate/core override, 1 for a predefined autoroute start.
+ * @param type Navigation type: 0 for room entry, 1 for an autoroute start, 2 for room entry followed by an autoroute start.
  */
 fun pathToRoom(room: OdonRoom, tile: RoomTile = room.tiles.first(), type: Int) {
-    if (!canPath || (type != 0 && type != 1)) return
+    if (!canPath || type !in 0..2) return
 
-    val goal = when(type) { // 0 tile 1 start
-        0 -> {
+    val enterRoomFirst = type == 2 && Dungeon.currentRoom != room
+    val goal = when {
+        type == 0 || enterRoomFirst -> {
             val overridePos = roomOverrides[room.name] ?: coreOverrides[room.name]?.get(tile.core)
 
             if (overridePos != null && room.rotation != Rotations.NONE) {
@@ -133,7 +134,7 @@ fun pathToRoom(room: OdonRoom, tile: RoomTile = room.tiles.first(), type: Int) {
                     ?: return modMessage("Couldn't find goal position for tile &e${tile.core}&r in &e${room.name}")
             }
         }
-        1 -> {
+        else -> {
             val rings = routeNodes[room.name] ?: return modMessage("No rings found in &e${room.name}")
 
             val starts = rings
@@ -147,10 +148,16 @@ fun pathToRoom(room: OdonRoom, tile: RoomTile = room.tiles.first(), type: Int) {
 
             target
         }
-        else -> return
     }
 
-    ClearExecutor.etherPath(to = goal)
+    val onArrival = if (enterRoomFirst) {
+        {
+            if (Dungeon.currentRoom == room) pathToRoom(room, tile, type = 1)
+            else modMessage("Couldn't reach &e${room.name}&r. Travel to route start cancelled.")
+        }
+    } else null
+
+    ClearExecutor.etherPath(to = goal, onComplete = onArrival)
 }
 
 fun TeleportPathNode.toEther(): ClearEtherNode {

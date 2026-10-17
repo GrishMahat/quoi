@@ -1,5 +1,8 @@
 package quoi.module.impl.dungeon.autoclear.executor
 
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import net.minecraft.core.BlockPos
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket
@@ -31,8 +34,9 @@ object ClearExecutor : EventListener {
         private set
 
     val routing: Boolean
-        get() = !nodes.isNullOrEmpty() || pendingInteract != null || active
+        get() = pathJob?.isActive == true || !nodes.isNullOrEmpty() || pendingInteract != null || active || pendingCompletion != null
 
+    private var pathJob: Job? = null
     private var pendingInteract: Direction? = null
     private var position: MutableVec3? = null
     private var activeNode: ClearNode? = null
@@ -49,8 +53,12 @@ object ClearExecutor : EventListener {
             if (syncDelay++ > 9) {
                 syncDelay = 0
                 val callback = pendingCompletion
-                pendingCompletion = null
-                if (callback != null) mc.submit { callback() }
+                if (callback != null) mc.submit {
+                    if (pendingCompletion === callback) {
+                        pendingCompletion = null
+                        callback()
+                    }
+                }
             }
         }
 
@@ -79,6 +87,8 @@ object ClearExecutor : EventListener {
         }
 
         on<WorldEvent.Change> {
+            pathJob?.cancel()
+            pathJob = null
             nodes = null
             syncDelay = 0
             compDelay = 0
@@ -92,19 +102,23 @@ object ClearExecutor : EventListener {
     }
 
     fun etherPath(to: BlockPos, config: PathConfig = PathConfig(), onComplete: (() -> Unit)? = null) {
+        cancel()
         if (player.at(to)) {
             onComplete?.invoke()
             return modMessage("Already there")
         }
 
-        scope.launch {
+        pathJob = scope.launch {
             val p = EtherwarpPathfinder.findDungeonPath(
                 from = player.position(),
                 to = to,
                 config = config,
             ) ?: return@launch
 
-            clearPath(p.map { it.toEther() }, onComplete)
+            ensureActive()
+            mc.submit {
+                if (isActive) clearPath(p.map { it.toEther() }, onComplete)
+            }.join()
         }
     }
 
@@ -121,6 +135,8 @@ object ClearExecutor : EventListener {
     }
 
     fun cancel() {
+        pathJob?.cancel()
+        pathJob = null
         nodes = null
         position = null
         pendingInteract = null

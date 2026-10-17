@@ -1,11 +1,19 @@
 package quoi.module.impl.dungeon.autoclear.impl
 
 import net.minecraft.network.protocol.game.ClientboundForgetLevelChunkPacket
-import quoi.api.abobaui.dsl.aboba
+import quoi.api.abobaui.constraints.impl.positions.Centre
+import quoi.api.abobaui.constraints.impl.size.Bounding
+import quoi.api.abobaui.constraints.impl.size.Copying
+import quoi.api.abobaui.dsl.*
+import quoi.api.abobaui.elements.impl.Text.Companion.maxWidth
+import quoi.api.abobaui.elements.impl.Text.Companion.shadow
+import quoi.api.abobaui.elements.impl.Text.Companion.textSupplied
 import quoi.api.colour.Colour
 import quoi.api.colour.withAlpha
 import quoi.api.events.PacketEvent
 import quoi.api.events.core.on
+import quoi.api.input.Keybinds
+import quoi.api.skyblock.SkyblockPlayer
 import quoi.api.skyblock.dungeon.Dungeon
 import quoi.api.skyblock.dungeon.odonscanning.MapRenderer
 import quoi.api.skyblock.dungeon.odonscanning.MapRenderer.renderMap
@@ -14,9 +22,10 @@ import quoi.api.skyblock.location.invoke
 import quoi.module.Module
 import quoi.module.impl.dungeon.autoclear.getLockedDoor
 import quoi.module.impl.dungeon.autoclear.pathToDoor
-import quoi.module.impl.dungeon.autoclear.pathToRoom
 import quoi.module.settings.UIComponent.Companion.childOf
+import quoi.module.settings.impl.KeybindComponent
 import quoi.utils.ChatUtils.modMessage
+import quoi.utils.commas
 import quoi.utils.ui.hud.impl.TextHud
 import quoi.utils.ui.screens.UIScreen.Companion.open
 
@@ -34,8 +43,7 @@ object InteractiveMap : Module(
     private val closeOn by segmented("Close on", "Release", listOf("Release", "Repress"))
     val faceDoorOnArrival by switch("Face door on arrival", desc = "Faces the targeted door after arriving.")
 
-    @Suppress("unused")
-    private val openKey by keybind("Open key")
+    private val openKey: KeybindComponent = register(keybind("Open key"))
         .onPress {
             if (!enabled || !Dungeon.inClear || Dungeon.isDead) return@onPress
             if (mapOpen && closeOn.index == 1) {
@@ -49,19 +57,9 @@ object InteractiveMap : Module(
             if (mapOpen) mc.setScreen(null)
         }
 
-    @Suppress("unused")
-    private val startKey by keybind("Start key", desc = "Teleports to start node in current room")
+    private val lockedKey: KeybindComponent = register(keybind("Locked door key", desc = "Teleports to the closest locked door"))
         .onPress {
-            if (!enabled || !mapOpen || !Dungeon.inClear || Dungeon.isDead) return@onPress
-            val room = Dungeon.currentRoom
-                ?: return@onPress modMessage("Current room is null. This should never happen")
-            pathToRoom(room, room.tiles.first(), 1)
-        }
-
-    @Suppress("unused")
-    private val lockedKey by keybind("Locked door key", desc = "Teleports to the closest locked door")
-        .onPress {
-            if (!enabled || !mapOpen || !Dungeon.inClear || Dungeon.isDead) return@onPress
+            if (!enabled || !Dungeon.inClear || Dungeon.isDead) return@onPress
             val door = getLockedDoor() ?: return@onPress modMessage("No locked doors found.")
             pathToDoor(door, faceDoorOnArrival)
         }
@@ -120,6 +118,53 @@ object InteractiveMap : Module(
 //            icon = iconCfg
         )
 
-        renderMap(config = cfg)
+        val infoScale = fontScale.coerceAtLeast(1f)
+
+        column(constrain(w = Copying - 32.px), gap = 12.px) {
+            block(bounds(x = Centre, padding = 10.px), Colour.BLACK.withAlpha(0.8f), 6.radius()) {
+                textSupplied(
+                    supplier = { "${SkyblockPlayer.mana.commas()} / ${SkyblockPlayer.maxMana.commas()} Mana" },
+                    font = cfg.font,
+                    colour = Colour.MINECRAFT_AQUA,
+                    pos = at(10.px, 10.px),
+                    size = (28f * infoScale).px
+                ).shadow = shadow
+            }
+
+            renderMap(config = cfg).element.constraints.x = Centre
+
+            block(
+                constrain(x = Centre, w = (960f * infoScale).px.coerceAtMost(Copying), h = Bounding + 12.px),
+                Colour.BLACK.withAlpha(0.8f),
+                6.radius()
+            ) {
+                column(constrain(16.px, 12.px, Copying - 32.px), gap = 8.px) {
+                    text(
+                        string = "§bLeft click§f: Room / door   §7|   §bRight click§f: Route start",
+                        font = cfg.font,
+                        pos = at(x = Centre),
+                        size = (24f * infoScale).px
+                    ) {
+                        maxWidth(Copying)
+                    }.shadow = shadow
+
+                    textSupplied(
+                        supplier = {
+                            val doorHint = if (lockedKey.value.key == Keybinds.KEY_NONE) "§fLocked door: §7Not bound"
+                            else "§b${lockedKey.getKeyName()}§f: Closest locked door"
+                            val closeHint = if (openKey.value.key == Keybinds.KEY_NONE) "Esc"
+                            else "${if (closeOn.index == 0) "Release " else ""}${openKey.getKeyName()} / Esc"
+                            "$doorHint   §7|   §b$closeHint§f: Close map"
+                        },
+                        font = cfg.font,
+                        pos = at(x = Centre),
+                        size = (24f * infoScale).px
+                    ).also {
+                        it.maxWidth(Copying)
+                        it.shadow = shadow
+                    }
+                }
+            }
+        }
     }
 }
