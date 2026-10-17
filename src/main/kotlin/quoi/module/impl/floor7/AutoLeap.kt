@@ -167,13 +167,13 @@ object AutoLeap : Module(
         on<WorldEvent.Change> { reset() }
 
         on<DungeonEvent.StageComplete> {
-            if (!p3Leap || !p3Auto || !Floor7.inPhaseAt(Phase.P3)) return@on
+            if (!p3Leap || !p3Auto || !Floor7.inPhaseAt(Phase.P3) || isAtPre4()) return@on
             if (whenBlown) return@on
             handleP3Leap(completedStage = stage)
         }
 
         on<DungeonEvent.StageComplete.Full> {
-            if (!p3Leap || !p3Auto || !Floor7.inPhaseAt(Phase.P3)) return@on
+            if (!p3Leap || !p3Auto || !Floor7.inPhaseAt(Phase.P3) || isAtPre4()) return@on
             if (!whenBlown) return@on
             handleP3Leap(completedStage = stage)
         }
@@ -217,7 +217,7 @@ object AutoLeap : Module(
                 leapToConfigured(crystalName, crystalClass.selected)
             }
 
-            if (i4Leap && i4Auto && isAtPre4() && Floor7.inStage(Stage.S1) && unformatted.startsWith("${player.name.string} completed a device!")) {
+            if (i4Leap && i4Auto && isAtPre4() && Floor7.inStage(Stage.S1, Stage.S2) && unformatted.startsWith("${player.name.string} completed a device!")) {
                 leapToPre4Target()
             }
         }
