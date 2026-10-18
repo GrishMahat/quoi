@@ -94,6 +94,8 @@ object InteractiveMap : Module(
         )
 
         val infoScale = cfg.fontScale.coerceAtLeast(1f)
+        val availableHeight = (mc.window.height - (100f * infoScale + 116f)).coerceAtLeast(128f)
+        val mapConfig = cfg.copy(scale = cfg.scale * (availableHeight / cfg.height).coerceAtMost(1f))
 
         column(constrain(w = Copying - 32.px), gap = 12.px) {
             block(bounds(x = Centre, padding = 10.px), Colour.BLACK.withAlpha(0.8f), 6.radius()) {
@@ -106,7 +108,7 @@ object InteractiveMap : Module(
                 ).shadow = cfg.shadow
             }
 
-            renderMap(config = cfg).element.constraints.x = Centre
+            renderMap(config = mapConfig).element.constraints.x = Centre
 
             block(
                 constrain(x = Centre, w = (1240f * infoScale).px.coerceAtMost(Copying), h = Bounding + 12.px),

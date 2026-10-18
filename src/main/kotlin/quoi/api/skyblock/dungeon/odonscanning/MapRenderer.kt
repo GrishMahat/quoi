@@ -8,10 +8,13 @@ import quoi.api.abobaui.elements.Element
 import quoi.api.abobaui.elements.ElementScope
 import quoi.api.abobaui.elements.impl.Block.Companion.outline
 import quoi.api.abobaui.elements.impl.Text
+import quoi.api.abobaui.elements.impl.Text.Companion.maxWidth
 import quoi.api.abobaui.elements.impl.Text.Companion.shadow
+import quoi.api.abobaui.elements.impl.Text.Companion.string
 import quoi.api.animations.Animation
 import quoi.api.colour.*
 import quoi.api.skyblock.dungeon.Dungeon
+import quoi.api.skyblock.dungeon.ScoreCalculation
 import quoi.api.skyblock.dungeon.odonscanning.tiles.OdonDoor
 import quoi.api.skyblock.dungeon.odonscanning.tiles.OdonRoom
 import quoi.api.skyblock.dungeon.odonscanning.tiles.RoomTile
@@ -21,6 +24,7 @@ import quoi.module.impl.dungeon.DungeonMap
 import quoi.module.impl.dungeon.autoclear.impl.InteractiveMap
 import quoi.module.impl.dungeon.autoclear.pathToDoor
 import quoi.module.impl.dungeon.autoclear.pathToRoom
+import quoi.utils.StringUtils.noControlCodes
 import quoi.utils.StringUtils.width
 import quoi.utils.ui.rendering.Font
 import quoi.utils.ui.rendering.NVGRenderer
@@ -40,17 +44,18 @@ object MapRenderer {
     fun ElementScope<*>.renderMap(config: MapConfig): ElementScope<*> {
         val (scale, radius) = config
 
-        val thickness = (12 * scale).px
         val size = 116f * scale
+        val mapHeight = 128f * scale
 
         return block(
-            size(size.px + thickness, size.px + thickness),
+            size(mapHeight.px, config.height.px),
             colour = DungeonMap.bgColour,
             (radius * 1.5f).radius()
         ) {
             if (DungeonMap.border) outline(DungeonMap.borderColour, thickness = DungeonMap.borderThickness.px)
 
-            val content = group(constrain(Centre, Centre, 0.px, 0.px))
+            val viewport = group(constrain(y = 0.px, w = Copying, h = mapHeight.px))
+            val content = viewport.group(constrain(Centre, Centre, 0.px, 0.px))
             val doors = content.group(size(Copying, Copying))
             val rooms = content.group(size(Copying, Copying))
             val markers = PlayerMarkers(config)
@@ -58,6 +63,8 @@ object MapRenderer {
             val roomViews = mutableMapOf<OdonRoom, RoomView>()
             val doorViews = mutableMapOf<OdonDoor, Element>()
             var previousScale = Float.NaN
+
+            if (DungeonMap.showInfo) renderInfo(config, mapHeight)
 
             watch({ layoutRevision }, immediate = true) {
                 val baseW = (mapSize.x * 16 + (mapSize.x - 1) * 4).toFloat().coerceAtLeast(1f)
@@ -106,6 +113,43 @@ object MapRenderer {
                 ui.recalculateMouse = true
             }
         }
+    }
+
+    // based on: https://github.com/Noamm9/NoammAddons/blob/1bca286c77939638c13029b1b6d7f387cf92b3f4/src/main/kotlin/com/github/noamm9/features/impl/dungeon/map/MapRenderer.kt
+    private fun ElementScope<*>.renderInfo(config: MapConfig, y: Float) {
+        val textSize = 6.3f * config.scale * config.fontScale
+        for (index in 0..1) {
+            val label = text(
+                "",
+                font = config.font,
+                pos = at(Centre, (y + config.scale * (-2f + index * 7f * config.fontScale)).px),
+                size = textSize.px
+            ) {
+                maxWidth(Copying - (12f * config.scale).px)
+                shadow = config.shadow
+            }
+            watch({ infoLines()[index] }, immediate = true) { line ->
+                label.string = line
+                val width = if (config.font.name == "Minecraft") line.width(textSize / mc.font.lineHeight)
+                    else NVGRenderer.textWidth(line.noControlCodes, textSize, config.font)
+                label.element.constraints.width = width.coerceAtMost(116f * config.scale).px
+                label.element.constraints.height = textSize.px
+            }
+        }
+    }
+
+    private fun infoLines(): List<String> {
+        val secrets = "§6Secrets: §b${Dungeon.secretCount}§f/§b${ScoreCalculation.secretsUntil300}§f/§e${ScoreCalculation.totalSecrets}"
+        val crypts = "${if (Dungeon.cryptCount >= 5) "§a" else "§c"}C${Dungeon.cryptCount}"
+        val bats = "${if (Dungeon.batKilled) "§a" else "§c"}B${Dungeon.batCount}"
+        val score = Dungeon.score
+        val deaths = "${if (Dungeon.deathCount == 0) "§a" else "§c"}${Dungeon.deathCount}"
+        val mimic = "${if (Dungeon.mimicKilled) "§a" else "§c"}M §f| "
+        val prince = "${if (Dungeon.princeKilled) "§a" else "§c"}P"
+        return listOf(
+            "$secrets    $crypts §f| $bats",
+            "§eScore: ${ScoreCalculation.colour(score)}$score   §cDeaths: $deaths   $mimic$prince"
+        )
     }
 
     private class RoomView(val element: Element) {
@@ -312,7 +356,9 @@ object MapRenderer {
         val icons: Boolean = true,
         val icon: IconConfig = IconConfig(),
         val autoClear: Boolean = false,
-    )
+    ) {
+        val height: Float get() = (128f + if (DungeonMap.showInfo) 15f * fontScale else 0f) * scale
+    }
 
     data class IconConfig(
         val scale: Float = DungeonMap.iconScale,

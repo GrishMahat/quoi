@@ -1,16 +1,14 @@
 package quoi.api.skyblock.dungeon
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import net.minecraft.core.BlockPos
 import net.minecraft.network.protocol.game.*
 import net.minecraft.world.entity.decoration.ArmorStand
+import net.minecraft.world.entity.monster.zombie.Zombie
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.level.block.LeverBlock
 import net.minecraft.world.level.block.SkullBlock
 import net.minecraft.world.level.block.entity.SkullBlockEntity
 import net.minecraft.world.level.block.state.BlockState
-import quoi.QuoiMod.scope
 import quoi.annotations.Init
 import quoi.api.colour.Colour
 import quoi.api.colour.withAlpha
@@ -33,8 +31,6 @@ import quoi.utils.StringUtils.noControlCodes
 import quoi.utils.skyblock.PartyUtils
 import java.util.*
 import kotlin.math.floor
-
-// TODO: fix score calc and other outdate stuff
 
 /**
  * modified OdinFabric (BSD 3-Clause)
@@ -68,7 +64,7 @@ object Dungeon : EventListener, Shortcuts {
         get() = dungeonStats.secretsFound
 
     inline val knownSecrets: Int
-        get() = dungeonStats.knownSecrets
+        get() = ScoreCalculation.totalSecrets
 
     inline val secretPercentage: Float
         get() = dungeonStats.secretsPercent
@@ -124,23 +120,20 @@ object Dungeon : EventListener, Shortcuts {
     inline val princeKilled: Boolean
         get() = dungeonStats.princeKilled
 
-    inline val batKilled: Boolean // TODO: add support for bat score per player
+    inline val batKilled: Boolean
         get() = dungeonStats.batKilled
+
+    val batCount: Int
+        get() = batKillers.size
 
     inline val currentRoom: OdonRoom?
         get() = ScanUtils.currentRoom
 
-    var isPaul: Boolean = false
-        private set
+    val isPaul: Boolean
+        get() = ScoreCalculation.isPaul
 
     inline val getBonusScore: Int
-        get() {
-            var score = cryptCount.coerceAtMost(5)
-            if (mimicKilled) score += 2
-            if (princeKilled) score += 1
-            if (batKilled) score += 1
-            return score
-        }
+        get() = ScoreCalculation.bonusScore
 
     inline val bloodDone: Boolean
         get() = dungeonStats.bloodDone
@@ -149,23 +142,7 @@ object Dungeon : EventListener, Shortcuts {
         get() = dungeonStats.bloodOpen
 
     inline val score: Int
-        get() {
-            val completed = completedRoomCount + (if (!bloodDone) 1 else 0) + (if (!inBoss) 1 else 0)
-            val total = if (totalRooms != 0) totalRooms else 36
-
-            val exploration = floor?.let {
-                floor((secretPercentage / it.secretPercentage) / 100f * 40f).coerceIn(0f, 40f).toInt() +
-                        floor(completed.toFloat() / total * 60f).coerceIn(0f, 60f).toInt()
-            } ?: 0
-
-            val skillRooms = floor(completed.toFloat() / total * 80f).coerceIn(0f, 80f).toInt()
-            val puzzlePenalty = (puzzleCount - puzzles.count { it.status == PuzzleStatus.Completed }) * 10
-
-            return exploration + (20 + skillRooms - puzzlePenalty - (deathCount * 2 - 1).coerceAtLeast(0)).coerceIn(
-                20,
-                100
-            ) + getBonusScore + 100
-        }
+        get() = ScoreCalculation.score.total
 
     inline val warpCooldown: Long
         get() = (enterTime - System.currentTimeMillis()).coerceAtLeast(0L)
@@ -177,13 +154,18 @@ object Dungeon : EventListener, Shortcuts {
         private set
 
     private var expectingBloodUpdate = false
+    private var chatDeaths = 0
+    private val batKillers = mutableSetOf<String>()
 
     init {
         ScanUtils.init()
 
         on<DungeonEvent.Start> {
             hasStarted = true
+            ScoreCalculation.updateMayor()
         }
+
+        on<DungeonEvent.Enter> { ScoreCalculation.updateMayor() }
 
         on<WorldEvent.Change> {
             hasStarted = false
@@ -191,6 +173,8 @@ object Dungeon : EventListener, Shortcuts {
             dungeonTeammatesNoSelf = emptyList()
             dungeonStats = DungeonStats()
             expectingBloodUpdate = false
+            chatDeaths = 0
+            batKillers.clear()
             leapTeammates = emptyList()
             dungeonTeammates.clear()
             Puzzle.entries.forEach { it.status = null }
@@ -198,10 +182,10 @@ object Dungeon : EventListener, Shortcuts {
             floor = if (ClickGui.forceDungeons) ClickGui.dungeonFloor.selected
             else if (Location.onZapto) Floor.F7
             else null
-            isPaul = false
         }
 
         on<PacketEvent.ReceivedPost, ClientboundPlayerInfoUpdatePacket> {
+            if (!inDungeons) return@on
             if (packet.actions().none {
                     it.equalsOneOf(
                         ClientboundPlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME,
@@ -212,15 +196,15 @@ object Dungeon : EventListener, Shortcuts {
                 .mapNotNull { it.displayName }
                 .ifEmpty { return@on }
 
-            val stringEntries = tabListEntries.map { it.string }
-            val colouredEntries = tabListEntries.map { it.string to Colour.RGB(it.siblings.lastOrNull()?.style?.color?.value ?: Colour.WHITE.rgb).withAlpha(1.0f) }
+            val stringEntries = tabListEntries.map { it.string.noControlCodes }
+            val colouredEntries = tabListEntries.map { it.string.noControlCodes to Colour.RGB(it.siblings.lastOrNull()?.style?.color?.value ?: Colour.WHITE.rgb).withAlpha(1.0f) }
 
             updateDungeonTeammates(colouredEntries)
             updateDungeonStats(stringEntries)
             getDungeonPuzzles(stringEntries)
         }
 
-        on<PacketEvent.Received> {
+        on<PacketEvent.ReceivedPost> {
             with(packet) {
                 when (this) {
                     is ClientboundSetPlayerTeamPacket -> {
@@ -229,7 +213,6 @@ object Dungeon : EventListener, Shortcuts {
                         val text = team.playerPrefix.string.noControlCodes + team.playerSuffix.string.noControlCodes
 
                         floorRegex.find(text)?.groupValues?.get(1)?.let {
-                            scope.launch(Dispatchers.IO) { isPaul = false }
                             val detectedFloor = Floor.valueOf(it)
                             if (floor != detectedFloor) {
                                 floor = detectedFloor
@@ -241,6 +224,7 @@ object Dungeon : EventListener, Shortcuts {
                             if (dungeonStats.percentCleared != it && expectingBloodUpdate) dungeonStats.bloodDone = true
                             dungeonStats.percentCleared = it
                         }
+                        if (inDungeons) updateElapsedTime(text)
                         dungeonTeammates.find { it.name == player.name.string }?.apply {
                             isDead = player.inventory.getItem(0).displayName.string.contains("Haunt")
                         }
@@ -254,6 +238,7 @@ object Dungeon : EventListener, Shortcuts {
                     }
 
                     is ClientboundSystemChatPacket -> {
+                        if (overlay()) return@on
                         val message = content.string.noControlCodes
                         if (expectingBloodRegex.matches(message)) expectingBloodUpdate = true
                         if (enterRegex.matches(message) && warpCooldown == 0L) enterTime = System.currentTimeMillis() + 30_000L
@@ -262,35 +247,41 @@ object Dungeon : EventListener, Shortcuts {
                             dungeonStats.doorOpener = opener
                             DungeonEvent.DoorOpen(opener).post()
                         }
-                        deathRegex.find(message)?.let { match ->
+                        deathRegex.matchEntire(message)?.let { match ->
+                            if (!inDungeons || "reconnected" in message) return@let
+                            chatDeaths++
+                            dungeonStats.deaths = maxOf(dungeonStats.deaths, chatDeaths)
                             dungeonTeammates.find { teammate ->
-                                teammate.name == (match.groupValues[1].takeUnless { it == "You" } ?: player.name.string)
-                            }?.deaths?.inc()
+                                teammate.name == (match.groupValues[1].takeUnless { it.isEmpty() || it == "You" } ?: player.name.string)
+                            }?.let { it.deaths++ }
                         }
 
+                        if (inDungeons) updateBonusScore(message)
+
                         when (message) {
-                            "[NPC] Mort: Here, I found this map when I first entered the dungeon." -> DungeonEvent.Start().post()
+                            "[NPC] Mort: Here, I found this map when I first entered the dungeon." -> if (!hasStarted) DungeonEvent.Start().post()
                             "The BLOOD DOOR has been opened!" -> dungeonStats.bloodOpen = true
                         }
 
-                        when (partyMessageRegex.find(message)?.groupValues?.get(1)?.lowercase() ?: return@on) {
-                            "mimic killed", "mimic slain", "mimic killed!", "mimic dead", "mimic dead!" ->
-                                dungeonStats.mimicKilled = true
-
-                            "prince killed", "prince slain", "prince killed!", "prince dead", "prince dead!" ->
-                                dungeonStats.princeKilled = true
-
-                            "bat killed", "bat slain", "bat killed!", "bat dead", "bat dead!" ->
-                                dungeonStats.batKilled = true
-
+                        when (partyMessageRegex.matchEntire(message)?.groups?.get("message")?.value?.lowercase()) {
                             "blaze done!", "blaze done", "blaze puzzle solved!" ->
                                 puzzles.find { it == Puzzle.BLAZE }.let { it?.status = PuzzleStatus.Completed }
                         }
                     }
 
-                    is ClientboundOpenScreenPacket -> inTerminal = terminalTitles.any { title.string.contains(it) }
-                    is ClientboundContainerClosePacket -> inTerminal = false
+                    is ClientboundEntityEventPacket -> {
+                        if (inClear && (floor?.floorNumber ?: 0) >= 6 && eventId.toInt() == 3 &&
+                            (getEntity(level) as? Zombie)?.isBaby == true) dungeonStats.mimicKilled = true
+                    }
+
                 }
+            }
+        }
+
+        on<PacketEvent.Received> {
+            when (val packet = packet) {
+                is ClientboundOpenScreenPacket -> inTerminal = terminalTitles.any { packet.title.string.contains(it) }
+                is ClientboundContainerClosePacket -> inTerminal = false
             }
         }
 
@@ -429,11 +420,38 @@ object Dungeon : EventListener, Shortcuts {
                 secretsFound = secretCountRegex.find(entry)?.groupValues?.get(1)?.toIntOrNull() ?: secretsFound
                 openedRooms = openedRoomsRegex.find(entry)?.groupValues?.get(1)?.toIntOrNull() ?: openedRooms
                 puzzleCount = puzzleCountRegex.find(entry)?.groupValues?.get(1)?.toIntOrNull() ?: puzzleCount
-                deaths = deathsRegex.find(entry)?.groupValues?.get(1)?.toIntOrNull() ?: deaths
+                deathsRegex.find(entry)?.groupValues?.get(1)?.toIntOrNull()?.let { deaths = maxOf(deaths, it, chatDeaths) }
                 crypts = cryptRegex.find(entry)?.groupValues?.get(1)?.toIntOrNull() ?: crypts
-                elapsedTime = timeRegex.find(entry)?.groupValues?.get(1) ?: elapsedTime
+                updateElapsedTime(entry)
             }
         }
+    }
+
+    private fun updateElapsedTime(text: String) {
+        val match = timeRegex.matchEntire(text.trim()) ?: return
+        val (hours, minutes, seconds) = match.destructured
+        dungeonStats.secondsElapsed = (hours.toIntOrNull() ?: 0) * 3600 + (minutes.toIntOrNull() ?: 0) * 60 + (seconds.toIntOrNull() ?: 0)
+        dungeonStats.elapsedTime = text.substringAfter(":").trim()
+        if (!hasStarted && dungeonStats.secondsElapsed > 0) DungeonEvent.Start().post()
+    }
+
+    // based on: https://github.com/Noamm9/NoammAddons/blob/1bca286c77939638c13029b1b6d7f387cf92b3f4/src/main/kotlin/com/github/noamm9/utils/dungeons/map/handlers/ScoreCalculation.kt
+    private fun updateBonusScore(message: String) {
+        val text = message.lowercase().trim()
+        if (text == "a prince falls. +1 bonus score") dungeonStats.princeKilled = true
+        if (text == "a bat has been slain. +1 bonus score") addBatKill(player.name.string)
+        if (inClear && (floor?.floorNumber ?: 0) >= 6 && mimicCharmRegex.matches(text)) dungeonStats.mimicKilled = true
+
+        val party = partyMessageRegex.matchEntire(message) ?: return
+        val partyText = party.groups["message"]!!.value.lowercase().trim().trimEnd('!', '.')
+        if (partyText in mimicMessages && (floor?.floorNumber ?: 0) >= 6) dungeonStats.mimicKilled = true
+        if (partyText in princeMessages) dungeonStats.princeKilled = true
+        if (partyText in batMessages) addBatKill(party.groups["sender"]!!.value)
+    }
+
+    private fun addBatKill(name: String) {
+        if (batKillers.size < 5) batKillers.add(name.lowercase())
+        dungeonStats.batKilled = batKillers.isNotEmpty()
     }
 
     private fun updateDungeonTeammates(tabList: List<Pair<String, Colour>>) {
@@ -508,28 +526,32 @@ object Dungeon : EventListener, Shortcuts {
     private val expectingBloodRegex = Regex("^\\[BOSS] The Watcher: You have proven yourself. You may pass.")
     private val doorOpenRegex = Regex("^(?:\\[\\w+] )?(\\w+) opened a (?:WITHER|Blood) door!")
     private val secretPercentRegex = Regex("^ Secrets Found: ([\\d.]+)%$")
-    private val deathRegex = Regex("☠ (\\w{1,16}) .* and became a ghost\\.")
-    private val timeRegex = Regex("^ Time: ((?:\\d+h ?)?(?:\\d+m ?)?\\d+s)$")
+    private val deathRegex = Regex("^\\s*☠ (?:You were|(\\w{1,16})) .+?(?: and became a ghost)?\\.$")
+    private val timeRegex = Regex("^(?:Time(?: Elapsed)?|Elapsed): (?:(\\d+)h ?)?(?:(\\d+)m ?)?(?:(\\d+)s)?$")
     private val completedRoomsRegex = Regex("^ Completed Rooms: (\\d+)$")
     private val clearedRegex = Regex("^Cleared: (\\d+)% \\(\\d+\\)$")
     private val secretCountRegex = Regex("^ Secrets Found: (\\d+)$")
     private val openedRoomsRegex = Regex("^ Opened Rooms: (\\d+)$")
     private val floorRegex = Regex("The Catacombs \\((\\w+)\\)$")
-    private val partyMessageRegex = Regex("^Party > .*?: (.+)$")
-    private val puzzleCountRegex = Regex("^Puzzles: \\((\\d+)\\)$")
-    private val deathsRegex = Regex("^Team Deaths: (\\d+)$")
+    private val partyMessageRegex = Regex("^Party > (?:\\[[^]]+] )*(?<sender>\\w+): (?<message>.+)$")
+    private val puzzleCountRegex = Regex("^\\s*Puzzles: \\((\\d+)\\)$")
+    private val deathsRegex = Regex("^\\s*Team Deaths: (\\d+)$")
     private val cryptRegex = Regex("^ Crypts: (\\d+)$")
+    private val mimicCharmRegex = Regex("charm you charmed a mimic and captured (?:\\d+ shards from it|its shard)\\.")
+    private val mimicMessages = setOf("mimic dead", "mimic killed", "mimic slain", "\$skytils-dungeon-score-mimic$", "child destroyed", "mimic obliterated", "mimic exorcised", "mimic destroyed", "mimic annhilated", "breefing killed", "breefing dead")
+    private val princeMessages = setOf("prince dead", "prince killed", "prince slain", "\$skytils-dungeon-score-prince$")
+    private val batMessages = setOf("bat dead", "bat killed", "bat slain", "\$skytils-dungeon-score-bat$")
 
     data class DungeonStats(
         var secretsFound: Int = 0,
         var secretsPercent: Float = 0f,
-        var knownSecrets: Int = 0,
         var crypts: Int = 0,
         var openedRooms: Int = 0,
         var completedRooms: Int = 0,
         var deaths: Int = 0,
         var percentCleared: Int = 0,
         var elapsedTime: String = "0s",
+        var secondsElapsed: Int = 0,
         var mimicKilled: Boolean = false,
         var princeKilled: Boolean = false,
         var batKilled: Boolean = false,

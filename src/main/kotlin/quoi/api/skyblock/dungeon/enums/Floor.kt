@@ -16,14 +16,14 @@ package quoi.api.skyblock.dungeon.enums
  * @property isMM Indicates whether the floor is a master mode floor (M1 to M7).
  * @property secretPercentage The percentage of secrets required.
  */
-enum class Floor(val secretPercentage: Float = 1f) {
-    E(0.3f),
-    F1(0.3f),
-    F2(0.4f),
-    F3(0.5f),
-    F4(0.6f),
-    F5(0.7f),
-    F6(0.85f),
+enum class Floor(val secretPercentage: Double = 1.0) {
+    E(0.3),
+    F1(0.3),
+    F2(0.4),
+    F3(0.5),
+    F4(0.6),
+    F5(0.7),
+    F6(0.85),
     F7,
     M1,
     M2,

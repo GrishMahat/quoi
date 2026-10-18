@@ -18,6 +18,7 @@ object DungeonMap : Module(
     val shadow by switch("Shadow", true).asParent()
     val font by segmented("Font", TextHud.HudFont.Minecraft).asParent()
     val fontScale by slider("Font scale", 1f, 0.5f, 3f, 0.05f)
+    val showInfo by switch("Map info", true, desc = "Shows found secrets / secrets needed for 300 / total secrets, score, deaths and bonuses.")
 
     val roomRadius by slider("Room radius", 5f, 1f, 10f, 1f)
     val darkenMultiplier by slider("Darken multiplier", 0.4f, 0.0f, 1.0f, 0.1f)
@@ -61,7 +62,7 @@ object DungeonMap : Module(
     private val map by hud("Dungeon map", toggleable = false) {
         renderMap(config = MapConfig())
     }.withSettings(
-        ::shadow, ::font, ::fontScale,
+        ::shadow, ::font, ::fontScale, ::showInfo,
         ::roomRadius, ::darkenMultiplier,
         ::bgColour, ::border, ::borderThickness, ::borderColour,
         ::roomColour, ::normalRoom, ::entranceRoom, ::puzzleRoom, ::trapRoom, ::miniRoom, ::bloodRoom, ::fairyRoom, ::rareRoom, ::mimicRoom, ::unknownRoom,

@@ -59,7 +59,7 @@ Use [actions tab](https://github.com/jcnlk/quoi/actions) to download (you need t
 - **Dungeon ESP**
   - Highlights teammates, starred mobs, and Wither bosses.
 - **Dungeon Map** (Beta)
-  - Shows rooms and doors in a HUD map.
+  - Shows rooms, doors, players, and dungeon stats, with appearance settings shared by the Interactive Map.
 - **Fire Freeze**
   - Shows the F3/M3 Fire Freeze timer and can automate its use.
 - **Interactive Map** (Beta)
@@ -85,6 +85,8 @@ Use [actions tab](https://github.com/jcnlk/quoi/actions) to download (you need t
   - **Triggerbot** - Clicks secrets you aim at.
   - **Auto close chest** - Closes secret chest menus.
   - **Full block** - Expands button, chest, lever, mushroom, and skull hitboxes.
+- **Score Calculator**
+  - Shows dungeon score with secret, puzzle, death, time, and bonus points, with automatic EZPZ detection and a Force Paul option.
 - **Splits**
   - Shows dungeon and boss phase times, including Goldor sections and optional tick times.
 - **Warp Cooldown**
