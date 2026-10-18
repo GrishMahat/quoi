@@ -11,7 +11,7 @@ object TextEngine {
 
     val FORMATTING_CODE = Regex("[§&][0-9a-fk-or]", RegexOption.IGNORE_CASE)
 
-    private val SPLIT_PATTERN = Regex("(?=${FORMATTING_CODE.pattern})")
+    private val SPLIT_PATTERN = Regex("(?=${FORMATTING_CODE.pattern})", FORMATTING_CODE.options)
 
     fun stripCodes(text: String): String = FormattingCodes.strip(text)
 
@@ -45,7 +45,7 @@ object TextEngine {
                     'l', 'o', 'k' -> {}
                     else -> {
                         val c = colourForCode(code)
-                        if (c != -1) col = alpha or (c and 0xFFFFFF)
+                        if (c != null) col = alpha or (c and 0xFFFFFF)
                     }
                 }
                 part = part.substring(2)
@@ -56,8 +56,8 @@ object TextEngine {
         return segments
     }
 
-    /** Opaque ARGB for a legacy colour code, or -1 if [code] is not a colour code. */
-    fun colourForCode(code: Char): Int = when (code) {
+    /** Opaque ARGB for a legacy colour code, or null if [code] is not a colour code. */
+    fun colourForCode(code: Char): Int? = when (code) {
         '0' -> 0xFF000000.toInt()
         '1' -> 0xFF0000AA.toInt()
         '2' -> 0xFF00AA00.toInt()
@@ -74,7 +74,7 @@ object TextEngine {
         'd' -> 0xFFFF55FF.toInt()
         'e' -> 0xFFFFFF55.toInt()
         'f' -> 0xFFFFFFFF.toInt()
-        else -> -1
+        else -> null
     }
 
     /**

@@ -1,9 +1,5 @@
 package quoi.utils.ui.rendering
 
-import quoi.QuoiMod.mc
-import quoi.api.colour.*
-import quoi.utils.ui.data.Gradient
-import quoi.utils.ui.data.Radii
 import net.minecraft.resources.Identifier
 import org.lwjgl.nanovg.NVGColor
 import org.lwjgl.nanovg.NVGPaint
@@ -14,8 +10,12 @@ import org.lwjgl.opengl.GL33C
 import org.lwjgl.stb.STBImage.stbi_load_from_memory
 import org.lwjgl.system.MemoryUtil.memAlloc
 import org.lwjgl.system.MemoryUtil.memFree
+import quoi.QuoiMod.mc
+import quoi.api.colour.*
 import quoi.utils.StringUtils.FORMATTING_CODE_PATTERN
 import quoi.utils.StringUtils.noControlCodes
+import quoi.utils.ui.data.Gradient
+import quoi.utils.ui.data.Radii
 import java.io.File
 import java.nio.ByteBuffer
 import kotlin.math.max
@@ -27,8 +27,7 @@ import kotlin.math.min
  * original: https://github.com/odtheking/OdinFabric/blob/main/src/main/kotlin/com/odtheking/odin/utils/ui/rendering/NVGRenderer.kt
  */
 object NVGRenderer {
-
-    private val formattingSplitPattern = Regex("(?=${FORMATTING_CODE_PATTERN.pattern})")
+    private val formattingSplitPattern = Regex("(?=${FORMATTING_CODE_PATTERN.pattern})", FORMATTING_CODE_PATTERN.options)
 
     private val nvgPaint = NVGPaint.malloc()
     private val nvgColor = NVGColor.malloc()
@@ -241,7 +240,7 @@ object NVGRenderer {
         nvgText(vg, x, y + .5f, text)
     }
 
-    fun formattedText(text: String, x: Float, y: Float, size: Float, colour: Int, font: Font) {
+    fun formattedText(text: String, x: Float, y: Float, size: Float, colour: Int, font: Font, shadow: Boolean = false) {
         var x = x
         var col = colour
         val alpha = colour and -0x1000000
@@ -290,16 +289,17 @@ object NVGRenderer {
             }
 
             if (text.isNotEmpty()) {
-                text(text, x, y, size, col, font)
+                val color = if (shadow) col.multiply(0.25f) else col
+                text(text, x, y, size, color, font)
 
                 val w = textWidth(text, size, font)
                 val t = size / 12f
                 if (underline) {
-                    line(x, y + size * 0.95f, x + w, y + size * 0.95f, t, col)
+                    line(x, y + size * 0.95f, x + w, y + size * 0.95f, t, color)
                 }
 
                 if (strike) {
-                    line(x, y + size * 0.5f, x + w, y + size * 0.5f, t, col)
+                    line(x, y + size * 0.5f, x + w, y + size * 0.5f, t, color)
                 }
 
                 x += w
@@ -354,7 +354,7 @@ object NVGRenderer {
         nvgFill(vg)
     }
 
-    fun image(image: Image, x: Float, y: Float, w: Float, h: Float, tl: Float, bl: Float, br: Float, tr: Float,  color: Int? = null) {
+    fun image(image: Image, x: Float, y: Float, w: Float, h: Float, tl: Float, bl: Float, br: Float, tr: Float, color: Int? = null) {
         nvgImagePattern(vg, x, y, w, h, 0f, getImage(image), 1f, nvgPaint)
 
         if (color != null) {

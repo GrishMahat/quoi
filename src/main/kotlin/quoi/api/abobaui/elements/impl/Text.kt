@@ -1,8 +1,5 @@
 package quoi.api.abobaui.elements.impl
 
-import net.minecraft.network.chat.Component
-import net.minecraft.network.chat.TextColor
-import net.minecraft.util.FormattedCharSequence
 import quoi.QuoiMod.mc
 import quoi.api.abobaui.constraints.Constraint
 import quoi.api.abobaui.constraints.Positions
@@ -13,7 +10,6 @@ import quoi.api.abobaui.dsl.withScale
 import quoi.api.abobaui.elements.Element
 import quoi.api.abobaui.elements.ElementScope
 import quoi.api.colour.Colour
-import quoi.api.colour.multiply
 import quoi.utils.StringUtils.FORMATTING_CODE_PATTERN
 import quoi.utils.StringUtils.noControlCodes
 import quoi.utils.StringUtils.width
@@ -85,27 +81,12 @@ open class Text(
             val fontScale = height / mc.font.lineHeight
             val string = string.replace(FORMATTING_CODE_PATTERN) { "§${it.value[1]}" }
             withScale {
-                //? if <26.2 {
                 ctx.drawText(string, 0, 0, colour, fontScale, shadow)
-                //?} else {
-                /*if (shadow) {
-                    val visual = Component.literal(string).visualOrderText
-                    val shadowSeq = FormattedCharSequence { sink ->
-                        visual.accept { index, style, codePoint ->
-                            val base = style.color?.value ?: colour
-                            val dark = TextColor.fromRgb(base.multiply(0.25f))
-                            sink.accept(index, style.withColor(dark), codePoint)
-                        }
-                    }
-                    ctx.drawText(shadowSeq, fontScale, fontScale, shadow = false, scale = fontScale)
-                }
-                ctx.drawText(string, 0, 0, colour, fontScale, false)
-                *///?}
             }
         } else if (font.name != "Minecraft" && ui.nvgPass) {
             if (shadow) {
                 val offset = height / 25f
-                NVGRenderer.formattedText(string, x + offset, y + offset, height, colour.multiply(0.25f), font)
+                NVGRenderer.formattedText(string, x + offset, y + offset, height, colour, font, shadow = true)
             }
             NVGRenderer.formattedText(string, x, y, height, colour, font)
         }

@@ -1,12 +1,17 @@
 package quoi.utils.ui.rendering
 
-import java.io.File
 import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.resources.Identifier
 import quoi.QuoiMod.mc
 import quoi.api.colour.Colour
+import quoi.api.colour.multiply
 import quoi.utils.ui.data.Gradient
 import quoi.utils.ui.data.Radii
+import java.io.File
+import kotlin.collections.HashMap
+import kotlin.collections.List
+import kotlin.collections.getOrPut
+import kotlin.collections.remove
 
 /**
  * Facade for all custom UI drawing. Keeps the renderer API the abobaui framework and the
@@ -96,19 +101,20 @@ object NVGRenderer {
     fun text(text: String, x: Float, y: Float, size: Float, color: Int, font: Font) =
         backend.text(text, x, y, size, color, font)
 
-    fun formattedText(text: String, x: Float, y: Float, size: Float, colour: Int, font: Font) {
+    fun formattedText(text: String, x: Float, y: Float, size: Float, colour: Int, font: Font, shadow: Boolean = false) {
         var x = x
         for (segment in TextEngine.parse(text, colour)) {
-            text(segment.text, x, y, size, segment.color, font)
+            val color = if (shadow) segment.color.multiply(0.25f) else segment.color
+            text(segment.text, x, y, size, color, font)
 
             val w = textWidth(segment.text, size, font)
             val t = size / 12f
             if (segment.underline) {
-                line(x, y + size * 0.95f, x + w, y + size * 0.95f, t, segment.color)
+                line(x, y + size * 0.95f, x + w, y + size * 0.95f, t, color)
             }
 
             if (segment.strike) {
-                line(x, y + size * 0.5f, x + w, y + size * 0.5f, t, segment.color)
+                line(x, y + size * 0.5f, x + w, y + size * 0.5f, t, color)
             }
 
             x += w
