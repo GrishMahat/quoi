@@ -14,17 +14,18 @@ object ModuleManager : EventListener {
     val modules = mutableListOf<Module>()
 
     fun initialise() {
+        val classLoader = Module::class.java.classLoader
         ClassGraph()
             .enableClassInfo()
             .acceptPackages("quoi.module.impl")
-            .overrideClassLoaders(Module::class.java.classLoader)
+            .enableClassLoaders(classLoader)
             .scan()
             .use { scan ->
-                scan.getSubclasses(Module::class.java.name)
+                scan.getAllSubclasses(Module::class.java.name)
                     .filter { !it.isAbstract }
                     .sortedBy { it.name }
                     .forEach { classInfo ->
-                        val clazz = classInfo.loadClass(Module::class.java)
+                        val clazz = Class.forName(classInfo.name, true, classLoader).asSubclass(Module::class.java)
                         modules += clazz.getField("INSTANCE").get(null) as Module
                     }
             }
