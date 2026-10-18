@@ -14,9 +14,6 @@
   "automerge": false,
   "minimumReleaseAge": "3 days",
   "minimumReleaseAgeBehaviour": "timestamp-optional",
-  "vulnerabilityAlerts": {
-    "enabled": false
-  },
   "customManagers": [
     {
       "customType": "regex",
