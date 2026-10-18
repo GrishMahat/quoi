@@ -11,7 +11,6 @@ import quoi.api.colour.Colour
 import quoi.api.colour.mix
 import quoi.api.colour.multiply
 import quoi.api.events.DungeonEvent
-import quoi.api.skyblock.dungeon.Dungeon
 import quoi.api.skyblock.dungeon.odonscanning.ScanUtils
 import quoi.api.vec.MutableVec3
 import quoi.module.impl.dungeon.DungeonMap
@@ -22,13 +21,18 @@ import quoi.utils.rotateAroundNorth
 import quoi.utils.rotateToNorth
 import java.lang.reflect.Type
 
-data class OdonRoom(
+class OdonRoom(
     var rotation: Rotations = Rotations.NONE,
     var data: RoomData,
     var clayPos: BlockPos = BlockPos(0, 0, 0),
     val tiles: MutableSet<RoomTile>,
 ) {
     val name get() = data.name
+    val identified get() = data.cores.isNotEmpty()
+    var highestBlock: Int? = null
+    val ready get() = identified && rotation != Rotations.NONE && highestBlock != null
+
+    val colour: Colour get() = if (this === ScanUtils.mimicRoom) data.colour.mix(DungeonMap.mimicRoom) else data.colour
 
     fun getRelativeCoords(pos: BlockPos) = pos.subtract(clayPos.atY(0)).rotateToNorth(rotation)
     fun getRelativeCoords(vec: Vec3) = vec.subtract(clayPos.x.toDouble(), 0.0, clayPos.z.toDouble()).rotateToNorth(rotation)
@@ -69,7 +73,8 @@ data class OdonRoom(
     }
 
 
-    fun updateState(col: Int) {
+    fun updateState(col: Int, roomColour: Int = 0) {
+        if (col == 0) return
         if (data.state == RoomState.GREEN && data.name == "Golden Oasis") return
 
         val new = when (col) {
@@ -79,18 +84,16 @@ data class OdonRoom(
                 RoomType.PUZZLE -> RoomState.FAILED
                 else -> data.state
             }
-            30 -> when (data.type) {
-                RoomType.ENTRANCE -> RoomState.DISCOVERED
-                else -> RoomState.GREEN
-            }
+            30 -> if (roomColour == 30 || data.type == RoomType.ENTRANCE) RoomState.DISCOVERED else RoomState.GREEN
             85, 119 -> RoomState.UNOPENED
-            0 -> RoomState.UNDISCOVERED
-            else -> RoomState.DISCOVERED
+            else -> if (data.state.equalsOneOf(RoomState.GREEN, RoomState.CLEARED, RoomState.FAILED)) data.state else RoomState.DISCOVERED
         }
 
+        if (new.ordinal > data.state.ordinal && data.type != RoomType.PUZZLE) return
         if (data.state != new) {
-            DungeonEvent.Room.State(this, data.state, new, this == Dungeon.currentRoom).post()
+            val old = data.state
             data.state = new
+            DungeonEvent.Room.State(this, old, new, this === ScanUtils.currentRoom).post()
         }
     }
 }
@@ -109,7 +112,8 @@ data class RoomTile(val x: Int, val z: Int, val core: Int = 0) {
 
 data class RoomData(
     val name: String, val type: RoomType, val cores: List<Int>,
-    val crypts: Int, val secrets: Int, val trappedChests: Int, var state: RoomState = RoomState.UNDISCOVERED
+    val crypts: Int, val secrets: Int, val trappedChests: Int, var state: RoomState = RoomState.UNDISCOVERED,
+    val shape: String = "1x1",
 ) {
     val colour: Colour get() {
         val base = when (type) {
@@ -120,14 +124,13 @@ data class RoomData(
             RoomType.TRAP     -> DungeonMap.trapRoom
             RoomType.CHAMPION -> DungeonMap.miniRoom
             RoomType.RARE     -> DungeonMap.rareRoom
+            RoomType.UNKNOWN  -> DungeonMap.unknownRoom
             else              -> DungeonMap.normalRoom
         }
 
-        val withMimic = if (this == ScanUtils.mimicRoom) base.mix(Colour.RED) else base
-
         return if (state.equalsOneOf(RoomState.UNDISCOVERED, RoomState.UNOPENED)) {
-            Colour.RGB(withMimic.rgb.multiply(1f - DungeonMap.darkenMultiplier))
-        } else withMimic
+            Colour.RGB(base.rgb.multiply(1f - DungeonMap.darkenMultiplier))
+        } else base
     }
 }
 
@@ -139,9 +142,9 @@ class RoomDataDeserializer : JsonDeserializer<RoomData> {
         val coresType = object : TypeToken<List<Int>>() {}.type
         val cores = context?.deserialize<List<Int>>(jsonObject?.get("cores"), coresType).orEmpty()
         val crypts = jsonObject?.get("crypts")?.asInt ?: 0
-        val secrets = jsonObject?.get("secrets")?.asInt ?: 0
+        val secrets = (jsonObject?.get("maxSecrets") ?: jsonObject?.get("secrets"))?.asInt ?: 0
         val trappedChests = jsonObject?.get("trappedChests")?.asInt ?: 0
 
-        return RoomData(name, type, cores, crypts, secrets, trappedChests)
+        return RoomData(name, type, cores, crypts, secrets, trappedChests, shape = jsonObject?.get("shape")?.asString ?: "1x1")
     }
 }

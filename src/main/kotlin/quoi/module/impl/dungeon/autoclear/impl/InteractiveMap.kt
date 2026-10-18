@@ -27,17 +27,15 @@ import quoi.module.settings.UIComponent.Companion.childOf
 import quoi.module.settings.impl.KeybindComponent
 import quoi.utils.ChatUtils.modMessage
 import quoi.utils.commas
-import quoi.utils.ui.hud.impl.TextHud
 import quoi.utils.ui.screens.UIScreen.Companion.open
 
 /**
  * TODO:
  *  room queuing while auto routing
- *  add map customization stuff
  */
 object InteractiveMap : Module(
     "Interactive Map",
-    desc = "Automatically teleports to a specified target.",
+    desc = "Automatically teleports to a specified target. Appearance is configured in Dungeon Map.",
     area = Island.Dungeon(inClear = true),
     tag = Tag.BETA
 ) {
@@ -67,24 +65,8 @@ object InteractiveMap : Module(
         }
 
     private val visuals by text("Visuals")
-    private val shadow by switch("Shadow", true).childOf(::visuals).asParent()
-    private val font by segmented("Font", TextHud.HudFont.Minecraft).childOf(::visuals)
-    private val fontScale by slider("Font scale", 1f, 0.5f, 3f, 0.1f).childOf(::visuals)
     private val scale by slider("Map scale", 5f, 1f, 10f, 0.5f).childOf(::visuals)
-    private val roomRadius by slider("Room radius", 5f, 1f, 10f, 1f).childOf(::visuals)
     val roomInCol by colourPicker("Highlight colour", Colour.GREY.withAlpha(0.5f), allowAlpha = true, desc = "Room the player currently in colour.").childOf(::visuals)
-
-//    private val icons by switch("Icons")
-//    private val showHeads by switch("Show player heads").childOf(::icons)
-//    private val showOwnHead by switch("Show own head").childOf(::showHeads)
-//    private val iconScale by slider("Icon scale", 1f, 0.1f, 3.0f, 0.1f).childOf(::showHeads)
-//    private val iconBorder by switch("Border").json("Icon border").childOf(::showHeads)
-//    private val classColour by switch("Class border colour").childOf(::iconBorder)
-//    private val iconBorderColour by colourPicker("Border colour", Colour.BLACK).json("Icon border colour").childOf(::iconBorder) { !classColour }
-//    private val iconBorderThickness by slider("Border thickness", 2, 1, 10, unit = "px").json("Icon border thickness").childOf(::iconBorder)
-//
-//    private val showNames by switch("Show names").childOf(::icons)
-//    private val nameScale by slider("Name scale", 0.8f, 0.1f, 3.0f, 0.1f).childOf(::showNames)
 
     val mapOpen: Boolean
         get() = mc.screen?.title?.string == "quoi clear map"
@@ -106,31 +88,12 @@ object InteractiveMap : Module(
             true
         }
 
-//        val iconCfg = MapRenderer.IconConfig(
-//            scale = iconScale,
-//            heads = showHeads,
-//            ownHead = showOwnHead,
-//            border = iconBorder,
-//            borderColour = iconBorderColour,
-//            classColour = classColour,
-//            thickness = iconBorderThickness,
-//            name = showNames,
-//            whenLeap = false,
-//            nameScale = nameScale
-//        )
-
         val cfg = MapRenderer.MapConfig(
             scale = scale,
-            radius = roomRadius,
-            font = font.selected.get(),
-            fontScale = fontScale,
-            shadow = shadow,
-            autoClear = true,
-//            icons = icons,
-//            icon = iconCfg
+            autoClear = true
         )
 
-        val infoScale = fontScale.coerceAtLeast(1f)
+        val infoScale = cfg.fontScale.coerceAtLeast(1f)
 
         column(constrain(w = Copying - 32.px), gap = 12.px) {
             block(bounds(x = Centre, padding = 10.px), Colour.BLACK.withAlpha(0.8f), 6.radius()) {
@@ -140,7 +103,7 @@ object InteractiveMap : Module(
                     colour = Colour.MINECRAFT_AQUA,
                     pos = at(10.px, 10.px),
                     size = (28f * infoScale).px
-                ).shadow = shadow
+                ).shadow = cfg.shadow
             }
 
             renderMap(config = cfg).element.constraints.x = Centre
@@ -168,7 +131,7 @@ object InteractiveMap : Module(
                                     size = hintSize
                                 ) {
                                     maxWidth(cellWidth)
-                                }.shadow = shadow
+                                }.shadow = cfg.shadow
                             }
                         }
                     }
@@ -184,7 +147,7 @@ object InteractiveMap : Module(
                             size = hintSize
                         ).also {
                             it.maxWidth(cellWidth)
-                            it.shadow = shadow
+                            it.shadow = cfg.shadow
                         }
 
                         textSupplied(
@@ -198,7 +161,7 @@ object InteractiveMap : Module(
                             size = hintSize
                         ).also {
                             it.maxWidth(cellWidth)
-                            it.shadow = shadow
+                            it.shadow = cfg.shadow
                         }
                     }
                 }

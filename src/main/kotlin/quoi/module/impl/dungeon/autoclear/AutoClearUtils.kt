@@ -141,6 +141,7 @@ fun pathToRoom(room: OdonRoom, tile: RoomTile = room.tiles.first(), type: Int) {
             }
         }
         else -> {
+            if (!room.ready) return modMessage("Room data has not loaded yet. Enter the room before starting its route.")
             val rings = routeNodes[room.name] ?: return modMessage("No rings found in &e${room.name}")
 
             val starts = rings

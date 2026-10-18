@@ -2,7 +2,7 @@ package quoi.api.skyblock.dungeon.odonscanning
 
 import com.google.common.reflect.TypeToken
 import com.google.gson.GsonBuilder
-import kotlin.math.round
+import kotlinx.io.files.FileNotFoundException
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
 import net.minecraft.network.protocol.game.ClientboundMapItemDataPacket
@@ -16,15 +16,7 @@ import quoi.api.events.WorldEvent
 import quoi.api.events.core.EventListener
 import quoi.api.events.core.on
 import quoi.api.skyblock.dungeon.Dungeon
-import quoi.api.skyblock.dungeon.odonscanning.tiles.DoorType
-import quoi.api.skyblock.dungeon.odonscanning.tiles.OdonDoor
-import quoi.api.skyblock.dungeon.odonscanning.tiles.OdonRoom
-import quoi.api.skyblock.dungeon.odonscanning.tiles.RoomData
-import quoi.api.skyblock.dungeon.odonscanning.tiles.RoomDataDeserializer
-import quoi.api.skyblock.dungeon.odonscanning.tiles.RoomState
-import quoi.api.skyblock.dungeon.odonscanning.tiles.RoomTile
-import quoi.api.skyblock.dungeon.odonscanning.tiles.RoomType
-import quoi.api.skyblock.dungeon.odonscanning.tiles.Rotations
+import quoi.api.skyblock.dungeon.odonscanning.tiles.*
 import quoi.api.skyblock.location.Island
 import quoi.api.skyblock.location.Location
 import quoi.api.vec.Vec2i
@@ -32,19 +24,27 @@ import quoi.utils.Shortcuts
 import quoi.utils.WorldUtils.getBlockEntityList
 import quoi.utils.WorldUtils.state
 import quoi.utils.equalsOneOf
+import kotlin.math.floor
 
-// https://github.com/Noamm9/NoammAddons/blob/master/src/main/kotlin/com/github/noamm9/utils/dungeons/map/handlers/DungeonScanner.kt
-// https://github.com/odtheking/Odin/blob/main/src/main/kotlin/com/odtheking/odin/utils/skyblock/dungeon/ScanUtils.kt
+/**
+ * modified Odin (BSD 3-Clause)
+ * copyright (c) 2025 odtheking
+ * original: https://github.com/odtheking/Odin/blob/main/src/main/kotlin/com/odtheking/odin/features/impl/dungeon/map/WorldScan.kt
+ *           https://github.com/odtheking/Odin/blob/main/src/main/kotlin/com/odtheking/odin/features/impl/dungeon/map/tile/DungeonRoom.kt
+ *
+ * modified NoammAddons (CC0-1.0)
+ * original: https://github.com/Noamm9/NoammAddons/blob/master/src/main/kotlin/com/github/noamm9/utils/dungeons/map/handlers/DungeonScanner.kt
+ *           https://github.com/Noamm9/NoammAddons/blob/master/src/main/kotlin/com/github/noamm9/utils/dungeons/map/core/UniqueRoom.kt
+ */
 object ScanUtils : EventListener, Shortcuts {
-    private const val START = -185
+    const val START = -185
 
     private val roomList: Set<RoomData> = loadRoomData()
     val coreToRoomData: Map<Int, RoomData> =
         roomList.flatMap { room -> room.cores.map { core -> core to room } }.toMap()
 
-    private val horizontals = Direction.entries.filter { it.axis.isHorizontal }
     private val mutableBlockPos = BlockPos.MutableBlockPos()
-    private var lastRoomPos: Vec2i = Vec2i(0, 0)
+    private val horizontals = Direction.entries.filter { it.axis.isHorizontal }
     private var lastScanTime = 0L
 
     val grid = Array<Any?>(121) { null }
@@ -65,7 +65,7 @@ object ScanUtils : EventListener, Shortcuts {
                 .registerTypeAdapter(RoomData::class.java, RoomDataDeserializer())
                 .create().fromJson(
                     (ScanUtils::class.java.getResourceAsStream("/assets/quoi/odon_rooms.json")
-                        ?: throw kotlinx.io.files.FileNotFoundException()).bufferedReader(),
+                        ?: throw FileNotFoundException()).bufferedReader(),
                     object : TypeToken<Set<RoomData>>() {}.type
                 )
         } catch (e: Exception) {
@@ -83,49 +83,36 @@ object ScanUtils : EventListener, Shortcuts {
 
             scanDungeon()
 
-            scannedRooms.filter { it.rotation == Rotations.NONE }.forEach { room -> // suboptimal
-                room.updateRotation()
-            }
+            scannedRooms.filter { it.identified && it.rotation == Rotations.NONE }.forEach { it.updateRotation() }
 
-            if (mimicRoom == null && (Dungeon.floor?.floorNumber ?: -1) > 5) {
-                scanMimic()
-            }
-
-            val px = player.x.toInt()
-            val pz = player.z.toInt()
-
-            val room = getRoomFromPos(px, pz)
-
-            val gx = (round((px - START) / 32.0).toInt() * 2).coerceIn(0, 10)
-            val gz = (round((pz - START) / 32.0).toInt() * 2).coerceIn(0, 10)
-
-            if (gx == lastRoomPos.x && gz == lastRoomPos.z && room == currentRoom && !Location.currentArea.isArea(Island.SinglePlayer)) return@on
-            lastRoomPos = Vec2i(gx, gz)
-
-            if (room != currentRoom) {
-                DungeonEvent.Room.Enter(room).post()
-            }
+            val room = getRoomFromPos(player.blockX, player.blockZ)?.takeIf { it.ready }
+            if (room !== currentRoom) DungeonEvent.Room.Enter(room).post()
         }
 
         on<DungeonEvent.Room.Enter> {
             currentRoom = room
-            if (passedRooms.none { it.data.name == currentRoom?.data?.name }) passedRooms.add(currentRoom ?: return@on)
+            room?.let { passedRooms.add(it) }
         }
 
         on<DungeonEvent.Room.Scan> {
             MapRenderer.refresh()
         }
 
-        on<PacketEvent.Received> {
-            if (packet is ClientboundMapItemDataPacket) mc.execute { MapRenderer.update(packet) }
+        on<DungeonEvent.Enter> { MapScan.initFloor(floor.floorNumber) }
+
+        on<PacketEvent.ReceivedPost> {
+            if (packet is ClientboundMapItemDataPacket && Dungeon.inClear) MapScan.update(packet)
         }
 
         on<WorldEvent.Chunk.Load> {
-            MapRenderer.onChunkLoad()
+            MapScan.initFloor()
+            if (Dungeon.inBoss || !Dungeon.inDungeons && !Location.currentArea.isArea(Island.SinglePlayer)) return@on
+            val x = chunk.pos.x + 12
+            val z = chunk.pos.z + 12
+            if (x in 0..10 && z in 0..10) scanGridTile(x, z, chunk)
         }
 
         on<WorldEvent.Change> {
-            roomList.forEach { it.state = RoomState.UNDISCOVERED }
             passedRooms.clear()
             scannedRooms.clear()
             scannedDoors.clear()
@@ -133,8 +120,9 @@ object ScanUtils : EventListener, Shortcuts {
             grid.fill(null)
             currentRoom = null
             mimicRoom = null
-            lastRoomPos = Vec2i(0, 0)
-            MapRenderer.reset()
+            lastScanTime = 0L
+            MapScan.reset()
+            MapRenderer.refresh()
         }
     }
 
@@ -144,24 +132,27 @@ object ScanUtils : EventListener, Shortcuts {
 
         for (x in 0..10) {
             for (z in 0..10) {
-                val i = z * 11 + x
-                if (grid[i] != null) continue
-
                 val wx = START + x * 16
                 val wz = START + z * 16
-
-                if (!level.hasChunk(wx shr 4, wz shr 4)) continue
-
-                val chunk = level.getChunk(wx shr 4, wz shr 4)
-                val height = getTopLayerOfRoom(Vec2i(wx, wz), chunk)
-                if (height <= 0) continue
-
-                val tile = scanTile(wx, wz, x, z, height, chunk)
-                if (tile != null) {
-                    grid[i] = tile
-                }
+                val chunk = level.chunkSource.getChunk(wx shr 4, wz shr 4, false) ?: continue
+                scanGridTile(x, z, chunk)
             }
         }
+        if (mimicRoom == null && !Dungeon.mimicKilled && (Dungeon.floor?.floorNumber ?: -1) > 5) scanMimic()
+    }
+
+    private fun scanGridTile(x: Int, z: Int, chunk: LevelChunk) {
+        val index = z * 11 + x
+        val wx = START + x * 16
+        val wz = START + z * 16
+        val existing = grid[index]
+        if (existing != null) {
+            if (x % 2 != 0 || z % 2 != 0 || existing !is OdonRoom) return
+            if (existing.tiles.any { it.x == wx && it.z == wz && it.core != 0 }) return
+        }
+        val height = getTopLayerOfRoom(Vec2i(wx, wz), chunk)
+        if (height <= 0) return
+        scanTile(wx, wz, x, z, height, chunk)?.let { grid[index] = it }
     }
 
     private fun scanTile(x: Int, z: Int, col: Int, row: Int, height: Int, chunk: LevelChunk): Any? {
@@ -171,16 +162,16 @@ object ScanUtils : EventListener, Shortcuts {
         return when {
             rowEven && colEven -> { // rooms
                 if (height <= 0) return null
-                val core = getCoreAtHeight(Vec2i(x, z), height, chunk)
+                val position = Vec2i(x, z)
+                val legacyCore = getRoomCore(position, chunk, height)
+                val core = legacyCore.takeIf { it in coreToRoomData } ?: getRoomCore(position, chunk)
                 val data = coreToRoomData[core] ?: return null
-                addToUnique(x, z, data, core, height, centre = true)
+                addWorldRoom(x, z, data, core, height)
             }
 
             !rowEven && !colEven -> { // 2x2 centres
                 val tile = grid[(row - 1) * 11 + col - 1] as? OdonRoom
-                if (tile != null) {
-                    addToUnique(x, z, tile.data, 0, height, centre = false)
-                } else null
+                tile?.takeIf { it.data.shape == "2x2" }
             }
 
             height in intArrayOf(73, 74, 81, 82) -> { // dors
@@ -193,6 +184,7 @@ object ScanUtils : EventListener, Shortcuts {
                 }
                 val door = OdonDoor(Vec2i(x, z), type)
                 scannedDoors.add(door)
+                MapRenderer.refresh()
                 door
             }
 
@@ -204,9 +196,10 @@ object ScanUtils : EventListener, Shortcuts {
                         if (tile.data.type == RoomType.ENTRANCE) {
                             val door = OdonDoor(Vec2i(x, z), DoorType.NORMAL)
                             scannedDoors.add(door)
+                            MapRenderer.refresh()
                             door
                         } else {
-                            addToUnique(x, z, tile.data, 0, height, centre = false)
+                            tile
                         }
                     } else null
                 } else null
@@ -214,105 +207,189 @@ object ScanUtils : EventListener, Shortcuts {
         }
     }
 
-    private fun addToUnique(x: Int, z: Int, data: RoomData, core: Int, height: Int, centre: Boolean): OdonRoom {
-        val roomName = data.name
-        var room = uniqueRooms[roomName]
-
-        if (room == null) {
-            room = OdonRoom(data = data, tiles = mutableSetOf())
-            uniqueRooms[roomName] = room
-            scannedRooms.add(room)
+    internal fun addWorldRoom(x: Int, z: Int, data: RoomData, core: Int, height: Int): OdonRoom {
+        val index = ((z - START) / 16) * 11 + (x - START) / 16
+        val existing = grid[index] as? OdonRoom
+        val room = uniqueRooms.getOrPut(data.name) {
+            existing?.takeUnless { it.identified } ?: OdonRoom(data = data.copy(), tiles = mutableSetOf()).also { scannedRooms.add(it) }
         }
+        if (existing != null && existing !== room) mergeRooms(room, existing)
+        if (!room.identified) room.data = data.copy(state = room.data.state)
+        room.highestBlock = height
 
-        if (centre) {
-//            room.roomComponents.add(RoomComponent(x, z, core))
-            val isNEw = room.tiles.none { it.x == x && it.z == z }
-            if (isNEw) {
-                room.rotation = Rotations.NONE
-                room.tiles.add(RoomTile(x, z, core))
-            }
-        }
-
-        if (room.rotation == Rotations.NONE) {
-            updateRotation(room, height)
-            player.blockPosition().let { pos ->
-                if (getRoomFromPos(pos.x, pos.z) === room) {
-                    DungeonEvent.Room.Enter(room).post()
-                }
-            }
-        }
-
+        val added = room.tiles.none { it.x == x && it.z == z }
+        room.tiles.removeAll { it.x == x && it.z == z }
+        room.tiles.add(RoomTile(x, z, core))
+        if (added) room.rotation = Rotations.NONE
+        grid[index] = room
+        if (room.rotation == Rotations.NONE) updateRotation(room, height)
         DungeonEvent.Room.Scan(room).post()
         return room
     }
 
-    fun scanMimic() { // untested
-        val chest = getBlockEntityList().find { pos ->
-            if (!pos.state.`is`(Blocks.TRAPPED_CHEST)) return@find false
+    internal fun mergeRooms(room: OdonRoom, other: OdonRoom) {
+        for (tile in other.tiles) {
+            val existing = room.tiles.find { it.x == tile.x && it.z == tile.z }
+            if (existing == null || existing.core == 0 && tile.core != 0) {
+                room.tiles.remove(existing)
+                room.tiles.add(tile)
+                room.rotation = Rotations.NONE
+            }
+        }
+        if (other.data.state.ordinal < room.data.state.ordinal) room.data.state = other.data.state
+        if (room.highestBlock == null) room.highestBlock = other.highestBlock
+        grid.indices.filter { grid[it] === other }.forEach { grid[it] = room }
+        uniqueRooms.entries.filter { it.value === other }.forEach { it.setValue(room) }
+        scannedRooms.remove(other)
+        if (passedRooms.remove(other)) passedRooms.add(room)
+        if (mimicRoom === other) mimicRoom = room
+        if (currentRoom === other) DungeonEvent.Room.Enter(room.takeIf { it.ready }).post()
+    }
 
-            val room = getRoomFromPos(pos.x, pos.z)
-            room != null && room.data.type != RoomType.TRAP
-        } ?: return
+    internal fun addMapRoom(indices: List<Int>, type: RoomType): OdonRoom {
+        var changed = false
+        val existing = indices.mapNotNull { grid[it] as? OdonRoom }.distinct()
+        val room = existing.firstOrNull { it.identified } ?: existing.firstOrNull()
+        ?: OdonRoom(data = RoomData("Unknown", type, emptyList(), 0, 0, 0), tiles = mutableSetOf()).also {
+            scannedRooms.add(it)
+            changed = true
+        }
+        existing.filter { it !== room }.forEach {
+            mergeRooms(room, it)
+            changed = true
+        }
+        if (!room.identified && room.data.type != type) {
+            room.data = room.data.copy(type = type)
+        }
+        for (index in indices) {
+            val x = START + index % 11 * 16
+            val z = START + index / 11 * 16
+            if (room.tiles.none { it.x == x && it.z == z }) {
+                room.tiles.add(RoomTile(x, z))
+                room.rotation = Rotations.NONE
+                changed = true
+            }
+            grid[index] = room
+        }
+        if (room.rotation == Rotations.NONE) room.highestBlock?.let { updateRotation(room, it) }
+        if (changed) MapRenderer.refresh()
+        return room
+    }
 
-        mimicRoom = getRoomFromPos(chest.x, chest.z)
+    internal fun addMapDoor(index: Int, colour: Int) {
+        val type = when (colour) {
+            119 -> DoorType.WITHER
+            18 -> DoorType.BLOOD
+            30 -> DoorType.ENTRANCE
+            82 -> DoorType.FAIRY
+            else -> DoorType.NORMAL
+        }
+        val door = (grid[index] as? OdonDoor) ?: OdonDoor(Vec2i(START + index % 11 * 16, START + index / 11 * 16), type).also {
+            grid[index] = it
+            scannedDoors.add(it)
+            MapRenderer.refresh()
+        }
+        door.type = type
+        door.updateState(colour)
+    }
+
+    fun scanMimic() {
+        val chests = mutableMapOf<OdonRoom, Int>()
+        for (pos in getBlockEntityList()) {
+            if (!pos.state.`is`(Blocks.TRAPPED_CHEST)) continue
+            val room = getRoomFromPos(pos.x, pos.z) ?: continue
+            if (!room.identified || room.data.type == RoomType.TRAP) continue
+            val count = chests.getOrDefault(room, 0) + 1
+            chests[room] = count
+            if (count > room.data.trappedChests) {
+                mimicRoom = room
+                return
+            }
+        }
     }
 
     fun getRoomFromPos(x: Number, z: Number): OdonRoom? {
-        val gx = (round((x.toInt() - START) / 32.0).toInt() * 2).coerceIn(0, 10)
-        val gz = (round((z.toInt() - START) / 32.0).toInt() * 2).coerceIn(0, 10)
-
-        return grid[gz * 11 + gx] as? OdonRoom
+        val gx = floor((x.toDouble() + 201) / 32).toInt()
+        val gz = floor((z.toDouble() + 201) / 32).toInt()
+        if (gx !in 0..5 || gz !in 0..5) return null
+        return grid[gz * 22 + gx * 2] as? OdonRoom
     }
 
     fun updateRotation(room: OdonRoom, roomHeight: Int) {
-        if (room.data.name == "Fairy") { // Fairy room doesn't have a clay block so we need to set it manually
-            room.clayPos = room.tiles.firstOrNull()?.let { BlockPos(it.x - 15, roomHeight, it.z - 15) } ?: return
+        if (!room.identified) return
+        val tileCount = when (room.data.shape) {
+            "1x2" -> 2
+            "1x3", "L" -> 3
+            "1x4", "2x2" -> 4
+            else -> 1
+        }
+        if (room.tiles.size != tileCount) return
+        val topLeft = room.tiles.minBy { it.x * 1000 + it.z }
+
+        if (room.data.name == "Fairy") {
+            room.clayPos = BlockPos(topLeft.x - 15, roomHeight, topLeft.z - 15)
             room.rotation = Rotations.SOUTH
             return
         }
-
-        room.rotation = Rotations.entries.dropLast(1).find { rotation ->
-            room.tiles.any { component ->
-                BlockPos(component.x + rotation.x, roomHeight, component.z + rotation.z).let { blockPos ->
-                    level.getBlockState(blockPos).block == Blocks.BLUE_TERRACOTTA && (room.tiles.size == 1 || horizontals.all { facing ->
-                        level.getBlockState(
-                            blockPos.offset((if (facing.axis == Direction.Axis.X) facing.stepX else 0), 0, (if (facing.axis == Direction.Axis.Z) facing.stepZ else 0))
-                        ).block.equalsOneOf(Blocks.AIR, Blocks.BLUE_TERRACOTTA)
-                    }).also { isCorrectClay -> if (isCorrectClay) room.clayPos = blockPos }
-                }
+        val minX = room.tiles.minOf { it.x } - 15
+        val minZ = room.tiles.minOf { it.z } - 15
+        val maxX = room.tiles.maxOf { it.x } + 15
+        val maxZ = room.tiles.maxOf { it.z } + 15
+        for (rotation in Rotations.entries.dropLast(1)) {
+            val candidates = if (room.data.shape == "L") {
+                room.tiles.map { BlockPos(it.x + rotation.x, roomHeight, it.z + rotation.z) }
+            } else {
+                listOf(BlockPos(if (rotation.x < 0) minX else maxX, roomHeight, if (rotation.z < 0) minZ else maxZ))
             }
-        } ?: Rotations.NONE // Rotation isn't found if we can't find the clay block
-
-//        if (room.rotation == Rotations.NONE) modMessage("${room.name} ROT NONE")
-    }
-
-    fun OdonRoom.updateRotation() {
-        val comp = this.tiles.firstOrNull() ?: return
-
-        if (level.hasChunk(comp.x shr 4, comp.z shr 4)) {
-            val chunk = level.getChunk(comp.x shr 4, comp.z shr 4)
-            val height = getTopLayerOfRoom(Vec2i(comp.x, comp.z), chunk)
-
-            if (height > 0) {
-                updateRotation(this, height)
+            for (pos in candidates) {
+                val chunk = level.chunkSource.getChunk(pos.x shr 4, pos.z shr 4, false) ?: continue
+                if (!chunk.getBlockState(pos).`is`(Blocks.BLUE_TERRACOTTA)) continue
+                if (room.tiles.size > 1 && horizontals.any {
+                        !chunk.getBlockState(pos.relative(it)).block.equalsOneOf(Blocks.AIR, Blocks.BLUE_TERRACOTTA)
+                    }) continue
+                room.clayPos = pos
+                room.rotation = rotation
+                return
             }
         }
     }
 
-    private fun getCoreAtHeight(vec2: Vec2i, roomHeight: Int, chunk: LevelChunk): Int {
-        val sb = StringBuilder(150)
-        val clampedHeight = roomHeight.coerceIn(11..140)
-        sb.append(CharArray(140 - clampedHeight) { '0' })
-        var bedrock = 0
+    fun OdonRoom.updateRotation() {
+        highestBlock?.let { updateRotation(this, it) }
+        if (rotation != Rotations.NONE) return
+        for (tile in tiles) {
+            if (tile.core == 0) continue
+            val chunk = level.chunkSource.getChunk(tile.x shr 4, tile.z shr 4, false) ?: continue
+            val height = getTopLayerOfRoom(Vec2i(tile.x, tile.z), chunk)
+            if (height <= 0 || height == highestBlock) continue
+            updateRotation(this, height)
+            if (rotation != Rotations.NONE) {
+                highestBlock = height
+                return
+            }
+        }
+    }
 
-        for (y in clampedHeight downTo 12) {
-            mutableBlockPos.set(vec2.x, y, vec2.z)
-            val block = chunk.getBlockState(mutableBlockPos).block
+    private fun getRoomCore(vec2: Vec2i, chunk: LevelChunk, roomHeight: Int? = null): Int {
+        val sb = StringBuilder(1024)
+        val top = roomHeight?.coerceIn(11..140) ?: 140
+        repeat(140 - top) { sb.append('0') }
+        var foundHighest = roomHeight != null
+        var bedrock = 0
+        for (y in top downTo 12) {
+            val state = chunk.getBlockState(mutableBlockPos.set(vec2.x, y, vec2.z))
+            val block = state.block
+            if (!foundHighest) {
+                if (!state.isAir && block != Blocks.GOLD_BLOCK) foundHighest = true
+                else {
+                    sb.append('0')
+                    continue
+                }
+            }
             if (block == Blocks.AIR && bedrock >= 2 && y < 69) {
-                sb.append(CharArray(y - 11) { '0' })
+                repeat(y - 11) { sb.append('0') }
                 break
             }
-
             if (block == Blocks.BEDROCK) bedrock++
             else {
                 bedrock = 0

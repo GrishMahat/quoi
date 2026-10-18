@@ -1,9 +1,10 @@
 package quoi.api.skyblock.dungeon.enums
 
+import net.minecraft.util.Mth
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.entity.player.PlayerSkin
 import quoi.api.colour.Colour
-import quoi.api.skyblock.dungeon.odonscanning.MapRenderer.mapSize
+import quoi.api.skyblock.dungeon.odonscanning.MapScan
 import quoi.api.vec.Vec2i
 import quoi.utils.EntityUtils.playerEntities
 
@@ -30,24 +31,18 @@ data class DungeonPlayer(
     var deaths: Int = 0,
     val colour: Colour = Colour.WHITE,
     val p3Stats: P3Stats = P3Stats(),
-    var mapPos: Vec2i = Vec2i(0, 0),
+    var mapPos: Vec2i? = null,
     var yaw: Float = 0f,
 ) {
     private var cachedEntity: Player? = null
 
-    fun position(): Pair<Float, Float> =
+    fun position(partialTick: Float): Pair<Float, Float>? =
         entity?.let {
-            ((it.x + 201f) / (32f / 20f)).toFloat() to ((it.z + 201f) / (32f / 20f)).toFloat()
-        } ?: run {
-            val w = (mapSize.x * 16 + (mapSize.x - 1) * 4).toFloat()
-            val h = (mapSize.z * 16 + (mapSize.z - 1) * 4).toFloat()
+            val pos = it.getPosition(partialTick)
+            MapScan.worldPosition(pos.x, pos.z)
+        } ?: mapPos?.let(MapScan::mapPosition)
 
-            val x = (mapPos.x / 2.0f) + (w / 2.0f)
-            val z = (mapPos.z / 2.0f) + (h / 2.0f)
-            x to z
-        }
-
-    fun yaw(): Float = entity?.yRot ?: yaw
+    fun yaw(partialTick: Float): Float = entity?.let { Mth.rotLerp(partialTick, it.yRotO, it.yRot) } ?: yaw
 
     val entity: Player?
         get() {

@@ -1,32 +1,31 @@
 package quoi.api.skyblock.dungeon.odonscanning.tiles
 
 import net.minecraft.core.BlockPos
-import net.minecraft.world.level.block.AirBlock
+import net.minecraft.world.level.block.Blocks
+import quoi.QuoiMod.mc
 import quoi.api.colour.Colour
 import quoi.api.colour.multiply
+import quoi.api.skyblock.dungeon.odonscanning.ScanUtils
 import quoi.module.impl.dungeon.DungeonMap
 import quoi.api.vec.Vec2i
-import quoi.utils.WorldUtils.state
 import quoi.utils.equalsOneOf
 
-data class OdonDoor(val pos: Vec2i, var type: DoorType) {
+class OdonDoor(val pos: Vec2i, var type: DoorType) {
 
     var state: RoomState = RoomState.UNDISCOVERED
     var mapLocked = type.equalsOneOf(DoorType.WITHER, DoorType.BLOOD)
 
     val locked: Boolean get() {
         if (!type.equalsOneOf(DoorType.WITHER, DoorType.BLOOD)) return false
-        return BlockPos(pos.x, 69, pos.z).state.block !is AirBlock
+        val chunk = mc.level?.chunkSource?.getChunk(pos.x shr 4, pos.z shr 4, false)
+            ?: return mapLocked && (type != DoorType.BLOOD || ScanUtils.scannedRooms.none {
+                it.data.type == RoomType.BLOOD && it.data.state.ordinal < RoomState.UNOPENED.ordinal
+            })
+        val block = chunk.getBlockState(BlockPos(pos.x, 69, pos.z))
+        return !block.isAir && !block.`is`(Blocks.BARRIER)
     }
 
-    val size: Vec2i get() {
-        val xOffset = ((pos.x + 185) shr 4) % 2
-        val zOffset = ((pos.z + 185) shr 4) % 2
-        return Vec2i(
-            (xOffset xor 1) * 4 + xOffset * 4,
-            (zOffset xor 1) * 4 + zOffset * 4
-        )
-    }
+    val size: Vec2i get() = Vec2i(4, 4)
 
     val placement: Vec2i get() {
         val x = (pos.x + 185) shr 4
@@ -38,7 +37,6 @@ data class OdonDoor(val pos: Vec2i, var type: DoorType) {
         val zPos = (z shr 1) * 20 + zEven * 16 + (zEven xor 1) * thicknessOffset
         return Vec2i(xPos, zPos)
     }
-
 
     val colour: Colour get() {
         val col = when (type) {
@@ -61,12 +59,6 @@ data class OdonDoor(val pos: Vec2i, var type: DoorType) {
             else -> RoomState.DISCOVERED
         }
 
-//        when (col) {
-//            18 -> type = DoorType.BLOOD
-//            119 -> type = DoorType.WITHER
-//            30 -> type = DoorType.ENTRANCE
-//        }
-
-        mapLocked = state == RoomState.UNOPENED && (type == DoorType.WITHER || type == DoorType.BLOOD)
+        mapLocked = type == DoorType.BLOOD || type == DoorType.WITHER && state == RoomState.UNOPENED
     }
 }

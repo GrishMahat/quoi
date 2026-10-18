@@ -1,35 +1,20 @@
 package quoi.api.skyblock.dungeon.odonscanning
 
-import kotlin.jvm.optionals.getOrNull
-import net.minecraft.network.protocol.game.ClientboundMapItemDataPacket
-import net.minecraft.world.level.saveddata.maps.MapDecorationTypes
 import quoi.QuoiMod.mc
 import quoi.api.abobaui.constraints.impl.positions.Centre
 import quoi.api.abobaui.constraints.impl.size.Copying
-import quoi.api.abobaui.dsl.at
-import quoi.api.abobaui.dsl.constrain
-import quoi.api.abobaui.dsl.minus
-import quoi.api.abobaui.dsl.onClick
-import quoi.api.abobaui.dsl.onMouseEnterExit
-import quoi.api.abobaui.dsl.plus
-import quoi.api.abobaui.dsl.px
-import quoi.api.abobaui.dsl.radius
-import quoi.api.abobaui.dsl.seconds
-import quoi.api.abobaui.dsl.size
+import quoi.api.abobaui.dsl.*
+import quoi.api.abobaui.elements.Element
 import quoi.api.abobaui.elements.ElementScope
 import quoi.api.abobaui.elements.impl.Block.Companion.outline
+import quoi.api.abobaui.elements.impl.Text
 import quoi.api.abobaui.elements.impl.Text.Companion.shadow
-import quoi.api.abobaui.elements.impl.refreshableGroup
 import quoi.api.animations.Animation
-import quoi.api.colour.Colour
-import quoi.api.colour.colour
-import quoi.api.colour.mix
-import quoi.api.colour.multiply
-import quoi.api.colour.withAlpha
+import quoi.api.colour.*
 import quoi.api.skyblock.dungeon.Dungeon
-import quoi.api.skyblock.dungeon.Dungeon.floor
 import quoi.api.skyblock.dungeon.odonscanning.tiles.OdonDoor
 import quoi.api.skyblock.dungeon.odonscanning.tiles.OdonRoom
+import quoi.api.skyblock.dungeon.odonscanning.tiles.RoomTile
 import quoi.api.skyblock.dungeon.odonscanning.tiles.RoomType
 import quoi.api.vec.Vec2i
 import quoi.module.impl.dungeon.DungeonMap
@@ -37,26 +22,19 @@ import quoi.module.impl.dungeon.autoclear.impl.InteractiveMap
 import quoi.module.impl.dungeon.autoclear.pathToDoor
 import quoi.module.impl.dungeon.autoclear.pathToRoom
 import quoi.utils.StringUtils.width
-import quoi.utils.level
 import quoi.utils.ui.rendering.Font
 import quoi.utils.ui.rendering.NVGRenderer
-import quoi.utils.ui.rendering.NVGRenderer.defaultFont
 import quoi.utils.ui.watch
 
 object MapRenderer {
 
-    private var startCoords: Vec2i? = null
-    var mapSize: Vec2i = Vec2i(0, 0)
-    var roomSize: Int? = null
-        private set
-    var mapCentre: Vec2i = Vec2i(0, 0)
-        private set
-    var refreshShit = 0
+    val mapSize: Vec2i get() = MapScan.mapSize
+    var layoutRevision = 0
         private set
 
 
     fun refresh() {
-        refreshShit++
+        layoutRevision++
     }
 
     fun ElementScope<*>.renderMap(config: MapConfig): ElementScope<*> {
@@ -72,76 +50,102 @@ object MapRenderer {
         ) {
             if (DungeonMap.border) outline(DungeonMap.borderColour, thickness = DungeonMap.borderThickness.px)
 
-            val refreshable = refreshableGroup(constrain(Centre, Centre, Copying - thickness, Copying - thickness)) {
+            val content = group(constrain(Centre, Centre, 0.px, 0.px))
+            val doors = content.group(size(Copying, Copying))
+            val rooms = content.group(size(Copying, Copying))
+            val markers = PlayerMarkers(config)
+            content.apply { markers.scope {} }
+            val roomViews = mutableMapOf<OdonRoom, RoomView>()
+            val doorViews = mutableMapOf<OdonDoor, Element>()
+            var previousScale = Float.NaN
 
+            watch({ layoutRevision }, immediate = true) {
                 val baseW = (mapSize.x * 16 + (mapSize.x - 1) * 4).toFloat().coerceAtLeast(1f)
                 val baseH = (mapSize.z * 16 + (mapSize.z - 1) * 4).toFloat().coerceAtLeast(1f)
-
                 val newScale = size / maxOf(baseW, baseH)
-
+                val resized = previousScale != newScale
+                previousScale = newScale
                 val new = config.copy(
                     scale = newScale,
-                    fontScale = config.fontScale * (newScale / scale),
                     radius = config.radius * (newScale / scale),
-                    icon = config.icon.copy(
-                        scale = config.icon.scale * (newScale / scale),
-                        nameScale = config.icon.nameScale * (newScale / scale),
-                        thickness = maxOf(1, (config.icon.thickness * (newScale / scale)).toInt())
-                    )
                 )
+                content.element.constraints.width = (baseW * newScale).px
+                content.element.constraints.height = (baseH * newScale).px
+                markers.config = new
 
-                val dynamicW = baseW * newScale
-                val dynamicH = baseH * newScale
-
-                group(constrain(Centre, Centre, dynamicW.px, dynamicH.px)) {
-                    ScanUtils.scannedDoors.forEach { door ->
-                        val pos = door.placement
-                        val size = door.size
-
-                        val col = Colour.Animated(
-                            from = colour { door.colour.rgb },
-                            to = colour { door.colour.rgb.multiply(1.15f) }
-                        )
-
-                        val outlineCol = Colour.Animated(
-                            from = Colour.TRANSPARENT,
-                            to = Colour.WHITE.withAlpha(180)
-                        )
-
-                        block(
-                            constrain(
-                                x = (pos.x * newScale).px,
-                                y = (pos.z * newScale).px,
-                                w = (size.x * newScale).px,
-                                h = (size.z * newScale).px
-                            ),
-                            colour = col
-                        ) {
-                            outline(outlineCol, thickness = 2.px)
-
-                            onClick {
-                                pathToDoor(door, InteractiveMap.faceDoorOnArrival)
-                                true
-                            }
-
-                            onMouseEnterExit {
-                                col.animate(0.15.seconds, style = Animation.Style.EaseOutQuint)
-                                outlineCol.animate(0.15.seconds, style = Animation.Style.EaseOutQuint)
-                            }
-                        }
+                doorViews.entries.removeIf { (door, element) ->
+                    (resized || door !in ScanUtils.scannedDoors).also { remove ->
+                        if (remove) doors.element.removeElement(element)
                     }
-
-                    ScanUtils.scannedRooms.forEach { room ->
+                }
+                for (door in ScanUtils.scannedDoors) {
+                    doorViews.getOrPut(door) { doors.renderDoor(new, door) }
+                }
+                roomViews.entries.removeIf { (room, view) ->
+                    (room !in ScanUtils.scannedRooms).also { remove ->
+                        if (remove) rooms.element.removeElement(view.element)
+                    }
+                }
+                for (room in ScanUtils.scannedRooms) {
+                    val view = roomViews.getOrPut(room) { RoomView(rooms.group(size(Copying, Copying)).element) }
+                    val label = if (room.identified) room.name else "?"
+                    if (!resized && view.tiles == room.tiles && view.label == label) continue
+                    view.element.removeAll()
+                    ElementScope(view.element).apply {
                         renderTiles(new, room)
                         renderName(new, room)
                     }
+                    view.tiles = room.tiles.toSet()
+                    view.label = label
                 }
-            }
-
-            watch({ refreshShit }) {
-                refreshable.refresh()
+                if (ui.initialised) {
+                    element.size()
+                    element.positionChildren()
+                    element.clip()
+                }
+                ui.recalculateMouse = true
             }
         }
+    }
+
+    private class RoomView(val element: Element) {
+        var tiles: Set<RoomTile> = emptySet()
+        var label: String? = null
+    }
+
+    private fun ElementScope<*>.renderDoor(config: MapConfig, door: OdonDoor): Element {
+        val pos = door.placement
+        val size = door.size
+        val col = Colour.Animated(
+            from = colour { door.colour.rgb },
+            to = colour { door.colour.rgb.multiply(1.15f) }
+        )
+        val outlineCol = Colour.Animated(
+            from = Colour.TRANSPARENT,
+            to = Colour.WHITE.withAlpha(180)
+        )
+        return block(
+            constrain(
+                (pos.x * config.scale).px,
+                (pos.z * config.scale).px,
+                (size.x * config.scale).px,
+                (size.z * config.scale).px
+            ),
+            colour = col
+        ) {
+            outline(outlineCol, thickness = 2.px)
+            if (config.autoClear) {
+                onClick {
+                    if (Dungeon.isDead) return@onClick false
+                    pathToDoor(door, InteractiveMap.faceDoorOnArrival)
+                    true
+                }
+                onMouseEnterExit {
+                    col.animate(0.15.seconds, style = Animation.Style.EaseOutQuint)
+                    outlineCol.animate(0.15.seconds, style = Animation.Style.EaseOutQuint)
+                }
+            }
+        }.element
     }
 
     private fun ElementScope<*>.renderTiles(config: MapConfig, room: OdonRoom) {
@@ -151,7 +155,7 @@ object MapRenderer {
         val (scale, radius, _, _, _, _, _, autoClear) = config
 
         val c = {
-            val base = room.data.colour
+            val base = room.colour
             if (autoClear && Dungeon.currentRoom == room) base.mix(InteractiveMap.roomInCol.withAlpha(255), InteractiveMap.roomInCol.alpha).rgb else base.rgb
         }
 
@@ -217,60 +221,60 @@ object MapRenderer {
                     tr = if (n || e) 0 else radius
                 )
             ) {
+                if (autoClear) outline(outlineCol, 2.px)
+
+                val mx = wg * scale + 0.5f
+                val my = ng * scale + 0.5f
+                val mw = width - eg * scale - 0.5f
+                val mh = height - sg * scale - 0.5f
+
+                fun mask(vert: Boolean, start: Float, end: Float, pos: Float) {
+                    val constraints =
+                        if (vert) constrain(pos.px, start.px, 4.px, (end - start).px)
+                        else constrain(start.px, pos.px, (end - start).px, 4.px)
+                    block(constraints, colour = col)
+                }
+
+                if (n) mask(
+                    false,
+                    start = if (has(p, -20, -20)) -1f else mx,
+                    end = if (has(p, 20, -20)) width + 1f else mw,
+                    pos = -2f
+                )
+
+                if (s) mask(
+                    false,
+                    start = if (has(p, -20, 20)) -1f else mx,
+                    end = if (has(p, 20, 20)) width + 1f else mw,
+                    pos = height - 2f
+                )
+
+                if (w) mask(
+                    true,
+                    start = if (has(p, -20, -20)) -1f else my,
+                    end = if (has(p, -20, 20)) height + 1f else mh,
+                    pos = -2f
+                )
+
+                if (e) mask(
+                    true,
+                    start = if (has(p, 20, -20)) -1f else my,
+                    end = if (has(p, 20, 20)) height + 1f else mh,
+                    pos = width - 2f
+                )
+
                 if (autoClear) {
-
-                    outline(outlineCol, 2.px)
-
-                    // this shit a bit overlaps needed lines
-                    // but looks good enough so I'm not fixing it.
-
-                    val mx = wg * scale + 0.5f
-                    val my = ng * scale + 0.5f
-                    val mw = width - eg * scale - 0.5f
-                    val mh = height - sg * scale - 0.5f
-
-                    fun mask(vert: Boolean, start: Float, end: Float, pos: Float) {
-                        val constraints =
-                            if (vert)
-                                constrain(pos.px, start.px, 4.px, (end - start).px)
-                            else
-                                constrain(start.px, pos.px, (end - start).px, 4.px)
-                        block(constraints, colour = col)
-                    }
-
-                    if (n) mask(false,
-                        start = if (has(p, -20, -20)) -1f else mx,
-                        end   = if (has(p, 20, -20)) width + 1f else mw,
-                        pos   = -2f
-                    )
-
-                    if (s) mask(false,
-                        start = if (has(p, -20, 20)) -1f else mx,
-                        end   = if (has(p, 20, 20)) width + 1f else mw,
-                        pos   = height - 2f
-                    )
-
-                    if (w) mask(true,
-                        start = if (has(p, -20, -20)) -1f else my,
-                        end   = if (has(p, -20, 20)) height + 1f else mh,
-                        pos   = -2f
-                    )
-
-                    if (e) mask(true,
-                        start = if (has(p, 20, -20)) -1f else my,
-                        end   = if (has(p, 20, 20)) height + 1f else mh,
-                        pos   = width - 2f
-                    )
-
                     onMouseEnterExit {
                         col.animate(0.15.seconds, style = Animation.Style.EaseOutQuint)
                         outlineCol.animate(0.15.seconds, style = Animation.Style.EaseOutQuint)
                     }
                     onClick {
+                        if (Dungeon.isDead) return@onClick false
                         pathToRoom(room, comp, type = 0)
                         true
                     }
                     onClick(button = 1) {
+                        if (Dungeon.isDead) return@onClick false
                         pathToRoom(room, comp, type = 2)
                         true
                     }
@@ -280,154 +284,34 @@ object MapRenderer {
     }
 
     private fun ElementScope<*>.renderName(config: MapConfig, room: OdonRoom) {
-        if (room.data.type in listOf(RoomType.ENTRANCE, RoomType.FAIRY, RoomType.BLOOD)) return
         val (scale, _, font, fontScale, shadow) = config
+        val lines = (if (room.identified) room.name else "?").split(" ")
+        val textSize = 18f * fontScale * (scale / 5f)
 
-        val lines = room.name.split(" ")
-        val textSize = 18f * fontScale
+        lines.forEachIndexed { i, line ->
+            val tw = if (font.name == "Minecraft") line.width(textSize / mc.font.lineHeight) else NVGRenderer.textWidth(line, textSize, font)
+            val x = room.textPlacement.x * scale + 8f * scale - tw / 2f
+            val y = room.textPlacement.z * scale + 8f * scale - lines.size * textSize / 2f + i * textSize
 
-        lines.forEachIndexed { i, s ->
-            val tw = if (font.name == "Minecraft") s.width(textSize / mc.font.lineHeight) else NVGRenderer.textWidth(s, textSize, font)
-            val x = (room.textPlacement.x * scale) + 8f * scale - (tw / 2f)
-            val y = (room.textPlacement.z * scale) + 8f * scale - (lines.size * textSize / 2f) + (i * textSize)
-
-            text(
-                string = s,
-                size = textSize.px,
-                colour = colour { room.textColour.rgb },
-                font = font,
-                pos = at(x = x.px, y = y.px)
-            ).shadow = shadow
-        }
-    }
-
-    fun onChunkLoad() {
-        if (mapSize.x == 0 && mapSize.z == 0) {
-            mapSize = when (floor?.floorNumber) {
-                0 -> Vec2i(4, 4)
-                1 -> Vec2i(4, 5)
-                2, 3 -> Vec2i(5, 5)
-                else -> Vec2i(6, 6)
-            }
-            refresh()
-        }
-    }
-
-    fun update(packet: ClientboundMapItemDataPacket) {
-        if (packet.mapId.id and 1000 != 0) return
-        val colours = level.getMapData(packet.mapId)?.colors ?: return
-
-        if (startCoords == null) {
-            val (greenStart, greenLength) = findGreenRoom(colours)
-            if (greenLength != 16 && greenLength != 18) return
-
-            roomSize = greenLength
-
-            val (start, center, size) = when (floor?.floorNumber) {
-                0 -> Triple(Vec2i(22, 22), Vec2i(-137, -137), Vec2i(4, 4))
-                1 -> Triple(Vec2i(22, 11), Vec2i(-137, -121), Vec2i(4, 5))
-                2, 3 -> Triple(Vec2i(11, 11), Vec2i(-121, -121), Vec2i(5, 5))
-                else -> {
-                    val s = Vec2i((greenStart and 127) % (greenLength + 4), (greenStart shr 7) % (greenLength + 4))
-                    val extraX = if (s.x == 5) 1 else 0
-                    val extraZ = if (s.z == 5) 1 else 0
-
-                    Triple(
-                        s,
-                        Vec2i(-121 + (extraX * 16), -121 + (extraZ * 16)),
-                        Vec2i(5 + extraX, 5 + extraZ)
-                    )
+            object : Text(line, font, colour { room.textColour.rgb }, at(x.px, y.px), textSize.px) {
+                override fun draw() {
+                    if (room.data.type !in unlabelledTypes) super.draw()
                 }
-            }
-
-            startCoords = start
-            mapCentre = center
-            mapSize = size
-        }
-
-        packet.decorations.getOrNull()?.let { decorations ->
-            val playerIterator = Dungeon.dungeonTeammates.iterator()
-
-            decorations.forEach { decoration ->
-                if (decoration.type.value() == MapDecorationTypes.FRAME.value()) return@forEach
-
-                val player = playerIterator.asSequence().firstOrNull { !it.isDead } ?: return@forEach
-
-                player.mapPos = Vec2i(decoration.x.toInt(), decoration.y.toInt())
-                player.yaw = decoration.rot() * 360 / 16f
-            }
-        }
-
-        val rs = roomSize ?: return
-        val halfRoom = rs / 2
-        val halfTile = halfRoom + 2
-        val centreX = startCoords!!.x + halfRoom
-        val centreZ = startCoords!!.z + halfRoom
-
-        for (x in 0..10) {
-            for (z in 0..10) {
-                val tile = ScanUtils.grid[z * 11 + x] ?: continue
-
-                val mapX = centreX + x * halfTile
-                val mapY = centreZ + z * halfTile
-
-                if (mapX in 0..127 && mapY in 0..127) {
-                    val col = colours[mapY * 128 + mapX].toInt() and 0xFF
-
-                    when (tile) {
-                        is OdonRoom -> {
-                            val stateCol = if (tile.tiles.size > 1) {
-                                val topLeft = tile.tiles.minBy { it.x * 1000 + it.z }
-
-                                val gx = (topLeft.x + 185) / 16
-                                val gz = (topLeft.z + 185) / 16
-
-                                val tx = centreX + gx * halfTile
-                                val ty = centreZ + gz * halfTile
-
-                                if (tx in 0..127 && ty in 0..127) colours[ty * 128 + tx].toInt() and 0xFF else col
-                            } else col
-
-                            tile.updateState(stateCol)
-                        }
-                        is OdonDoor -> tile.updateState(col)
-                    }
-                }
-            }
+            }.scope {}.shadow = shadow
         }
     }
 
-    fun reset() {
-        startCoords = null
-        roomSize = null
-        mapCentre = Vec2i(0, 0)
-        refreshShit = 0
-        mapSize = Vec2i(0, 0)
-    }
-
-    private fun findGreenRoom(mapData: ByteArray): Pair<Int, Int> {
-        var start = -1
-        var length = 0
-        for (i in mapData.indices) {
-            if (mapData[i].toInt() == 30) {
-                if (length++ == 0) start = i
-            } else {
-                if (length >= 16) return start to length
-                length = 0
-            }
-        }
-        return start to length
-    }
+    private val unlabelledTypes = setOf(RoomType.ENTRANCE, RoomType.FAIRY, RoomType.BLOOD)
 
     data class MapConfig(
         val scale: Float = 3f,
         val radius: Float = DungeonMap.roomRadius,
-        val font: Font = defaultFont,
+        val font: Font = DungeonMap.font.selected.get(),
         val fontScale: Float = DungeonMap.fontScale,
         val shadow: Boolean = DungeonMap.shadow,
         val icons: Boolean = true,
         val icon: IconConfig = IconConfig(),
-        val autoClear: Boolean = false
+        val autoClear: Boolean = false,
     )
 
     data class IconConfig(
