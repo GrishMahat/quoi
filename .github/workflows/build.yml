@@ -2,10 +2,11 @@ name: Build
 
 on:
   push:
-    branches:
-      - multiversion
+    branches: [multiversion]
     paths: &build-paths
-      - ".github/workflows/build.yml"
+      - ".github/workflows/**"
+      - ".forgejo/workflows/**"
+      - "renovate.json"
       - "gradle/**"
       - "src/**"
       - "versions/**"
@@ -32,21 +33,21 @@ jobs:
 
     steps:
       - name: Check Out Repository
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Validate Gradle Wrapper
-        uses: gradle/actions/wrapper-validation@v6.4.0
+        uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
 
       - name: Set Up Java 25
-        uses: actions/setup-java@v6.0.1
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: "25"
 
       - name: Set Up Gradle
-        uses: gradle/actions/setup-gradle@v6.4.0
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
           cache-provider: enhanced
           cache-read-only: ${{ github.event_name != 'push' }}
@@ -57,7 +58,7 @@ jobs:
 
       - name: Upload Minecraft 26.1 JAR
         if: ${{ !cancelled() && (github.event_name != 'pull_request' || failure()) }}
-        uses: actions/upload-artifact@v7.0.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           path: build/libs/26.1.x/quoi-*.jar
           if-no-files-found: error
@@ -66,7 +67,7 @@ jobs:
 
       - name: Upload Minecraft 26.2 JAR
         if: ${{ !cancelled() && (github.event_name != 'pull_request' || failure()) }}
-        uses: actions/upload-artifact@v7.0.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           path: build/libs/26.2/quoi-*.jar
           if-no-files-found: error
@@ -75,7 +76,7 @@ jobs:
 
       - name: Upload Minecraft 26.3 JAR
         if: ${{ !cancelled() && (github.event_name != 'pull_request' || failure()) }}
-        uses: actions/upload-artifact@v7.0.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           path: build/libs/26.3/quoi-*.jar
           if-no-files-found: error
@@ -84,7 +85,7 @@ jobs:
 
       - name: Upload Minecraft 26.4 JAR
         if: ${{ !cancelled() && (github.event_name != 'pull_request' || failure()) }}
-        uses: actions/upload-artifact@v7.0.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           path: build/libs/26.4/quoi-*.jar
           if-no-files-found: error

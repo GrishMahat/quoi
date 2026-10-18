@@ -2,22 +2,12 @@ version: 2
 updates:
   - package-ecosystem: "gradle"
     directory: "/"
-    target-branch: "multiversion"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 5
-    groups:
-      gradle:
-        patterns:
-          - "*"
+    open-pull-requests-limit: 0
 
   - package-ecosystem: "github-actions"
     directory: "/"
-    target-branch: "multiversion"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 5
-    groups:
-      actions:
-        patterns:
-          - "*"
+    open-pull-requests-limit: 0
