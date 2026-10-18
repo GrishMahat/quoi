@@ -2,6 +2,7 @@ package quoi.module.impl.floor7
 
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal
+import net.minecraft.world.phys.EntityHitResult
 import net.minecraft.world.phys.Vec3
 import quoi.api.events.TickEvent
 import quoi.api.events.core.on
@@ -17,11 +18,12 @@ import quoi.utils.skyblock.player.interact.AuraManager
 import kotlin.math.abs
 
 // https://github.com/jcnlk/MeowClient/blob/main/module/modules/CrystalAuraModule.js
-object CrystalAura : Module(
-    "Crystal Aura",
-    desc = "Automatically picks up Energy Crystals.",
+object Crystals : Module(
+    "Crystals",
+    desc = "Picks up Energy Crystals with an aura or triggerbot.",
     area = Island.Dungeon(7, inBoss = true, phase = Phase.P1)
 ) {
+    private val mode by selector("Mode", "Aura", listOf("Aura", "Triggerbot"), desc = "Aura picks up nearby crystals automatically. Triggerbot only picks up the crystal you are looking at.")
     private val range by slider("Range", 3.0, 1.0, 5.0, 0.1, desc = "Maximum distance to a crystal target.")
     private val delay by slider("Delay", 7, 1, 20, 1, unit = "ticks", desc = "Delay between crystal interactions.")
     private val inContainer by switch("In container", desc = "Also triggers while any menu is open.")
@@ -51,7 +53,13 @@ object CrystalAura : Module(
         val eyePosition = player.eyePosition
         val maxDistanceSquared = range * range
 
-        val entities: Sequence<Entity> = getEntities<EndCrystal>().filter { crystal ->
+        val triggerHit = if (mode.selected == "Triggerbot") {
+            mc.hitResult as? EntityHitResult ?: return null
+        } else null
+        val crystals = if (triggerHit != null) sequenceOf(triggerHit.entity).filterIsInstance<EndCrystal>()
+        else getEntities<EndCrystal>()
+
+        val entities = crystals.filter { crystal ->
             CRYSTAL_POSITIONS.any { pos ->
                 abs(crystal.x - pos.x) < 0.1 &&
                         abs(crystal.y - pos.y) < 0.1 &&
@@ -66,7 +74,7 @@ object CrystalAura : Module(
             if (entity.isRemoved || !entity.isAlive) continue
             if (eyePosition.distanceToSqr(entity.position()) > 25.0) continue
 
-            val hitPosition = closestHitPosition(eyePosition, entity) ?: continue
+            val hitPosition = triggerHit?.location ?: closestHitPosition(eyePosition, entity) ?: continue
             val distanceSquared = eyePosition.distanceToSqr(hitPosition)
             if (distanceSquared > bestDistanceSquared) continue
 
