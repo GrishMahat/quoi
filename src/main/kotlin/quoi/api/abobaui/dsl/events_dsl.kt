@@ -11,7 +11,6 @@ import kotlin.experimental.ExperimentalTypeInference
 // Mouse events //
 //--------------//
 
-@OverloadResolutionByLambdaReturnType
 fun ElementScope<*>.onClick(button: Int = 0, block: (Mouse.Clicked) -> Boolean) {
     element.registerEvent(Mouse.Clicked(button), block)
 }
@@ -22,7 +21,6 @@ inline fun ElementScope<*>.onClick(button: Int = 0, crossinline block: (Mouse.Cl
     element.registerEventUnit(Mouse.Clicked(button), block)
 }
 
-@OverloadResolutionByLambdaReturnType
 fun ElementScope<*>.onClick(nonSpecific: Boolean, block: (Mouse.Clicked.NonSpecific) -> Boolean) {
     element.registerEvent(Mouse.Clicked.NonSpecific(0), block)
 }
@@ -37,7 +35,6 @@ inline fun ElementScope<*>.onRelease(button: Int = 0, crossinline block: (Mouse.
     element.registerEventUnit(Mouse.Released(button), block)
 }
 
-@OverloadResolutionByLambdaReturnType
 fun ElementScope<*>.onScroll(block: (Mouse.Scrolled) -> Boolean) {
     element.registerEvent(Mouse.Scrolled(0), block)
 }
@@ -48,7 +45,6 @@ inline fun ElementScope<*>.onScroll(crossinline block: (Mouse.Scrolled) -> Unit)
     element.registerEventUnit(Mouse.Scrolled(0), block)
 }
 
-@OverloadResolutionByLambdaReturnType
 fun ElementScope<*>.onMouseMove(block: (Mouse.Moved) -> Boolean) {
     element.registerEvent(Mouse.Moved, block)
 }
