@@ -119,8 +119,8 @@ Use [builds from multiversion](https://github.com/jcnlk/quoi/actions/workflows/b
   - Adds relic look, a triggerbot and an aura for both pickup and placement.
 - **Simon Says**
   - Shows the sequence and can complete the device automatically.
-- **Terminal Aura**
-  - Opens nearby terminals in P3, with optional ground and leap-delay checks.
+- **Terminals**
+  - Opens terminals in P3 with Aura or Triggerbot mode, with optional ground and leap-delay checks.
 - **Tick Timers**
   - Shows Storm pad and Goldor timers in seconds or server ticks.
 - **Wither Cloak**

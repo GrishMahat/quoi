@@ -3,6 +3,7 @@ package quoi.module.impl.floor7
 import net.minecraft.network.protocol.game.ServerboundInteractPacket
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.entity.decoration.ArmorStand
+import net.minecraft.world.phys.EntityHitResult
 import quoi.api.events.TickEvent
 import quoi.api.events.core.on
 import quoi.api.skyblock.dungeon.Dungeon
@@ -11,21 +12,22 @@ import quoi.api.skyblock.location.Island
 import quoi.api.skyblock.location.invoke
 import quoi.module.Module
 import quoi.module.settings.UIComponent.Companion.childOf
+import quoi.module.settings.UIComponent.Companion.visibleIf
 import quoi.utils.EntityUtils
 import quoi.utils.isWithinFov
 import quoi.utils.minFovDot
 import quoi.utils.skyblock.player.LeapManager
 
-// Kyleen
 @Suppress("UNNECESSARY_SAFE_CALL")
-object TerminalAura : Module(
-    "Terminal Aura",
-    desc = "Automatically opens terminals.",
+object Terminals : Module(
+    "Terminals",
+    desc = "Opens nearby terminals with an aura or triggerbot.",
     area = Island.Dungeon(7, inBoss = true, phase = Phase.P3)
 ) {
-    private val auraDistance by slider("Distance", 4.0, 0.0, 4.0, 0.1)
-    private val auraDelay by slider("Delay", 750, 0, 2000, 50)
-    private val auraFov by slider("Aura FOV", 360, 10, 360, 1, unit = "°")
+    private val mode by selector("Mode", "Aura", listOf("Aura", "Triggerbot"), desc = "Aura opens nearby terminals automatically. Triggerbot only opens the terminal you are looking at.")
+    private val distance by slider("Distance", 4.0, 0.0, 4.0, 0.1)
+    private val delay by slider("Delay", 750, 0, 2000, 50, unit = "ms")
+    private val auraFov by slider("Aura FOV", 360, 10, 360, 1, unit = "°").visibleIf { mode.selected == "Aura" }
     private val groundOnly by switch("Ground only")
     private val leapDelayEnabled by switch("Leap delay", desc = "Delays opening terminals for x seconds after leap")
     private val leapDelay by slider("Leap delay time", 0.5, 0.1, 5.0, 0.1, unit = "s").childOf(::leapDelayEnabled)
@@ -35,7 +37,7 @@ object TerminalAura : Module(
     init {
         on<TickEvent.Start> {
             if (Dungeon.inTerminal || Dungeon.isDead || mc.screen != null) return@on
-            if (System.currentTimeMillis() - lastClick < auraDelay) return@on
+            if (System.currentTimeMillis() - lastClick < delay) return@on
 
             if (leapDelayEnabled) {
                 val delayMs = (leapDelay * 1000.0).toLong()
@@ -48,7 +50,11 @@ object TerminalAura : Module(
             val lookVec = player.getViewVector(mc.deltaTracker.getGameTimeDeltaPartialTick(false)).normalize()
             val minFovDot = minFovDot(auraFov)
             val fullCircleFov = auraFov >= 360
-            val entities = EntityUtils.getEntities<ArmorStand>(player.boundingBox.inflate(auraDistance))
+            val triggerHit = if (mode.selected == "Triggerbot") {
+                mc.hitResult as? EntityHitResult ?: return@on
+            } else null
+            val entities = if (triggerHit != null) listOfNotNull(triggerHit.entity as? ArmorStand)
+            else EntityUtils.getEntities<ArmorStand>(player.boundingBox.inflate(distance))
 
             for (entity in entities) {
                 val name = entity.displayName?.string ?: continue
@@ -59,15 +65,16 @@ object TerminalAura : Module(
 
                 val entityCenter = entity.position().add(0.0, entity.bbHeight / 2.0, 0.0)
 
-                if (eyePos.distanceToSqr(entityCenter) > auraDistance * auraDistance) continue
-                if (!isWithinFov(eyePos, entityCenter, lookVec, minFovDot, fullCircleFov)) continue
+                if (eyePos.distanceToSqr(entityCenter) > distance * distance) continue
+                if (triggerHit == null && !isWithinFov(eyePos, entityCenter, lookVec, minFovDot, fullCircleFov)) continue
 
-                val aabb = entity.boundingBox.inflate(0.1)
-                val hitResult = aabb.clip(eyePos, entityCenter)
+                val hitVec = if (triggerHit != null) triggerHit.location else {
+                    val hitResult = entity.boundingBox.inflate(0.1).clip(eyePos, entityCenter)
 
-                if (hitResult.isEmpty) continue
+                    if (hitResult.isEmpty) continue
 
-                val hitVec = hitResult.get()
+                    hitResult.get()
+                }
 
                 val packet = ServerboundInteractPacket(entity.id, InteractionHand.MAIN_HAND, hitVec.subtract(entity.position()), player.isShiftKeyDown)
 
