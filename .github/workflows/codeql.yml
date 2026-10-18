@@ -1,0 +1,70 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [multiversion]
+    paths: &codeql-paths
+      - ".github/workflows/codeql.yml"
+      - "gradle/**"
+      - "src/**"
+      - "versions/**"
+      - "build.gradle.kts"
+      - "gradle.properties"
+      - "gradlew"
+      - "settings.gradle.kts"
+      - "stonecutter.gradle.kts"
+  pull_request:
+    branches: [multiversion]
+    paths: *codeql-paths
+  schedule:
+    - cron: "17 4 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Check Out Repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set Up Java 25
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Set Up Gradle
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-provider: enhanced
+          cache-read-only: true
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        with:
+          languages: java-kotlin
+          build-mode: manual
+
+      - name: Build All Minecraft Targets for Analysis
+        run: >-
+          ./gradlew buildAll --no-daemon --no-parallel --no-build-cache --no-configuration-cache
+          --rerun-tasks --stacktrace -Pkotlin.incremental=false
+          -Pkotlin.compiler.execution.strategy=in-process
+
+      - name: Analyze Code
+        uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        with:
+          category: "/language:java-kotlin"
