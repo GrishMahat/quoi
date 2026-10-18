@@ -95,7 +95,9 @@ dependencies {
 
     property("classgraph_version").let {
         implementation("io.github.classgraph:classgraph:$it")
-        include("io.github.classgraph:classgraph:$it")
+        listOf("classgraph", "classgraph-classpath", "classgraph-vfs", "classgraph-base").forEach { artifact ->
+            include("io.github.classgraph:$artifact:$it")
+        }
     }
 
     findProperty("minecraft_lwjgl_version")?.let {

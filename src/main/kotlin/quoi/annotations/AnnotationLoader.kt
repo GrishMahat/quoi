@@ -6,13 +6,15 @@ import quoi.QuoiMod.logger
 object AnnotationLoader {
     fun load() {
         ClassGraph()
+            .enableClasspath()
+            .enableNonSystemModules()
             .enableClassInfo()
             .enableAnnotationInfo()
             .acceptPackages("quoi")
             .scan()
             .use { scan ->
                 scan.getClassesWithAnnotation(Init::class.java.name)
-                    .loadClasses()
+                    .map { Class.forName(it.name, false, Init::class.java.classLoader) }
                     .sortedByDescending { it.getAnnotation(Init::class.java)?.priority ?: 0 }
                     .forEach { clazz ->
                         runCatching {
