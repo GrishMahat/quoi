@@ -127,9 +127,9 @@ stonecutter parameters {
         replace("level.addBreakingBlockEffect(pos, direction)", "level.addBreakingBlockEffects(pos, direction, false)")
         replace("packet.values.position", "packet.position.endPosition()")
         replace("player.drop(false)", "gameMode.dropItem(player, false)")
-        replace("click.button()", "Mouse.normalizeButton(click.button())")
-        replace("mouseButtonEvent.button()", "Mouse.normalizeButton(mouseButtonEvent.button())")
-        replace("input.button()", "Mouse.normalizeButton(input.button())")
+        replace("click.button()", "quoi.api.input.Mouse.normalizeButton(click.button())")
+        replace("mouseButtonEvent.button()", "quoi.api.input.Mouse.normalizeButton(mouseButtonEvent.button())")
+        replace("input.button()", "quoi.api.input.Mouse.normalizeButton(input.button())")
     }
     replacements.regex(sdl, "enderman_type") {
         replace("\\bEnderMan\\b", "Enderman", "\\bEnderman\\b", "EnderMan")

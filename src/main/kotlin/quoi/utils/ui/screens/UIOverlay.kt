@@ -1,6 +1,7 @@
+//~ ui_frame
+
 package quoi.utils.ui.screens
 
-//~ ui_frame
 import quoi.api.abobaui.AbobaUI
 import quoi.api.events.GuiEvent
 import quoi.api.events.RenderEvent

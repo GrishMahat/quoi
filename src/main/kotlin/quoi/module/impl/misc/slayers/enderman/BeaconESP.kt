@@ -1,6 +1,7 @@
+//~ enderman_type
+
 package quoi.module.impl.misc.slayers.enderman
 
-//~ enderman_type
 import net.minecraft.core.BlockPos
 import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket
 import net.minecraft.network.protocol.game.ClientboundSectionBlocksUpdatePacket

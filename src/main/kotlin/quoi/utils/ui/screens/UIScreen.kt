@@ -1,6 +1,7 @@
+//~ ui_frame
+
 package quoi.utils.ui.screens
 
-//~ ui_frame
 import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.input.CharacterEvent
@@ -10,7 +11,6 @@ import net.minecraft.network.chat.Component
 import quoi.QuoiMod.mc
 import quoi.api.abobaui.AbobaUI
 import quoi.api.input.Keyboard.Modifier.isCtrlDown
-import quoi.api.input.Mouse
 import quoi.api.input.Keybinds
 import quoi.utils.Scheduler.scheduleTask
 import quoi.utils.sf

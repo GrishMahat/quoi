@@ -1,6 +1,7 @@
+//~ enderman_type
+
 package quoi.module.impl.dungeon
 
-//~ enderman_type
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.ambient.Bat
@@ -82,9 +83,7 @@ object DungeonESP : Module(
             Test.collectMobs()
         }
 
-        on<WorldEvent.Change> {
-            currentEntities.clear()
-        }
+        on<WorldEvent.Change> { currentEntities.clear() }
 
         on<RenderEvent.World> {
             if (enabled && teammateEsp && teammateHighlight.style != "Glow") getEntities<Player>().forEach { entity ->
@@ -167,12 +166,11 @@ object DungeonESP : Module(
 
     private fun getColour(entity: Entity) = when (entity) {
         is Bat if (entity.maxHealth.equalsOneOf(100f, 200f, 400f, 800f)) -> colourBat to colourBatFill
-        is EnderMan if (entity.name.string == "Dinnerbone") -> {
+        is EnderMan -> {
             val stand = getEntity(entity.id + 1) as? ArmorStand
 
-            if (stand?.customName?.string?.contains("✯") == true) {
-                colourStar to colourStarFill
-            } else null
+            if (stand?.customName?.string?.contains("✯") == true) colourStar to colourStarFill
+            else null
         }
         is ArmorStand -> {
             handleStand(entity)
