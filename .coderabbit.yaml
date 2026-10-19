@@ -33,3 +33,7 @@ reviews:
       instructions: |
         Review event and path filters, token permissions, cache trust, and pinned action references.
         The Build workflow distributes downloadable JARs through GitHub Actions artifacts.
+    - path: ".forgejo/workflows/**"
+      instructions: |
+        Review Forgejo event filters, context expressions, runner compatibility, cache trust, and pinned action URLs.
+        Only successful pushes to multiversion may publish downloadable JARs. Forgejo's build does not run GitHub CodeQL.
