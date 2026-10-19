@@ -5,10 +5,7 @@
       <option name="externalSystemIdString" value="GRADLE" />
       <option name="taskNames">
         <list>
-          <option value=":26.1.x:build" />
-          <option value=":26.2:build" />
-          <option value=":26.3:build" />
-          <option value=":26.4:build" />
+          <option value="buildAll" />
         </list>
       </option>
     </ExternalSystemSettings>
