@@ -230,7 +230,9 @@ object LeapManager : EventListener {
         useInputSuppressed = true
         mc.options.keyUse.apply {
             isDown = false
-            while (consumeClick()) Unit
+            while (consumeClick()) {
+                // Drain queued use clicks before opening the leap menu.
+            }
         }
     }
 

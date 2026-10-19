@@ -79,6 +79,9 @@ stonecutter parameters {
 
     replacements.string(current.parsed >= "26.4-snapshot-4") {
         replace("SoundEvents.CAT_AMBIENT_BABY", "SoundEvents.BABY_CAT_SOUND_SET.ambientSound().get()")
+        replace("import net.minecraft.tags.FluidTags", "import net.minecraft.world.level.material.Fluids")
+        replace("FluidTags.WATER", "Fluids.WATER")
+        replace("FluidTags.LAVA", "Fluids.LAVA")
     }
 
     // Registry families replace the individual colored and weathered constants.
