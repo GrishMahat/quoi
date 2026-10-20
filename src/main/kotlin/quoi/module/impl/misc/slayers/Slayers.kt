@@ -1,17 +1,16 @@
 package quoi.module.impl.misc.slayers
 
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext
+import net.minecraft.network.protocol.game.ClientboundAddEntityPacket
 import net.minecraft.network.protocol.game.ClientboundSetPlayerTeamPacket
+import net.minecraft.network.protocol.game.ClientboundSystemChatPacket
 import net.minecraft.sounds.SoundEvents
 import net.minecraft.world.entity.LivingEntity
-import net.minecraft.world.entity.decoration.ArmorStand
 import quoi.api.colour.Colour
 import quoi.api.colour.alpha
 import quoi.api.colour.withAlpha
-import quoi.api.events.PacketEvent
-import quoi.api.events.RenderEvent
-import quoi.api.events.SlayerEvent
-import quoi.api.events.TickEvent
+import quoi.api.events.*
+import quoi.api.events.core.Event
 import quoi.api.events.core.on
 import quoi.api.events.core.trackedBy
 import quoi.api.skyblock.location.Island
@@ -23,7 +22,6 @@ import quoi.module.impl.misc.slayers.enderman.EndermanSlayer
 import quoi.module.settings.UIComponent.Companion.visibleIf
 import quoi.module.settings.group.SettingGroup.Companion.childOf
 import quoi.utils.ChatUtils.modMessage
-import quoi.utils.EntityUtils.getEntities
 import quoi.utils.EntityUtils.getEntity
 import quoi.utils.EntityUtils.interpolatedBox
 import quoi.utils.StringUtils.formatTime
@@ -31,6 +29,12 @@ import quoi.utils.StringUtils.noControlCodes
 import quoi.utils.romanToInt
 import quoi.utils.skyblock.player.PlayerUtils
 import quoi.utils.ui.textPair
+
+//? if <26.2 {
+import net.minecraft.world.entity.EntityType as EntityTypes
+//?} else {
+/*import net.minecraft.world.entity.EntityTypes
+*///?}
 
 @Suppress("unnecessary_safe_call")
 object Slayers : Module(
@@ -53,6 +57,7 @@ object Slayers : Module(
 
     private var spawnStartedAt = 0L
     private var killStartedAt = 0L
+    private var lastBossSpawn: ClientboundAddEntityPacket? = null
 
     @Suppress("unused")
     private val debug by textHud("Debug") {
@@ -70,6 +75,10 @@ object Slayers : Module(
     }.setting().visibleIf { Test.enabled }
 
     init {
+        on<PacketEvent.ReceivedPost> { handlePacket(this) }
+
+        on<WorldEvent.Change> { reset() }
+
         on<SlayerEvent.State> {
             val now = System.currentTimeMillis()
 
@@ -123,54 +132,86 @@ object Slayers : Module(
     }
 
     override fun onDisable() {
+        reset()
         slayers.forEach { s -> s.features.forEach { it.onDisable() } }
         super.onDisable()
     }
 
+    override fun shouldHandle(event: Event): Boolean = event is WorldEvent.Change || super.shouldHandle(event)
+
     var questTier = 0
         private set
 
-    val questState by trackedBy<PacketEvent.Received, ClientboundSetPlayerTeamPacket, QuestState>(QuestState.NONE) {
-        val params = packet.parameters.orElse(null) ?: return@trackedBy it
+    var questState = QuestState.NONE
+        private set
 
-        val text = (params.playerPrefix.string + params.playerSuffix.string).noControlCodes.trim()
-        val new = when {
-            text.contains("Combat") || text.contains("Kills") -> QuestState.SPAWNING
-            text == "Slay the boss!" -> QuestState.KILLING
-            text == "Boss slain!" -> QuestState.SLAIN
-            else -> it // can get stuck when boss is slain, and you collect the reward but doesn't really matter since I won't be using it prob.
+    private fun handlePacket(event: PacketEvent.ReceivedPost) {
+        when (val packet = event.packet) {
+            is ClientboundAddEntityPacket -> {
+                if (packet.type in bossTypes.values) lastBossSpawn = packet
+            }
+
+            is ClientboundSystemChatPacket -> {
+                if (packet.overlay) return
+                val text = packet.content.string.noControlCodes.trim()
+                val match = spawnRegex.matchEntire(text)
+                if (match != null) {
+                    val type = bossTypes[match.groupValues[1]] ?: return
+                    val spawn = lastBossSpawn
+                    lastBossSpawn = null
+                    if (spawn?.type != type) return
+
+                    currentBoss = (getEntity(spawn.id) as? LivingEntity)?.takeIf { it.isAlive } ?: return
+                    questTier = romanToInt(match.groupValues[2])
+                    updateQuestState(QuestState.KILLING)
+                }
+
+                when (text) {
+                    "SLAYER QUEST STARTED!" -> updateQuestState(QuestState.SPAWNING)
+                    "SLAYER QUEST COMPLETE!" -> updateQuestState(QuestState.SLAIN)
+                    "SLAYER QUEST FAILED!" -> updateQuestState(QuestState.FAILED)
+                }
+            }
+
+            is ClientboundSetPlayerTeamPacket -> {
+                val params = packet.parameters.orElse(null) ?: return
+                val text = (params.playerPrefix.string + params.playerSuffix.string).noControlCodes.trim()
+                when {
+                    text.contains("Combat") || text.contains("Kills") -> updateQuestState(QuestState.SPAWNING)
+                    text == "Slay the boss!" -> updateQuestState(QuestState.KILLING)
+                    text == "Boss slain!" -> updateQuestState(QuestState.SLAIN)
+                }
+            }
         }
-
-        if (new != it) SlayerEvent.State(it, new).post()
-
-        new
     }
 
-    val currentBoss by trackedBy<TickEvent.End, LivingEntity?>(null) { boss ->
-        if (questState != QuestState.KILLING) {
-            questTier = 0
-            return@trackedBy null
-        }
-
-        boss?.let {
-            if (!it.isDeadOrDying && !it.isRemoved) return@trackedBy it
-            return@trackedBy null
-        }
-
-        val spawnedBy = getEntities<ArmorStand>().firstOrNull { stand ->
-            val name = stand.displayName?.string ?: return@trackedBy null
-            name.contains("Spawned by: ${player.name.string}", ignoreCase = true)
-        } ?: return@trackedBy null
-
-        val bossStand = (getEntity(spawnedBy.id - 2) as? ArmorStand)?.displayName?.string
-            ?: return@trackedBy null
-
-        questTier = tierRegex.find(bossStand)?.destructured
-            ?.let { (tier) -> romanToInt(tier) }
-            ?: return@trackedBy null
-
-        getEntity(spawnedBy.id - 3) as? LivingEntity
+    private fun updateQuestState(new: QuestState) {
+        val old = questState
+        if (old == new) return
+        questState = new
+        if (new != QuestState.KILLING) resetBoss()
+        SlayerEvent.State(old, new).post()
     }
+
+    private fun resetBoss() {
+        lastBossSpawn = null
+        currentBoss = null
+        questTier = 0
+    }
+
+    private fun reset() {
+        updateQuestState(QuestState.NONE)
+        resetBoss()
+        spawnStartedAt = 0L
+        killStartedAt = 0L
+    }
+
+    var currentBoss by trackedBy<TickEvent.End, LivingEntity?>(null) { boss ->
+        if (questState != QuestState.KILLING) return@trackedBy null
+
+        boss?.takeUnless { it.isDeadOrDying || it.isRemoved }
+    }
+        private set
 
     private fun LevelRenderContext.drawSlayer(entity: LivingEntity?, colour: Colour? = null, main: Boolean = true) {
         if (entity == null || entity.isInvisible || entity.isDeadOrDying) return
@@ -193,5 +234,14 @@ object Slayers : Module(
         })
     }
 
-    private val tierRegex = Regex(".* (I{1,3}|IV|V) \\d+.*❤$")
+    private val spawnRegex = Regex("SLAYER BOSS! The (.+) (IV|V|I{1,3}) spawned!")
+    private val bossTypes = mapOf(
+        "Revenant Horror" to EntityTypes.ZOMBIE,
+        "Atoned Horror" to EntityTypes.ZOMBIE,
+        "Tarantula Broodfather" to EntityTypes.SPIDER,
+        "Conjoined Brood" to EntityTypes.SPIDER,
+        "Sven Packmaster" to EntityTypes.WOLF,
+        "Voidgloom Seraph" to EntityTypes.ENDERMAN,
+        "Inferno Demonlord" to EntityTypes.BLAZE,
+    )
 }
