@@ -22,6 +22,7 @@ import quoi.api.colour.Colour
 import quoi.api.colour.withAlpha
 import quoi.api.customtriggers.*
 import quoi.api.customtriggers.TriggerManager.triggers
+import quoi.api.customtriggers.conditions.TriggerCondition
 import quoi.api.input.CursorShape
 import quoi.config.TypeNamed
 import quoi.config.typeName
@@ -364,7 +365,9 @@ class CustomTriggerEditor {
                 }
             }
             with(component) { draw() }
-
+            if (component is TriggerCondition) {
+                choiceField("Expected result", { component.expected }, listOf(true, false)) { component.expected = it }
+            }
         }
     }
 

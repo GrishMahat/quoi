@@ -47,7 +47,7 @@ class TriggerEngine(
             safely(trigger) {
                 if (trigger.validationError() != null) return@safely
                 val local = trigger.trigger.createContext(context) ?: return@safely
-                if (!trigger.conditions.all { matches(it, local) }) return@safely
+                if (!trigger.conditions.all { matches(it, local) == it.expected }) return@safely
                 if (!resume(trigger, trigger.actions.toList(), 0, local, started)) return@safely
                 when (context) {
                     is TriggerContext.Chat if local is TriggerContext.Chat -> context.cancelled = context.cancelled || local.cancelled

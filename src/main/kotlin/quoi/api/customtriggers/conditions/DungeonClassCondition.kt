@@ -9,7 +9,7 @@ import quoi.api.skyblock.dungeon.Dungeon
 import quoi.api.skyblock.dungeon.enums.DungeonClass
 
 @TypeName("dungeon_class")
-class DungeonClassCondition(var clazz: DungeonClass = DungeonClass.Mage) : TriggerCondition {
+class DungeonClassCondition(var clazz: DungeonClass = DungeonClass.Mage) : TriggerCondition() {
     override fun matches(ctx: TriggerContext) = Dungeon.inDungeons && Dungeon.currentDungeonPlayer.clazz == clazz
     override fun displayString() = "Dungeon class: ${clazz.name}"
     override fun ElementScope<*>.draw() = column(size(w = Copying)) {

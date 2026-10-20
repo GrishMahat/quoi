@@ -12,7 +12,7 @@ import quoi.utils.skyblock.item.ItemUtils.skyblockId
 class HoldingItemCondition(
     var field: Field = Field.NAME,
     var matcher: TextMatcher = TextMatcher()
-) : TriggerCondition {
+) : TriggerCondition() {
     enum class Field(val label: String) { NAME("Item name"), SKYBLOCK_ID("SkyBlock ID") }
     override fun validationError() = matcher.validationError()
     fun matchesItem(name: String, id: String) = matcher.matches(if (field == Field.NAME) name else id)

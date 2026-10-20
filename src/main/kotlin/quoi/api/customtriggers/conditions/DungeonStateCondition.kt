@@ -7,7 +7,7 @@ import quoi.api.skyblock.dungeon.Dungeon
 import quoi.config.TypeName
 
 @TypeName("dungeon_state")
-class DungeonStateCondition(var state: State = State.IN_DUNGEON) : TriggerCondition {
+class DungeonStateCondition(var state: State = State.IN_DUNGEON) : TriggerCondition() {
     enum class State(val label: String) {
         IN_DUNGEON("In dungeon"), CLEAR("In clear"), BOSS("In boss"), TERMINAL("In terminal"), DEAD("Player is dead")
     }

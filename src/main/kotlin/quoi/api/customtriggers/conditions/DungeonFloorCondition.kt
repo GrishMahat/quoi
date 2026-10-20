@@ -8,7 +8,7 @@ import quoi.api.skyblock.dungeon.enums.Floor
 import quoi.config.TypeName
 
 @TypeName("dungeon_floor")
-class DungeonFloorCondition(var floor: Floor = Floor.F7) : TriggerCondition {
+class DungeonFloorCondition(var floor: Floor = Floor.F7) : TriggerCondition() {
     override fun matches(ctx: TriggerContext) = Dungeon.inDungeons && Dungeon.floor == floor
     override fun displayString() = "Dungeon floor: ${floor.name}"
     override fun ElementScope<*>.draw() = choiceField("Floor", { floor }, Floor.entries) { floor = it }

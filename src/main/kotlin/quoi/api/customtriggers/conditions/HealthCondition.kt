@@ -6,7 +6,7 @@ import quoi.api.skyblock.SkyblockPlayer
 import quoi.config.TypeName
 
 @TypeName("health")
-class HealthCondition(var comparison: Comparison = Comparison.BELOW, var percent: Int = 50) : TriggerCondition {
+class HealthCondition(var comparison: Comparison = Comparison.BELOW, var percent: Int = 50) : TriggerCondition() {
     enum class Comparison(val label: String) { BELOW("At or below"), ABOVE("At or above") }
     override fun validationError() = if (percent !in 0..100) "Health percentage must be between 0 and 100." else null
     override fun matches(ctx: TriggerContext): Boolean {

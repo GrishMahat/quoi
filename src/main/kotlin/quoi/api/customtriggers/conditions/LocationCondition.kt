@@ -8,7 +8,7 @@ import quoi.api.skyblock.location.Island
 import quoi.api.skyblock.location.Location
 
 @TypeName("location")
-class LocationCondition(var island: Island = Island.Hub, var subarea: String = "") : TriggerCondition {
+class LocationCondition(var island: Island = Island.Hub, var subarea: String = "") : TriggerCondition() {
     override fun matches(ctx: TriggerContext) = Location.currentArea == island &&
         (subarea.isBlank() || Location.subarea?.trim()?.equals(subarea.trim(), true) == true)
     override fun displayString() = "In ${island.displayName}${if (subarea.isBlank()) "" else ": $subarea"}"
