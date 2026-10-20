@@ -5,6 +5,7 @@ import net.minecraft.world.entity.decoration.ArmorStand
 import net.minecraft.world.entity.monster.Blaze
 import net.minecraft.world.entity.monster.skeleton.WitherSkeleton
 import net.minecraft.world.entity.monster.zombie.ZombifiedPiglin
+import net.minecraft.world.phys.EntityHitResult
 import quoi.api.colour.Colour
 import quoi.api.events.ChatEvent
 import quoi.api.events.TickEvent
@@ -72,8 +73,13 @@ object BlazeSlayer : SettingGroup(Slayers, "Blaze", area = Island.CrimsonIsle, s
         }
 
     val attune: Attunement?
-        get() = (activeDemon ?: blazeBoss)?.getAttune() // since boss is invisible during demon phase we get activeDemon first
+        get() = (activeDemon ?: blazeBoss ?: targetMob)?.getAttune() // since boss is invisible during demon phase we get activeDemon first
 
+    private val targetMob: LivingEntity?
+        get() {
+            val entity = (mc.hitResult as? EntityHitResult)?.entity as? LivingEntity ?: return null
+            return entity.takeIf { it is Blaze || (it.isPassenger && (it is WitherSkeleton || it is ZombifiedPiglin)) }
+        }
 
     // could fail if someone next to you spawns demons at the same time, but it's very unlikely it'd every happen
     val demons by trackedBy<TickEvent.End, Pair<LivingEntity, LivingEntity>?>(null) { demons ->
@@ -99,7 +105,7 @@ object BlazeSlayer : SettingGroup(Slayers, "Blaze", area = Island.CrimsonIsle, s
         if (this.isDeadOrDying) return null
 
         val stand = when {
-            this == blazeBoss -> getEntities<ArmorStand>(this.position(), radius = 3.0) { entity -> // id + 2 only works for phase 1. other are random.
+            this is Blaze -> getEntities<ArmorStand>(this.position(), radius = 3.0) { entity -> // id + 2 only works for phase 1. other are random.
                 val name = entity.customName?.string?.noControlCodes ?: return@getEntities false
                 Attunement.entries.any { name.contains(it.name, true) }
             }.firstOrNull()
