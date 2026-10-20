@@ -15,6 +15,7 @@ import quoi.utils.aabb
 import quoi.utils.render.drawFilledBox
 import quoi.utils.render.drawWireFrameBox
 import quoi.utils.skyblock.item.ItemUtils.getBreakerCharges
+import quoi.utils.skyblock.item.ItemUtils.skyblockId
 import quoi.utils.skyblock.player.PlayerUtils
 import quoi.utils.skyblock.player.SwapManager
 import quoi.utils.skyblock.player.interact.AuraManager
@@ -46,13 +47,16 @@ class BreakerNode : RouteNode() {
     }
 
     override fun execute(pos: MutableVec3): Boolean {
-        if (active) return false
         if (blocks.isEmpty()) return true
-        val breakerSlot = PlayerUtils.breakerSlot ?: return true
-
         val toBreak = realBlocks.filter { pos -> level.isLoaded(pos) && !pos.state.isAir }
 
         if (toBreak.isEmpty()) return true
+        if (active) return false
+
+        val breakerSlot = PlayerUtils.breakerSlot ?: run {
+            val hasBreaker = (0..8).any { player.inventory.getItem(it).skyblockId == "DUNGEONBREAKER" }
+            return !hasBreaker
+        }
 
         if (player.inventory.selectedSlot != breakerSlot) {
             SwapManager.swapToSlot(breakerSlot)
@@ -60,25 +64,21 @@ class BreakerNode : RouteNode() {
         }
 
         val initialCharges = getBreakerCharges(player.inventory.getItem(breakerSlot))
-        if (initialCharges == 0) return true
+        if (initialCharges == 0) return false
 
+        val batch = toBreak.take(initialCharges)
         active = true
 
         if (AutoRoutes.zeroTickDb) {
-            toBreak.forEach { AuraManager.breakBlock(it, immediate = true) }
-            active = false
-            return true
+            batch.forEach { AuraManager.breakBlock(it, immediate = true) }
+            scheduleTask(10) { active = false }
         } else {
-            toBreak.forEachIndexed { i, pos ->
-                if (i >= initialCharges) {
-                    active = false
-                    return true
-                }
-                scheduleTask(i) { AuraManager.breakBlock(pos, immediate = true) }
+            batch.forEachIndexed { i, pos ->
+                scheduleTask(i + 1) { AuraManager.breakBlock(pos, immediate = true) }
             }
-            scheduleTask(realBlocks.size) { active = false }
-            return false
+            scheduleTask(batch.size + 1) { active = false }
         }
+        return false
     }
 
     override fun render(ctx: LevelRenderContext, style: String, colour: Colour, fillColour: Colour, activeColour: Colour, thickness: Float) {

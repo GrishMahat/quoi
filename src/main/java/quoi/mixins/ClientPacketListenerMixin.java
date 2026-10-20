@@ -1,10 +1,5 @@
 package quoi.mixins;
 
-import quoi.api.events.ChatEvent;
-import quoi.api.events.EntityEvent;
-import quoi.api.events.PacketEvent;
-import quoi.api.events.core.EventDispatcher;
-import quoi.module.impl.general.Tweaks;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
@@ -12,8 +7,10 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.network.PacketListener;
 import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketUtils;
 import net.minecraft.network.protocol.game.ClientboundSetEntityDataPacket;
 import net.minecraft.network.protocol.game.ClientboundSetEquipmentPacket;
+import net.minecraft.network.protocol.ping.ClientboundPongResponsePacket;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -22,6 +19,11 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import quoi.api.events.ChatEvent;
+import quoi.api.events.EntityEvent;
+import quoi.api.events.PacketEvent;
+import quoi.api.events.core.EventDispatcher;
+import quoi.module.impl.general.Tweaks;
 
 import static quoi.module.impl.render.RenderOptimiser.should;
 
@@ -40,6 +42,11 @@ public class ClientPacketListenerMixin {
         if (EventDispatcher.onPacketReceived(packet)) return;
         original.call(packet, listener);
         new PacketEvent.ReceivedPost(packet).post();
+    }
+
+    @Inject(method = "handlePongResponse", at = @At("HEAD"))
+    private void quoi$queuePongResponse(ClientboundPongResponsePacket packet, CallbackInfo ci) {
+        PacketUtils.ensureRunningOnSameThread(packet, (ClientPacketListener) (Object) this, Minecraft.getInstance().packetProcessor());
     }
 
     @Inject(
@@ -68,7 +75,7 @@ public class ClientPacketListenerMixin {
             )
     )
     private void onEntityTrackerUpdate(ClientboundSetEntityDataPacket packet, CallbackInfo ci, @Local Entity entity) {
-        if(!entity.equals(Minecraft.getInstance().player) || !should(Tweaks.getFixDoubleSneak())) return;
+        if (!entity.equals(Minecraft.getInstance().player) || !should(Tweaks.getFixDoubleSneak())) return;
         packet.packedItems().removeIf(entry -> entry.serializer().equals(EntityDataSerializers.POSE));
     }
 

@@ -242,6 +242,7 @@ object AutoRoutes : Module(
 
         if (activeNode != node) {
             activeNode = node
+            executing = false
         }
 
         if (interactDelay > 0) return
