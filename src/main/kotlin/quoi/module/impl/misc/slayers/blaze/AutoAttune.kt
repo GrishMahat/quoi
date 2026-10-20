@@ -1,9 +1,10 @@
 package quoi.module.impl.misc.slayers.blaze
 
 import net.minecraft.world.InteractionHand
-import quoi.api.events.ChatEvent
 import quoi.api.events.PacketEvent
+import quoi.api.events.SlayerEvent
 import quoi.api.events.TickEvent
+import quoi.api.events.core.Subscription
 import quoi.api.events.core.on
 import quoi.api.events.core.once
 import quoi.module.impl.misc.slayers.QuestState
@@ -13,47 +14,68 @@ import quoi.utils.StringUtils.noControlCodes
 import quoi.utils.skyblock.item.ItemUtils.lore
 import quoi.utils.skyblock.player.PlayerUtils.rightClick
 import quoi.utils.skyblock.player.SwapManager
+
 //? if <26.3 {
 import net.minecraft.network.protocol.game.ServerboundSwingPacket
+import org.apache.logging.log4j.core.tools.picocli.CommandLine.Help.Ansi.Style.on
+import quoi.api.events.ChatEvent
 //?} else {
 /*import net.minecraft.network.protocol.game.ServerboundPunchPacket
 *///?}
 
 object AutoAttune : ToggleableGroup(BlazeSlayer, "Auto attune") {
-    private var lastSwap = -1L
+    private var swapTask: Subscription<TickEvent.Start>? = null
+    private val pendingAttunements = mutableMapOf<String, Pair<Attunement, Long>>()
 
     init {
         //? if <26.3 {
         on<PacketEvent.Sent, ServerboundSwingPacket> {
             if (packet.hand != InteractionHand.MAIN_HAND) return@on
-        //?} else {
-        /*on<PacketEvent.Sent, ServerboundPunchPacket> {
-        *///?}
-            if (System.currentTimeMillis() - lastSwap < 400L) return@on
+            //?} else {
+            /*on<PacketEvent.Sent, ServerboundPunchPacket> {
+            *///?}
+            if (swapTask != null) return@on
             if (BlazeSlayer.attune == null) return@on
 
-            once<TickEvent.Start> {
+            swapTask = once<TickEvent.Start> {
+                swapTask = null
                 val attunement = BlazeSlayer.attune ?: return@once
                 val result = SwapManager.swapById(*attunement.daggers)
 
                 if (!result.success) return@once
 
                 val attuned = player.mainHandItem.lore
-                    ?.firstOrNull { it.noControlCodes.startsWith("Attuned: ") }
+                    ?.map { it.noControlCodes }
+                    ?.firstOrNull { it.startsWith("Attuned: ") }
                     ?.removePrefix("Attuned: ")
+                    ?.trim()
                     ?.uppercase()
 
+                val family = attunement.daggers.first()
+                val now = System.currentTimeMillis()
+                pendingAttunements[family]?.let { (expected, clickedAt) ->
+                    if (attuned != expected.name && now - clickedAt < 1_000L) return@once
+                    pendingAttunements.remove(family)
+                }
+
                 if (attuned != attunement.name) {
+                    pendingAttunements[family] = attunement to now
                     player.rightClick()
                 }
-                lastSwap = System.currentTimeMillis()
             }
         }
 
+        on<SlayerEvent.State> { onDisable() }
+
         on<ChatEvent.Packet> {
-            if (unformatted.startsWith("Strike using the") ||
-                unformatted.startsWith("Your hit was reduced by Hellion Shield!")) cancel()
+            if (unformatted.startsWith("Strike using the") || unformatted.startsWith("Your hit was reduced by Hellion Shield!")) cancel()
         }
+    }
+
+    override fun onDisable() {
+        swapTask?.unregister()
+        swapTask = null
+        pendingAttunements.clear()
     }
 
     override val running: Boolean
