@@ -1,6 +1,7 @@
 package quoi.module.impl.misc.slayers.blaze
 
 import net.minecraft.world.InteractionHand
+import quoi.api.events.ChatEvent
 import quoi.api.events.PacketEvent
 import quoi.api.events.SlayerEvent
 import quoi.api.events.TickEvent
@@ -17,8 +18,6 @@ import quoi.utils.skyblock.player.SwapManager
 
 //? if <26.3 {
 import net.minecraft.network.protocol.game.ServerboundSwingPacket
-import org.apache.logging.log4j.core.tools.picocli.CommandLine.Help.Ansi.Style.on
-import quoi.api.events.ChatEvent
 //?} else {
 /*import net.minecraft.network.protocol.game.ServerboundPunchPacket
 *///?}
