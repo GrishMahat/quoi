@@ -20,10 +20,6 @@ object CustomRenderLayer {
         return RenderType.create(name, setup)
     }
 
-    val LINE_LIST: RenderType = create("quoi_lines", CustomRenderPipelines.LINE_LIST) {
-        setLayeringTransform(LayeringTransform.VIEW_OFFSET_Z_LAYERING)
-    }
-    val LINE_LIST_ESP: RenderType = create("quoi_lines_esp", CustomRenderPipelines.LINE_LIST_ESP)
     val TRIANGLE_STRIP: RenderType = create("quoi_debug_quads", CustomRenderPipelines.TRIANGLE_STRIP) {
         setLayeringTransform(LayeringTransform.VIEW_OFFSET_Z_LAYERING)
         sortOnUpload()

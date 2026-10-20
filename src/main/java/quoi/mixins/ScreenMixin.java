@@ -1,3 +1,6 @@
+//~ gui_extraction
+//~ screen_extraction
+
 package quoi.mixins;
 
 import quoi.api.events.GuiEvent;
@@ -43,7 +46,7 @@ public class ScreenMixin {
     }
 
     @Inject(
-            method = "renderWithTooltipAndSubtitles",
+            method = "extractRenderStateWithTooltipAndSubtitles",
             at = @At("HEAD"),
             cancellable = true
     )
@@ -52,7 +55,7 @@ public class ScreenMixin {
     }
 
     @Inject(
-            method = "renderWithTooltipAndSubtitles",
+            method = "extractRenderStateWithTooltipAndSubtitles",
             at = @At("TAIL")
     )
     protected void quoi$onRenderPost(GuiGraphicsExtractor context, int mouseX, int mouseY, float deltaTicks, CallbackInfo ci) {
@@ -60,7 +63,7 @@ public class ScreenMixin {
     }
 
     @Inject(
-            method = "renderBackground",
+            method = "extractBackground",
             at = @At("HEAD"),
             cancellable = true
     )

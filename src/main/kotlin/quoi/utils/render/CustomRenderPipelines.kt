@@ -7,6 +7,9 @@ import com.mojang.blaze3d.pipeline.RenderPipeline
 import com.mojang.blaze3d.platform.CompareOp
 import com.mojang.blaze3d.vertex.DefaultVertexFormat
 import net.minecraft.client.renderer.RenderPipelines
+//? if >=26.4-snapshot-5 {
+/*import net.minecraft.client.renderer.BindGroupLayouts
+*///?}
 //? if <26.2 {
 import com.mojang.blaze3d.vertex.VertexFormat
 //?} else {
@@ -19,38 +22,17 @@ import com.mojang.blaze3d.vertex.VertexFormat
  * original: https://github.com/odtheking/OdinFabric/blob/main/src/main/kotlin/com/odtheking/odin/utils/render/CustomRenderPipelines.kt
  */
 object CustomRenderPipelines {
+    //? if >=26.4-snapshot-5 {
+    /*private val filledSnippet = RenderPipeline.builder(RenderPipelines.GLOBALS_SNIPPET)
+        .withBindGroupLayout(BindGroupLayouts.PROJECTION)
+        .withBindGroupLayout(BindGroupLayouts.DYNAMIC_TRANSFORMS)
+        .withVertexShader("core/position_color")
+        .withFragmentShader("core/position_color")
+        .buildSnippet()
+    *///?}
+
     // Follow vanilla's depth convention, which became reversed Z in 26.2.
     private val testedDepth = DepthStencilState(DepthStencilState.DEFAULT.depthTest(), false)
-    //$ pipeline_start LINE_LIST
-    val LINE_LIST: RenderPipeline = RenderPipelines.register(
-        RenderPipeline.builder(RenderPipelines.LINES_SNIPPET)
-            .withLocation("quoi/pipeline/lines")
-            //$ pipeline_vertices POSITION_COLOR_NORMAL LINES {
-            .withVertexFormat(DefaultVertexFormat.POSITION_COLOR_NORMAL, VertexFormat.Mode.LINES)
-            //$}
-            .withCull(false)
-            .withColorTargetState(ColorTargetState(BlendFunction.TRANSLUCENT))
-            .withDepthStencilState(testedDepth)
-            .build()
-    //$ pipeline_end {
-    )
-    //$}
-
-    //$ pipeline_start LINE_LIST_ESP
-    val LINE_LIST_ESP: RenderPipeline = RenderPipelines.register(
-        RenderPipeline.builder(RenderPipelines.LINES_SNIPPET)
-            .withLocation("quoi/pipeline/lines_esp")
-            //$ pipeline_vertices POSITION_COLOR_NORMAL LINES {
-            .withVertexFormat(DefaultVertexFormat.POSITION_COLOR_NORMAL, VertexFormat.Mode.LINES)
-            //$}
-            .withCull(false)
-            .withColorTargetState(ColorTargetState(BlendFunction.TRANSLUCENT))
-            .withDepthStencilState(DepthStencilState(CompareOp.ALWAYS_PASS, false))
-            .build()
-    //$ pipeline_end {
-    )
-    //$}
-
     //$ pipeline_start TRIANGLE_STRIP
     val TRIANGLE_STRIP: RenderPipeline = RenderPipelines.register(
         RenderPipeline.builder(RenderPipelines.DEBUG_FILLED_SNIPPET)

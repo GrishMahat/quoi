@@ -33,6 +33,7 @@ tasks.register("runActive") {
 stonecutter parameters {
     val gui = current.parsed >= "26.2"
     val sdl = current.parsed >= "26.3"
+    val snapshot5 = current.parsed >= "26.4-snapshot-5"
     val pipelineInBlaze3d = current.parsed < "26.3" || current.parsed >= "26.4-snapshot-1"
 
     // Minecraft 26.2 moves screens and HUD state into Gui and Hud.
@@ -82,6 +83,35 @@ stonecutter parameters {
         replace("import net.minecraft.tags.FluidTags", "import net.minecraft.world.level.material.Fluids")
         replace("FluidTags.WATER", "Fluids.WATER")
         replace("FluidTags.LAVA", "Fluids.LAVA")
+    }
+
+    // Snapshot 5 moves pipeline definitions and carries GUI input in the extractor.
+    replacements.string(snapshot5) {
+        replace("net.minecraft.client.renderer.RenderPipelines", "net.minecraft.client.renderer.pipeline.RenderPipelines")
+        replace("RenderSetup.builder(pipeline)", "RenderSetup.nonOitBuilder(pipeline)")
+        replace("RenderPipeline.builder(RenderPipelines.DEBUG_FILLED_SNIPPET)", "RenderPipeline.builder(filledSnippet)")
+    }
+
+    replacements.string(snapshot5, "gui_extraction") {
+        listOf("extractRenderState", "extractBackground", "extractWidgetRenderState").forEach { method ->
+            listOf("ctx", "guiGraphics").forEach { context ->
+                replace(
+                    "override fun $method($context: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, deltaTicks: Float)",
+                    "override fun $method($context: GuiGraphicsExtractor)",
+                )
+                replace("$method($context, mouseX, mouseY, deltaTicks)", "$method($context)")
+            }
+        }
+        replace("this, context, mouseX, mouseY", "this, context, context.mouseX(), context.mouseY()")
+        replace("{ ctx, a ->", "{ ctx ->")
+        replace("RenderEvent.Overlay(ctx, a)", "RenderEvent.Overlay(ctx, ctx.deltaTracker())")
+    }
+    replacements.string(snapshot5, "screen_extraction") {
+        replace("GuiGraphicsExtractor context, int mouseX, int mouseY, float deltaTicks, CallbackInfo", "GuiGraphicsExtractor context, CallbackInfo")
+    }
+    replacements.string(snapshot5, "container_extraction") {
+        replace("GuiGraphicsExtractor context, int mouseX, int mouseY, CallbackInfo", "GuiGraphicsExtractor context, CallbackInfo")
+        replace("GuiGraphicsExtractor context, Slot slot, int x, int y, CallbackInfo", "GuiGraphicsExtractor context, Slot slot, CallbackInfo")
     }
 
     // Registry families replace the individual colored and weathered constants.

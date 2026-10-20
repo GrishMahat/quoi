@@ -1,3 +1,6 @@
+//~ gui_extraction
+//~ container_extraction
+
 package quoi.mixins;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -43,7 +46,7 @@ public class AbstractContainerScreenMixin {
     }
 
     @Inject(
-            method = "renderTooltip",
+            method = "extractTooltip",
             at = @At("HEAD"),
             cancellable = true
     )

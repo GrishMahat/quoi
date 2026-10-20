@@ -1,3 +1,5 @@
+//~ gui_extraction
+
 package quoi.api.events.core
 
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents

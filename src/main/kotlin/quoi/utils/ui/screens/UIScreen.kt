@@ -1,4 +1,5 @@
 //~ ui_frame
+//~ gui_extraction
 
 package quoi.utils.ui.screens
 
@@ -27,6 +28,10 @@ class UIScreen(val instance: AbobaUI.Instance, val background: Boolean = true ) 
         super.extractRenderState(ctx, mouseX, mouseY, deltaTicks)
         //?}
         instance.ctx = ctx
+        //? if >=26.4-snapshot-5 {
+        /*val mouseX = ctx.mouseX()
+        val mouseY = ctx.mouseY()
+        *///?}
         instance.eventManager.onMouseMove(mouseX * sf.toFloat(), mouseY * sf.toFloat())
         NVGSpecialRenderer.draw(ctx, 0, 0, ctx.guiWidth(), ctx.guiHeight()) {
             instance.render(true)
@@ -78,8 +83,8 @@ class UIScreen(val instance: AbobaUI.Instance, val background: Boolean = true ) 
 
     override fun isPauseScreen() = false
 
-    override fun extractBackground(guiGraphics: GuiGraphicsExtractor, mouseY: Int, j: Int, deltaTicks: Float) {
-        if (background) super.extractBackground(guiGraphics, mouseY, j, deltaTicks)
+    override fun extractBackground(guiGraphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, deltaTicks: Float) {
+        if (background) super.extractBackground(guiGraphics, mouseX, mouseY, deltaTicks)
     }
 
     companion object {
