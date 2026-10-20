@@ -1,42 +1,32 @@
 package quoi.mixins;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import net.minecraft.network.PacketListener;
 import net.minecraft.network.protocol.Packet;
-import org.spongepowered.asm.mixin.Final;
+import net.minecraft.network.protocol.PacketFlow;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import quoi.api.events.PacketEvent;
 import quoi.api.events.core.EventDispatcher;
 
 // based on https://github.com/Noamm9/NoammAddons/blob/1.1.9/src/main/java/com/github/noamm9/mixin/MixinPacketProcessorListener.java
 @Mixin(targets = "net.minecraft.network.PacketProcessor$ListenerAndPacket")
 public abstract class PacketProcessorListenerMixin {
-    @Shadow
-    @Final
-    private Packet<?> packet;
-
-    @Inject(
+    @WrapOperation(
             method = "handle",
             at = @At(
                     value = "INVOKE",
                     target = "Lnet/minecraft/network/protocol/Packet;handle(Lnet/minecraft/network/PacketListener;)V"
             )
     )
-    private void quoi$beforePacketHandled(CallbackInfo ci) {
-        EventDispatcher.onPacketProcessing(packet);
-    }
-
-    @Inject(
-            method = "handle",
-            at = @At(
-                    value = "INVOKE",
-                    target = "Lnet/minecraft/network/protocol/Packet;handle(Lnet/minecraft/network/PacketListener;)V",
-                    shift = At.Shift.AFTER
-            )
-    )
-    private void quoi$afterPacketHandled(CallbackInfo ci) {
+    private void quoi$handlePacket(Packet<?> packet, PacketListener listener, Operation<Void> original) {
+        if (listener.flow() != PacketFlow.CLIENTBOUND) {
+            original.call(packet, listener);
+            return;
+        }
+        if (EventDispatcher.onPacketReceived(packet)) return;
+        original.call(packet, listener);
         new PacketEvent.ReceivedPost(packet).post();
     }
 }

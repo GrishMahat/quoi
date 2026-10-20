@@ -1,32 +1,39 @@
 package quoi.mixins;
 
-import quoi.api.events.core.EventDispatcher;
 import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelHandlerContext;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketFlow;
+import net.minecraft.network.protocol.common.ServerboundKeepAlivePacket;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import quoi.api.events.core.EventDispatcher;
 
 @Mixin(Connection.class)
 public abstract class ConnectionMixin {
     @Inject(
-            method = "channelRead0(Lio/netty/channel/ChannelHandlerContext;Lnet/minecraft/network/protocol/Packet;)V",
+            method = "send(Lnet/minecraft/network/protocol/Packet;Lio/netty/channel/ChannelFutureListener;Z)V",
             at = @At("HEAD"),
             cancellable = true
     )
-    private void quoi$receivePacket(ChannelHandlerContext context, Packet<?> packet, CallbackInfo ci) {
-        if (EventDispatcher.onPacketReceived(packet)) ci.cancel();
-    }
+    private void quoi$sendPacket(Packet<?> packet, ChannelFutureListener channelFutureListener, boolean flush, CallbackInfo ci) {
+        Connection connection = (Connection) (Object) this;
+        if (connection.getReceiving() != PacketFlow.CLIENTBOUND ||
+                !(connection.getPacketListener() instanceof ClientPacketListener) ||
+                packet instanceof ServerboundKeepAlivePacket) return;
 
-    @Inject(
-            method = "sendPacket",
-            at = @At("HEAD"),
-            cancellable = true
-    )
-    private void quoi$sendImmediately(Packet<?> packet, ChannelFutureListener channelFutureListener, boolean flush, CallbackInfo ci) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (!minecraft.isSameThread()) {
+            minecraft.execute(() -> {
+                if (connection.isConnected()) connection.send(packet, channelFutureListener, flush);
+            });
+            ci.cancel();
+            return;
+        }
         if (EventDispatcher.onPacketSent(packet)) ci.cancel();
     }
 }

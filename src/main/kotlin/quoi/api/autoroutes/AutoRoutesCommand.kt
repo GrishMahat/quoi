@@ -4,7 +4,6 @@ import kotlinx.coroutines.launch
 import net.minecraft.core.BlockPos
 import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket
 import net.minecraft.world.phys.Vec3
-import quoi.QuoiMod.scope
 import quoi.api.autoroutes.RouteRegistry.nodeEntries
 import quoi.api.autoroutes.RouteRegistry.nodeTypes
 import quoi.api.autoroutes.awaits.RaycastAwait
@@ -20,6 +19,7 @@ import quoi.api.events.PacketEvent
 import quoi.api.events.TickEvent
 import quoi.api.events.core.EventListener
 import quoi.api.events.core.Subscription
+import quoi.api.events.core.asyncScope
 import quoi.api.events.core.on
 import quoi.api.skyblock.dungeon.Dungeon.currentRoom
 import quoi.api.skyblock.dungeon.Dungeon.inClear
@@ -197,7 +197,7 @@ object AutoRoutesCommand : EventListener {
             val file = File(configPath, "$name.json")
             if (!file.exists()) return@sub modMessage("&cFile not found!")
             modMessage("Converting..")
-            scope.launch {
+            asyncScope.launch {
                 try {
                     when (from) {
                         "legacy" -> LegacyConverter.convert(file)

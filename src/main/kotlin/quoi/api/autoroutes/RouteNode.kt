@@ -56,7 +56,6 @@ abstract class RouteNode(
     }
 
     open fun update(room: OdonRoom) {
-        triggered = false
         pos = room.getRealCoords(relative)
         val (x, y, z) = pos
         val r = radius ?: 0.5f

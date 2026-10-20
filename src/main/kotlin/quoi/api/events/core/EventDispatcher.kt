@@ -31,8 +31,6 @@ import quoi.api.skyblock.dungeon.Dungeon.dungeonItemDrops
 import quoi.utils.StringUtils.containsOneOf
 import quoi.utils.StringUtils.noControlCodes
 import quoi.utils.equalsOneOf
-import quoi.utils.skyblock.item.SuperboomCooldown
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Bridges fabric's own event hooks and packet handling.
@@ -43,7 +41,6 @@ object EventDispatcher {
 
     private var lastWorld: ClientLevel? = null
     private var tabLoaded = false
-    private val collectedItemIds = ConcurrentHashMap.newKeySet<Int>()
 
     init {
         ClientTickEvents.START_CLIENT_TICK.register {
@@ -67,7 +64,6 @@ object EventDispatcher {
         ClientLifecycleEvents.CLIENT_STOPPING.register { GameEvent.Unload().post() }
 
         ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE.register { _, _ ->
-            collectedItemIds.clear()
             WorldEvent.Change().post()
             totalTicks = 0
             tabLoaded = false
@@ -83,7 +79,6 @@ object EventDispatcher {
         }
 
         ClientPlayConnectionEvents.DISCONNECT.register { handler, _ ->
-            collectedItemIds.clear()
             WorldEvent.Change().post()
             ServerEvent.Disconnect(handler.serverData?.ip ?: "SinglePlayer").post()
         }
@@ -110,6 +105,7 @@ object EventDispatcher {
 
     @JvmStatic
     fun onPacketReceived(packet: Packet<*>): Boolean {
+        check(mc.isSameThread) { "Packet events must run on the client thread" }
         if (PacketEvent.Received(packet).post()) return true
 
         return when (packet) {
@@ -123,45 +119,38 @@ object EventDispatcher {
                 val string = text.string
                 if (packet.overlay) ChatEvent.ActionBar(string, text).post() else ChatEvent.Packet(string, string.noControlCodes, text).post()
             }
+            is ClientboundTakeItemEntityPacket -> {
+                val player = mc.player ?: return false
+                if (!Dungeon.inClear) return false
+                val entity = mc.level?.getEntity(packet.itemId) as? ItemEntity ?: return false
+                if (entity.item.hoverName.string.containsOneOf(dungeonItemDrops, true) && entity.distanceTo(player) <= 6)
+                    DungeonEvent.Secret.Item(entity).post()
+                else false
+            }
+            is ClientboundRemoveEntitiesPacket -> {
+                val player = mc.player ?: return false
+                if (!Dungeon.inClear) return false
+                packet.entityIds.forEach { id ->
+                    val entity = mc.level?.getEntity(id) as? ItemEntity ?: return@forEach
+                    if (entity.item.hoverName.string.containsOneOf(dungeonItemDrops, true) && entity.distanceTo(player) <= 6)
+                        DungeonEvent.Secret.Item(entity).post()
+                }
+                false
+            }
+            is ClientboundSoundPacket -> {
+                if (!Dungeon.inClear) return false
+                if (packet.sound.value().equalsOneOf(SoundEvents.BAT_HURT, SoundEvents.BAT_DEATH) && packet.volume == 0.1f)
+                    DungeonEvent.Secret.Bat(packet).post()
+                else false
+            }
             else -> false
         }
     }
 
     @JvmStatic
-    fun onPacketProcessing(packet: Packet<*>) {
-        if (packet !is ClientboundTakeItemEntityPacket && packet !is ClientboundRemoveEntitiesPacket && packet !is ClientboundSoundPacket) return
-        val player = mc.player ?: return
-        if (!Dungeon.inClear) return
-
-        when (packet) {
-            is ClientboundSoundPacket -> {
-                if (packet.sound.value().equalsOneOf(SoundEvents.BAT_HURT, SoundEvents.BAT_DEATH) && packet.volume == 0.1f)
-                    DungeonEvent.Secret.Bat(packet).post()
-            }
-            is ClientboundTakeItemEntityPacket -> {
-                val entity = mc.level?.getEntity(packet.itemId) as? ItemEntity ?: return
-                if (entity.item.hoverName.string.containsOneOf(dungeonItemDrops, true) &&
-                    (packet.playerId == player.id || entity.distanceTo(player) <= 6)
-                ) postItemSecret(entity)
-            }
-            is ClientboundRemoveEntitiesPacket -> packet.entityIds.forEach { id ->
-                val entity = mc.level?.getEntity(id) as? ItemEntity ?: return@forEach
-                if (entity.item.hoverName.string.containsOneOf(dungeonItemDrops, true) && entity.distanceTo(player) <= 6)
-                    postItemSecret(entity)
-            }
-        }
-    }
-
-    private fun postItemSecret(entity: ItemEntity): Boolean {
-        if (!collectedItemIds.add(entity.id)) return false
-        return DungeonEvent.Secret.Item(entity).post()
-    }
-
-    @JvmStatic
     fun onPacketSent(packet: Packet<*>): Boolean {
+        check(mc.isSameThread) { "Packet events must run on the client thread" }
         if (PacketEvent.Sent(packet).post()) return true
-
-        SuperboomCooldown.onPacketSent(packet)
 
         return when (packet) {
             is ServerboundUseItemOnPacket -> {
