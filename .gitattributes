@@ -1,0 +1,11 @@
+# Normalize text files to LF, including source code, configs and shell scripts.
+* text=auto eol=lf
+
+# Use Windows line endings for batch scripts.
+*.bat eol=crlf
+
+# Treat packaged code, images, fonts and audio as binary.
+*.jar binary
+*.png binary
+*.ttf binary
+*.ogg binary
