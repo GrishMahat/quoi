@@ -1,0 +1,19 @@
+# Accepted commit types shared by GitHub and Forgejo clones.
+#
+# Format: <type>:<changelog section title>
+#
+# Read by .githooks/commit-msg. Section titles can also be used for release notes.
+#
+# Keep entries in the desired order for release notes.
+
+feat:Features
+fix:Bug Fixes
+refactor:Refactoring
+perf:Performance
+docs:Documentation
+chore:Chores
+test:Tests
+build:Build System
+ci:CI
+style:Code Style
+revert:Reverts
