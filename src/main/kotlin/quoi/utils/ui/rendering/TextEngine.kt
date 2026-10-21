@@ -11,8 +11,6 @@ object TextEngine {
 
     val FORMATTING_CODE = Regex("[§&][0-9a-fk-or]", RegexOption.IGNORE_CASE)
 
-    private val SPLIT_PATTERN = Regex("(?=${FORMATTING_CODE.pattern})", FORMATTING_CODE.options)
-
     fun stripCodes(text: String): String = FormattingCodes.strip(text)
 
     data class Segment(val text: String, val color: Int, val underline: Boolean, val strike: Boolean)
@@ -31,10 +29,15 @@ object TextEngine {
 
         val segments = ArrayList<Segment>()
 
-        for (string in text.split(SPLIT_PATTERN)) {
-            var part = string
-            if (part.length >= 2 && (part[0] == '§' || part[0] == '&')) {
-                when (val code = part[1].lowercaseChar()) {
+        var start = 0
+        while (start < text.length) {
+            var end = start + 1
+            while (end < text.length - 1 && !FormattingCodes.isCodeAt(text, end)) end++
+            if (end >= text.length - 1) end = text.length
+
+            var contentStart = start
+            if (end - start >= 2 && (text[start] == '§' || text[start] == '&')) {
+                when (val code = text[start + 1].lowercaseChar()) {
                     'n' -> underline = true
                     'm' -> strike = true
                     'r' -> {
@@ -48,10 +51,11 @@ object TextEngine {
                         if (c != null) col = alpha or (c and 0xFFFFFF)
                     }
                 }
-                part = part.substring(2)
+                contentStart += 2
             }
 
-            if (part.isNotEmpty()) segments.add(Segment(part, col, underline, strike))
+            if (contentStart < end) segments.add(Segment(text.substring(contentStart, end), col, underline, strike))
+            start = end
         }
         return segments
     }

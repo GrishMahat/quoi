@@ -19,20 +19,44 @@ object UIGeometry {
     /** Clip both triangles of each GUI quad, interpolating UVs and vertex colours. */
     fun clipQuads(vertices: FloatArray, colors: IntArray, rect: FloatArray): Pair<FloatArray, IntArray> {
         if (rect[2] <= rect[0] || rect[3] <= rect[1]) return FloatArray(0) to IntArray(0)
-        val output = ArrayList<Float>(vertices.size)
-        val outputColors = ArrayList<Int>(colors.size)
+        var output = FloatArray(0)
+        var outputColors = IntArray(0)
+        var size = 0
+        fun reserve(count: Int) {
+            if (size + count > outputColors.size) {
+                val capacity = max(size + count, max(colors.size, outputColors.size * 2))
+                output = output.copyOf(capacity * 4)
+                outputColors = outputColors.copyOf(capacity)
+            }
+        }
         fun emit(vertex: ClipVertex) {
-            output.add(vertex.x); output.add(vertex.y); output.add(vertex.u); output.add(vertex.v)
-            outputColors.add(vertex.color)
+            reserve(1)
+            val p = size * 4
+            output[p] = vertex.x; output[p + 1] = vertex.y; output[p + 2] = vertex.u; output[p + 3] = vertex.v
+            outputColors[size++] = vertex.color
         }
         for (offset in colors.indices step 4) {
+            var inside = true
+            var left = true; var right = true; var above = true; var below = true
+            for (i in 0..3) {
+                val p = (offset + i) * 4
+                val x = vertices[p]; val y = vertices[p + 1]
+                inside = inside && x >= rect[0] && x <= rect[2] && y >= rect[1] && y <= rect[3]
+                left = left && x < rect[0]; right = right && x > rect[2]
+                above = above && y < rect[1]; below = below && y > rect[3]
+            }
+            if (inside) {
+                reserve(4)
+                vertices.copyInto(output, size * 4, offset * 4, (offset + 4) * 4)
+                colors.copyInto(outputColors, size, offset, offset + 4)
+                size += 4
+                continue
+            }
+            if (left || right || above || below) continue
+
             val quad = (0..3).map { i ->
                 val p = (offset + i) * 4
                 ClipVertex(vertices[p], vertices[p + 1], vertices[p + 2], vertices[p + 3], colors[offset + i])
-            }
-            if (quad.all { it.x >= rect[0] && it.x <= rect[2] && it.y >= rect[1] && it.y <= rect[3] }) {
-                quad.forEach(::emit)
-                continue
             }
             for (triangle in listOf(listOf(quad[0], quad[1], quad[2]), listOf(quad[0], quad[2], quad[3]))) {
                 var polygon = triangle
@@ -61,7 +85,8 @@ object UIGeometry {
                 }
             }
         }
-        return output.toFloatArray() to outputColors.toIntArray()
+        return (if (size * 4 == output.size) output else output.copyOf(size * 4)) to
+            (if (size == outputColors.size) outputColors else outputColors.copyOf(size))
     }
 
     private data class ClipVertex(val x: Float, val y: Float, val u: Float, val v: Float, val color: Int) {

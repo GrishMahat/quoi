@@ -42,7 +42,6 @@ object WorldUtils { // todo cleanup
 
     inline val BlockPos.walkable: Boolean
         get() = this.airLike && this.above().airLike
-//        get() = mc.level?.getBlockCollisions(mc.player!!, this.aabb)?.none() == true
 
     inline val BlockPos.etherwarpable: Boolean
         get() {
@@ -50,10 +49,11 @@ object WorldUtils { // todo cleanup
             return isValidEtherwarpBlock(level, this)
         }
 
-    val Block.registryName: String get() {
-        val registry = BuiltInRegistries.BLOCK.getKey(this)
-        return "${registry.namespace}:${registry.path}"
-    }
+    val Block.registryName: String
+        get() {
+            val registry = BuiltInRegistries.BLOCK.getKey(this)
+            return "${registry.namespace}:${registry.path}"
+        }
 
     fun MultiPlayerGameMode.startPrediction(action: PredictiveAction) {
         val level = mc.level ?: return
@@ -136,8 +136,8 @@ object WorldUtils { // todo cleanup
         val pZ = player.chunkPosition().z
 
         return buildList {
-            for (x in (pX - renderDistance) .. (pX + renderDistance)) {
-                for (z in (pZ - renderDistance) .. (pZ + renderDistance)) {
+            for (x in (pX - renderDistance)..(pX + renderDistance)) {
+                for (z in (pZ - renderDistance)..(pZ + renderDistance)) {
                     val chunk = level.getChunk(x, z, ChunkStatus.FULL, false) ?: continue
                     addAll(chunk.blockEntitiesPos)
                 }
@@ -175,4 +175,19 @@ object WorldUtils { // todo cleanup
         }
         return res
     }
+
+    /**
+     * Returns the first match in the same distance and tie order as [nearbyBlocks]
+     */
+    inline fun BlockPos.firstNearbyBlock(radius: Float, predicate: (BlockPos) -> Boolean): BlockPos? {
+        val mut = BlockPos.MutableBlockPos()
+        CachedSphere.forEachInRadius(x, y, z, radius) { x, y, z ->
+            mut.set(x, y, z)
+            if (predicate(mut)) return mut.immutable()
+        }
+        return null
+    }
+
+    inline fun Vec3.firstNearbyBlock(radius: Float, predicate: (BlockPos) -> Boolean): BlockPos? =
+        BlockPos.containing(this).firstNearbyBlock(radius, predicate)
 }

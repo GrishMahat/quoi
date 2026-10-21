@@ -21,7 +21,6 @@ val rendererSources = when {
         "quoi/utils/ui/rendering/McImages.kt",
         "quoi/utils/ui/rendering/RendererBackend.kt",
         "quoi/utils/ui/rendering/ShelfPacker.kt",
-        "quoi/utils/ui/rendering/TextEngine.kt",
         "quoi/utils/ui/rendering/UIGeometry.kt",
         "quoi/utils/ui/rendering/UIRenderer.kt",
         "quoi/utils/ui/rendering/Image.kt",

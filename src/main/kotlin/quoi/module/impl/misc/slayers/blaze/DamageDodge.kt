@@ -27,6 +27,7 @@ import quoi.utils.Scheduler.scheduleTask
 import quoi.utils.StringUtils.containsOneOf
 import quoi.utils.WorldUtils.blocksAtFeet
 import quoi.utils.WorldUtils.nearbyBlocks
+import quoi.utils.WorldUtils.firstNearbyBlock
 import quoi.utils.WorldUtils.registryName
 import quoi.utils.WorldUtils.state
 import quoi.utils.WorldUtils.ticksUntilCollision
@@ -115,7 +116,7 @@ object DamageDodge : ToggleableGroup(BlazeSlayer, "Damage dodge", desc = "Automa
             if (Slayers.questState != QuestState.KILLING || !fire || !input.moving) return@on
             if (player.blocksAtFeet { it in fireBlocks }.any()) return@on
 
-            val closest = player.position().nearbyBlocks(5f) { it in fireBlocks }.firstOrNull() ?: return@on
+            val closest = player.position().firstNearbyBlock(5f) { it in fireBlocks } ?: return@on
             val ticks = ticksUntilCollision(closest) ?: return@on
             if (ticks <= 1.5) {
                 input.stop()

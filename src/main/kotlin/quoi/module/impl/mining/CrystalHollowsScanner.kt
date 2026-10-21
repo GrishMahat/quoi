@@ -73,7 +73,8 @@ object CrystalHollowsScanner : Module(
                         handleChunk(chunk)
                         if (CrystalHollowsMap.enabled) isDirty = true
                     }
-                } catch (_: Exception) { }
+                } catch (_: Exception) {
+                }
             }
         }
 
@@ -117,8 +118,11 @@ object CrystalHollowsScanner : Module(
             for (z in 0..15) {
                 for (y in fromY..toY) {
                     val pos = BlockPos(chunk.pos.minBlockX + x, y, chunk.pos.minBlockZ + z)
+                    val firstBlock = chunk.getBlockState(pos).block
 
                     if (structureScanner) Structure.entries.forEach { structure ->
+                        val expected = structure.blocks.firstOrNull()
+                        if (expected != null && !firstBlock.matchesStructureBlock(expected)) return@forEach
                         if (!structure.quarter.test(pos)) return@forEach
 
                         if (structure.canBeMultiple) {
@@ -136,8 +140,8 @@ object CrystalHollowsScanner : Module(
                     }
 
                     if (routeScanner) {
-                        if (chunk.getBlockState(pos).block != Blocks.COBBLESTONE || y > 70) continue
-                        val valid = Direction.entries.filter { it != Direction.DOWN }.all {
+                        if (firstBlock != Blocks.COBBLESTONE || y > 70) continue
+                        val valid = routeDirections.all {
                             val state = chunk.level.getBlockState(pos.relative(it))
                             state.isAir || state.block.registryName.contains("glass")
                         }
@@ -154,14 +158,12 @@ object CrystalHollowsScanner : Module(
     private fun scanStructure(chunk: LevelChunk, structure: Structure, x: Int, startY: Int, z: Int): Boolean {
         if (startY + structure.blocks.size >= 180) return false
 
-        structure.blocks.forEachIndexed { i, block ->
-            if (block == null) return@forEachIndexed
+        val pos = BlockPos.MutableBlockPos()
+        for (i in 1 until structure.blocks.size) {
+            val block = structure.blocks[i] ?: continue
 
             val checkY = startY + i
-
-            val pos = BlockPos(chunk.pos.minBlockX + x, checkY, chunk.pos.minBlockZ + z)
-
-            val state = chunk.getBlockState(pos)
+            val state = chunk.getBlockState(pos.set(chunk.pos.minBlockX + x, checkY, chunk.pos.minBlockZ + z))
 
             if (!state.block.matchesStructureBlock(block)) {
                 return false
@@ -198,4 +200,6 @@ object CrystalHollowsScanner : Module(
         Blocks.PIGLIN_HEAD,
         Blocks.PIGLIN_WALL_HEAD
     )
+
+    private val routeDirections = Direction.entries.filter { it != Direction.DOWN }
 }

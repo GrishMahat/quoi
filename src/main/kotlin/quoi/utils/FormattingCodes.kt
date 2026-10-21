@@ -19,7 +19,7 @@ object FormattingCodes {
         return result.append(text, start, text.length).toString()
     }
 
-    private fun isCodeAt(text: String, index: Int): Boolean {
+    internal fun isCodeAt(text: String, index: Int): Boolean {
         return !(text[index] != '§' && text[index] != '&') && when (text[index + 1].lowercaseChar()) {
             in '0'..'9', in 'a'..'f', in 'k'..'o', 'r' -> true
             else -> false

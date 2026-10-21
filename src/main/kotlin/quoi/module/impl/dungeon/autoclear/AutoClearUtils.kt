@@ -18,7 +18,7 @@ import quoi.module.impl.dungeon.autoclear.impl.AutoRoutes.routeNodes
 import quoi.utils.ChatUtils.modMessage
 import quoi.utils.StringUtils.containsOneOf
 import quoi.utils.WorldUtils.etherwarpable
-import quoi.utils.WorldUtils.nearbyBlocks
+import quoi.utils.WorldUtils.firstNearbyBlock
 import quoi.utils.addVec
 import quoi.utils.distanceToSqr
 import quoi.utils.equalsOneOf
@@ -136,7 +136,7 @@ fun pathToRoom(room: OdonRoom, tile: RoomTile = room.tiles.first(), type: Int) {
             if (overridePos != null && room.rotation != Rotations.NONE) {
                 room.getRealCoords(overridePos)
             } else {
-                tile.blockPos.nearbyBlocks(25f) { it.etherwarpable }.firstOrNull()
+                tile.blockPos.firstNearbyBlock(25f) { it.etherwarpable }
                     ?: return modMessage("Couldn't find goal position for tile &e${tile.core}&r in &e${room.name}")
             }
         }
