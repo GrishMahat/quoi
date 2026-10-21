@@ -59,6 +59,12 @@ object Slayers : Module(
     private var killStartedAt = 0L
     private var lastBossSpawn: ClientboundAddEntityPacket? = null
 
+    private data class BossInfo(val entity: LivingEntity, val tier: Int)
+
+    private var lastBoss: BossInfo? = null
+    private var cocoonTicks = 0
+    private var hatchedBoss = false
+
     @Suppress("unused")
     private val debug by textHud("Debug") {
         column {
@@ -78,6 +84,10 @@ object Slayers : Module(
         on<PacketEvent.ReceivedPost> { handlePacket(this) }
 
         on<WorldEvent.Change> { reset() }
+
+        on<TickEvent.Server> {
+            if (cocoonTicks > 0) cocoonTicks--
+        }
 
         on<SlayerEvent.State> {
             val now = System.currentTimeMillis()
@@ -148,7 +158,9 @@ object Slayers : Module(
     private fun handlePacket(event: PacketEvent.ReceivedPost) {
         when (val packet = event.packet) {
             is ClientboundAddEntityPacket -> {
-                if (packet.type in bossTypes.values) lastBossSpawn = packet
+                if (packet.type !in bossTypes.values) return
+                if (cocoonTicks > 0 && packet.type != lastBoss?.entity?.type) return
+                lastBossSpawn = packet
             }
 
             is ClientboundSystemChatPacket -> {
@@ -161,19 +173,31 @@ object Slayers : Module(
                     lastBossSpawn = null
                     if (spawn?.type != type) return
 
-                    currentBoss = (getEntity(spawn.id) as? LivingEntity)?.takeIf { it.isAlive } ?: return
-                    questTier = romanToInt(match.groupValues[2])
-                    updateQuestState(QuestState.KILLING)
+                    trackBoss(spawn, romanToInt(match.groupValues[2]))
                 }
 
                 when (text) {
-                    "SLAYER QUEST STARTED!" -> updateQuestState(QuestState.SPAWNING)
+                    "YOU COCOONED YOUR SLAYER BOSS" -> {
+                        if (lastBoss == null) return
+                        cocoonTicks = 140
+                        lastBossSpawn = null
+                    }
+                    "SLAYER QUEST STARTED!" -> {
+                        val boss = lastBoss
+                        val spawn = lastBossSpawn
+                        if (cocoonTicks > 0 && boss != null && spawn?.type == boss.entity.type &&
+                            spawn.id != boss.entity.id && trackBoss(spawn, boss.tier, hatched = true)
+                        ) return
+
+                        updateQuestState(QuestState.SPAWNING)
+                    }
                     "SLAYER QUEST COMPLETE!" -> updateQuestState(QuestState.SLAIN)
                     "SLAYER QUEST FAILED!" -> updateQuestState(QuestState.FAILED)
                 }
             }
 
             is ClientboundSetPlayerTeamPacket -> {
+                if (cocoonTicks > 0 || (hatchedBoss && currentBoss?.isAlive == true)) return
                 val params = packet.parameters.orElse(null) ?: return
                 val text = (params.playerPrefix.string + params.playerSuffix.string).noControlCodes.trim()
                 when {
@@ -185,11 +209,27 @@ object Slayers : Module(
         }
     }
 
+    private fun trackBoss(spawn: ClientboundAddEntityPacket, tier: Int, hatched: Boolean = false): Boolean {
+        val boss = (getEntity(spawn.id) as? LivingEntity)?.takeIf { it.isAlive } ?: return false
+        currentBoss = boss
+        questTier = tier
+        lastBoss = BossInfo(boss, tier)
+        lastBossSpawn = null
+        cocoonTicks = 0
+        hatchedBoss = hatched
+        updateQuestState(QuestState.KILLING)
+        return true
+    }
+
     private fun updateQuestState(new: QuestState) {
         val old = questState
         if (old == new) return
         questState = new
         if (new != QuestState.KILLING) resetBoss()
+        if (new == QuestState.SPAWNING || new == QuestState.FAILED || new == QuestState.NONE) {
+            lastBoss = null
+            cocoonTicks = 0
+        }
         SlayerEvent.State(old, new).post()
     }
 
@@ -197,11 +237,14 @@ object Slayers : Module(
         lastBossSpawn = null
         currentBoss = null
         questTier = 0
+        hatchedBoss = false
     }
 
     private fun reset() {
         updateQuestState(QuestState.NONE)
         resetBoss()
+        lastBoss = null
+        cocoonTicks = 0
         spawnStartedAt = 0L
         killStartedAt = 0L
     }
