@@ -8,6 +8,8 @@ import quoi.api.events.TickEvent
 import quoi.api.events.core.Subscription
 import quoi.api.events.core.on
 import quoi.api.events.core.once
+import quoi.module.impl.misc.slayers.QuestState
+import quoi.module.impl.misc.slayers.Slayers
 import quoi.module.settings.group.ToggleableGroup
 import quoi.utils.StringUtils.noControlCodes
 import quoi.utils.skyblock.item.ItemUtils.lore
@@ -74,4 +76,7 @@ object AutoAttune : ToggleableGroup(BlazeSlayer, "Auto attune") {
         swapTask = null
         pendingAttunements.clear()
     }
+
+    override val running: Boolean
+        get() = super.running && Slayers.questState == QuestState.KILLING
 }
