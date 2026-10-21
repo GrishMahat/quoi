@@ -14,6 +14,7 @@ import quoi.api.colour.Colour
 import quoi.api.colour.withAlpha
 import quoi.api.events.DungeonEvent
 import quoi.api.events.PacketEvent
+import quoi.api.events.TickEvent
 import quoi.api.events.WorldEvent
 import quoi.api.events.core.EventListener
 import quoi.api.events.core.on
@@ -153,6 +154,9 @@ object Dungeon : EventListener, Shortcuts {
     var dungeonStats = DungeonStats()
         private set
 
+    var deathTick = -1
+        private set
+
     private var expectingBloodUpdate = false
     private var chatDeaths = 0
     private val batKillers = mutableSetOf<String>()
@@ -172,6 +176,7 @@ object Dungeon : EventListener, Shortcuts {
             Blessing.entries.forEach { it.reset() }
             dungeonTeammatesNoSelf = emptyList()
             dungeonStats = DungeonStats()
+            deathTick = -1
             expectingBloodUpdate = false
             chatDeaths = 0
             batKillers.clear()
@@ -182,6 +187,12 @@ object Dungeon : EventListener, Shortcuts {
             floor = if (ClickGui.forceDungeons) ClickGui.dungeonFloor.selected
             else if (Location.onZapto) Floor.F7
             else null
+        }
+
+        on<TickEvent.Server> {
+            if (!inClear || deathTick < 0) return@on
+            if (deathTick == 0) deathTick = 40
+            deathTick--
         }
 
         on<PacketEvent.ReceivedPost, ClientboundPlayerInfoUpdatePacket> {
@@ -271,7 +282,12 @@ object Dungeon : EventListener, Shortcuts {
 
                     is ClientboundEntityEventPacket -> {
                         if (inClear && (floor?.floorNumber ?: 0) >= 6 && eventId.toInt() == 3 &&
-                            (getEntity(level) as? Zombie)?.isBaby == true) dungeonStats.mimicKilled = true
+                            (getEntity(level) as? Zombie)?.isBaby == true
+                        ) dungeonStats.mimicKilled = true
+                    }
+
+                    is ClientboundSetTimePacket -> {
+                        if (inClear) deathTick = 40 - (gameTime % 40).toInt()
                     }
 
                 }

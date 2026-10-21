@@ -124,7 +124,7 @@ Download the JAR for your Minecraft version from [Releases](https://github.com/j
 - **Terminals**
   - Opens terminals in P3 with Aura or Triggerbot mode, with optional ground and leap-delay checks.
 - **Tick Timers**
-  - Shows Storm pad and Goldor timers in seconds or server ticks.
+  - Shows the Death tick timer during clear and Storm pad and Goldor timers in seconds or server ticks.
 - **Wither Cloak**
   - Tracks Creeper Veil, hides cloak creepers, and can activate cloak during the boss countdown.
 

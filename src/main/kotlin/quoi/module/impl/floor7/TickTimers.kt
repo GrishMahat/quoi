@@ -6,7 +6,9 @@ import quoi.api.events.DungeonEvent
 import quoi.api.events.TickEvent
 import quoi.api.events.WorldEvent
 import quoi.api.events.core.on
+import quoi.api.skyblock.dungeon.Dungeon.deathTick
 import quoi.api.skyblock.dungeon.Dungeon.inBoss
+import quoi.api.skyblock.dungeon.Dungeon.inClear
 import quoi.api.skyblock.dungeon.enums.Phase
 import quoi.api.skyblock.dungeon.enums.Stage
 import quoi.api.skyblock.location.Island
@@ -19,7 +21,7 @@ import quoi.utils.ui.hud.Hud
 
 object TickTimers : Module(
     "Tick Timers",
-    desc = "Displays tick timers for floor seven boss fight.",
+    desc = "Displays death tick, pad, and Goldor timers.",
     area = Island.Dungeon(7)
 ) {
     private val showInTicks by switch("Show in ticks")
@@ -45,6 +47,17 @@ object TickTimers : Module(
     }.setting()
 
     private val startTimer by switch("Goldor start timer").visibleIf { goldorHud.enabled }
+
+    @Suppress("unused")
+    private val deathTickHud by textHud("Death tick") {
+        visibleIf { inClear && deathTick >= 0 }
+        textSupplied(
+            supplier = { formatTime(if (preview) 15 else deathTick, 40) },
+            size = theme.textSize,
+            font = font,
+            colour = colour
+        ).shadow = shadow
+    }.setting()
 
     private var goldorTick = -1
     private var goldorStart = -1
