@@ -12,7 +12,6 @@ import quoi.api.skyblock.dungeon.Dungeon.inClear
 import quoi.api.skyblock.dungeon.enums.Phase
 import quoi.api.skyblock.dungeon.enums.Stage
 import quoi.api.skyblock.location.Island
-import quoi.api.skyblock.location.invoke
 import quoi.module.Module
 import quoi.module.settings.UIComponent.Companion.visibleIf
 import quoi.utils.StringUtils.toFixed
@@ -22,7 +21,7 @@ import quoi.utils.ui.hud.Hud
 object TickTimers : Module(
     "Tick Timers",
     desc = "Displays death tick, pad, and Goldor timers.",
-    area = Island.Dungeon(7)
+    area = Island.Dungeon
 ) {
     private val showInTicks by switch("Show in ticks")
 
