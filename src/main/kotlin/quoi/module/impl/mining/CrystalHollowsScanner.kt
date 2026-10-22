@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
+import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.world.level.block.Block
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.level.chunk.LevelChunk
@@ -27,7 +28,6 @@ import quoi.utils.ChatUtils.literal
 import quoi.utils.EntityUtils.renderX
 import quoi.utils.EntityUtils.renderY
 import quoi.utils.EntityUtils.renderZ
-import quoi.utils.WorldUtils.registryName
 import quoi.utils.aabb
 import quoi.utils.render.drawFilledBox
 import quoi.utils.render.drawStyledBox
@@ -114,15 +114,14 @@ object CrystalHollowsScanner : Module(
     private fun handleChunk(chunk: LevelChunk) {
         val fromY = if (structureScanner && !routeScanner) 30 else 0
         val toY = if (routeScanner && !structureScanner) 70 else 180
+        val scanPos = BlockPos.MutableBlockPos()
         for (x in 0..15) {
             for (z in 0..15) {
                 for (y in fromY..toY) {
-                    val pos = BlockPos(chunk.pos.minBlockX + x, y, chunk.pos.minBlockZ + z)
+                    val pos = scanPos.set(chunk.pos.minBlockX + x, y, chunk.pos.minBlockZ + z)
                     val firstBlock = chunk.getBlockState(pos).block
 
-                    if (structureScanner) Structure.entries.forEach { structure ->
-                        val expected = structure.blocks.firstOrNull()
-                        if (expected != null && !firstBlock.matchesStructureBlock(expected)) return@forEach
+                    if (structureScanner) Structure.candidates(firstBlock).forEach { structure ->
                         if (!structure.quarter.test(pos)) return@forEach
 
                         if (structure.canBeMultiple) {
@@ -133,7 +132,7 @@ object CrystalHollowsScanner : Module(
                         }
 
                         if (scanStructure(chunk, structure, x, y, z)) {
-                            val realPos = pos.offset(structure.xOffset, structure.yOffset, structure.zOffset)
+                            val realPos = pos.immutable().offset(structure.xOffset, structure.yOffset, structure.zOffset)
                             foundStructures.computeIfAbsent(structure) { mutableListOf() }.add(realPos)
                             ChatUtils.modMessage("Found ${structure.displayName} at ${pos.x}, ${pos.y}, ${pos.z}")
                         }
@@ -143,11 +142,11 @@ object CrystalHollowsScanner : Module(
                         if (firstBlock != Blocks.COBBLESTONE || y > 70) continue
                         val valid = routeDirections.all {
                             val state = chunk.level.getBlockState(pos.relative(it))
-                            state.isAir || state.block.registryName.contains("glass")
+                            state.isAir || state.block in glassBlocks
                         }
 
                         if (valid && pos !in foundRouteBlocks) {
-                            foundRouteBlocks.add(pos)
+                            foundRouteBlocks.add(pos.immutable())
                         }
                     }
                 }
@@ -200,6 +199,10 @@ object CrystalHollowsScanner : Module(
         Blocks.PIGLIN_HEAD,
         Blocks.PIGLIN_WALL_HEAD
     )
+
+    private val glassBlocks by lazy {
+        BuiltInRegistries.BLOCK.filter { BuiltInRegistries.BLOCK.getKey(it).toString().contains("glass") }.toSet()
+    }
 
     private val routeDirections = Direction.entries.filter { it != Direction.DOWN }
 }

@@ -381,53 +381,44 @@ fun getArrowOrigin(from: Vec3, yaw: Float, isTerminator: Boolean): Vec3 {
     }
 }
 
-fun getVisiblePoint(from: Vec3, to: BlockPos, block: (Vec3) -> BlockPos? = { rayCast(from, it).pos }): Vec3? {
-    val t = to.vec3
-    val targets = listOf(
-        // centre
-        t.add(0.5, 1.0, 0.5),
-        t.add(0.0, 0.5, 0.5), // left
-        t.add(1.0, 0.5, 0.5), // right
-        t.add(0.5, 0.5, 0.0), // front
-        t.add(0.5, 0.5, 1.0), // back
-        t.add(0.5, 0.0, 0.5), // bottom
-        // left
-        t.add(0.0, 0.001, 0.001),
-        t.add(0.0, 0.001, 0.999),
-        t.add(0.0, 0.999, 0.001),
-        t.add(0.0, 0.999, 0.999),
-        // right
-        t.add(1.0, 0.001, 0.001),
-        t.add(1.0, 0.001, 0.999),
-        t.add(1.0, 0.999, 0.001),
-        t.add(1.0, 0.999, 0.999),
-        // front
-        t.add(0.001, 0.001, 0.0),
-        t.add(0.001, 0.999, 0.0),
-        t.add(0.999, 0.001, 0.0),
-        t.add(0.999, 0.999, 0.0),
-        // back
-        t.add(0.001, 0.001, 1.0),
-        t.add(0.001, 0.999, 1.0),
-        t.add(0.999, 0.001, 1.0),
-        t.add(0.999, 0.999, 1.0),
-        // bottom
-        t.add(0.001, 0.0, 0.001),
-        t.add(0.001, 0.0, 0.999),
-        t.add(0.999, 0.0, 0.001),
-        t.add(0.999, 0.0, 0.999),
-        // top
-        t.add(0.001, 1.0, 0.001),
-        t.add(0.001, 1.0, 0.999),
-        t.add(0.999, 1.0, 0.001),
-        t.add(0.999, 1.0, 0.999)
-    )
+private val visiblePointOffsets = arrayOf(
+    doubleArrayOf(0.5, 1.0, 0.5),
+    doubleArrayOf(0.0, 0.5, 0.5),
+    doubleArrayOf(1.0, 0.5, 0.5),
+    doubleArrayOf(0.5, 0.5, 0.0),
+    doubleArrayOf(0.5, 0.5, 1.0),
+    doubleArrayOf(0.5, 0.0, 0.5),
+    doubleArrayOf(0.0, 0.001, 0.001),
+    doubleArrayOf(0.0, 0.001, 0.999),
+    doubleArrayOf(0.0, 0.999, 0.001),
+    doubleArrayOf(0.0, 0.999, 0.999),
+    doubleArrayOf(1.0, 0.001, 0.001),
+    doubleArrayOf(1.0, 0.001, 0.999),
+    doubleArrayOf(1.0, 0.999, 0.001),
+    doubleArrayOf(1.0, 0.999, 0.999),
+    doubleArrayOf(0.001, 0.001, 0.0),
+    doubleArrayOf(0.001, 0.999, 0.0),
+    doubleArrayOf(0.999, 0.001, 0.0),
+    doubleArrayOf(0.999, 0.999, 0.0),
+    doubleArrayOf(0.001, 0.001, 1.0),
+    doubleArrayOf(0.001, 0.999, 1.0),
+    doubleArrayOf(0.999, 0.001, 1.0),
+    doubleArrayOf(0.999, 0.999, 1.0),
+    doubleArrayOf(0.001, 0.0, 0.001),
+    doubleArrayOf(0.001, 0.0, 0.999),
+    doubleArrayOf(0.999, 0.0, 0.001),
+    doubleArrayOf(0.999, 0.0, 0.999),
+    doubleArrayOf(0.001, 1.0, 0.001),
+    doubleArrayOf(0.001, 1.0, 0.999),
+    doubleArrayOf(0.999, 1.0, 0.001),
+    doubleArrayOf(0.999, 1.0, 0.999),
+)
 
-    for (targetVec in targets) {
+fun getVisiblePoint(from: Vec3, to: BlockPos, block: (Vec3) -> BlockPos? = { rayCast(from, it).pos }): Vec3? {
+    for (offset in visiblePointOffsets) {
+        val targetVec = Vec3(to.x + offset[0], to.y + offset[1], to.z + offset[2])
         val hitPos = block(targetVec.subtract(from))
-        if (hitPos == to) {
-            return targetVec
-        }
+        if (hitPos == to) return targetVec
     }
     return null
 }

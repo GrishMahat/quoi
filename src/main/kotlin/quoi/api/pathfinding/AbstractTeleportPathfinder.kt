@@ -83,14 +83,11 @@ abstract class AbstractTeleportPathfinder<T : TeleportContext> : AbstractPathfin
 
             if (result != null) {
                 if (hitCache.add(result.asLong())) {
-                    val hCost = (result.distanceTo(ctx.goal) / ctx.dist) * ctx.hWeight
-
-                    val nx = result.x + 0.5
-                    val ny = getNodeY(ctx, result)
-                    val nz = result.z + 0.5
-
-                    val node = TeleportPathNode(nx, ny, nz, result, current.g + 1.0, hCost, current, ctx.raycasts.yaws[i], ctx.raycasts.pitches[i])
-                    ctx.addNode(node)
+                    val gCost = current.g + 1.0
+                    if (ctx.canImprove(result, gCost)) {
+                        val hCost = (result.distanceTo(ctx.goal) / ctx.dist) * ctx.hWeight
+                        ctx.addNode(TeleportPathNode(result.x + 0.5, getNodeY(ctx, result), result.z + 0.5, result, gCost, hCost, current, ctx.raycasts.yaws[i], ctx.raycasts.pitches[i]))
+                    }
                 }
             }
         }

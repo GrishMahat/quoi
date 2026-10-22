@@ -515,5 +515,21 @@ enum class Structure( // todo cleanup some day
             Blocks.RED_WOOL
         ),
         StructureType.GOLDEN_DRAGON, CrystalHollowsQuarter.ANY, "Golden Dragon", 0, -3, 5
-    )
+    );
+
+    companion object {
+        private val candidatesByBlock by lazy {
+            net.minecraft.core.registries.BuiltInRegistries.BLOCK.associateWith { block ->
+                entries.filter { structure ->
+                    when (val first = structure.blocks.firstOrNull()) {
+                        null -> true
+                        Blocks.SKELETON_SKULL -> block is net.minecraft.world.level.block.AbstractSkullBlock
+                        else -> block == first
+                    }
+                }
+            }
+        }
+
+        internal fun candidates(block: Block): List<Structure> = candidatesByBlock[block].orEmpty()
+    }
 }

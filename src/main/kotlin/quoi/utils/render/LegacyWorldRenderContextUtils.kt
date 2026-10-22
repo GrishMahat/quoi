@@ -17,7 +17,6 @@ import quoi.utils.skyblock.player.PlayerUtils.eyeHeight
 import quoi.utils.unaryMinus
 import kotlin.math.max
 import kotlin.math.pow
-import kotlin.math.tan
 
 /**
  * from OdinFabric (BSD 3-Clause)
@@ -44,42 +43,12 @@ private fun VertexConsumer.addQuad(
 
 private fun Vector3fc.toVec3() = Vec3(x().toDouble(), y().toDouble(), z().toDouble())
 
-private fun lineHalfWidth(cameraPos: Vec3, point: Vec3, thickness: Float): Double {
+private fun lineGeometry(cameraPos: Vec3): LineGeometry {
     val camera = camera()
-    val depth = point.subtract(cameraPos).dot(camera.forwardVector().toVec3()).coerceAtLeast(0.05)
-    val fovDegrees = (mc.options.fov().get() as Number).toDouble()
-    val halfFovRadians = Math.toRadians(fovDegrees) / 2.0
-    return ((thickness / 2.0) * (2.0 * depth * tan(halfFovRadians)) / mc.window.height.toDouble()).coerceAtLeast(0.0015)
-}
-
-private fun perpendicular(direction: Vec3): Vec3 {
-    val camera = camera()
-    val left = camera.leftVector().toVec3()
-    val up = camera.upVector().toVec3()
-    val normalizedDirection = direction.normalize()
-    val screenX = normalizedDirection.dot(left)
-    val screenY = normalizedDirection.dot(up)
-    val perpendicular = left.scale(-screenY).add(up.scale(screenX))
-
-    return if (perpendicular.lengthSqr() > 1.0E-6) perpendicular.normalize() else up
-}
-
-private fun addLineSegment(buffer: VertexConsumer, pose: com.mojang.blaze3d.vertex.PoseStack.Pose, start: Vec3, end: Vec3, cameraPos: Vec3, colour: Colour, thickness: Float) {
-    val direction = end.subtract(start)
-    if (direction.lengthSqr() <= 1.0E-6) return
-
-    val primary = perpendicular(direction)
-    val secondary = direction.cross(primary).normalize()
-    val startPrimary = primary.scale(lineHalfWidth(cameraPos, start, thickness))
-    val endPrimary = primary.scale(lineHalfWidth(cameraPos, end, thickness))
-    val startSecondary = secondary.scale(lineHalfWidth(cameraPos, start, thickness))
-    val endSecondary = secondary.scale(lineHalfWidth(cameraPos, end, thickness))
-    val translatedStart = start.subtract(cameraPos)
-    val translatedEnd = end.subtract(cameraPos)
-
-    // Match the old lineWidth(thickness) behavior by keeping width in screen space instead of world space.
-    buffer.addQuad(pose, translatedStart.subtract(startPrimary), translatedStart.add(startPrimary), translatedEnd.add(endPrimary), translatedEnd.subtract(endPrimary), colour)
-    buffer.addQuad(pose, translatedStart.subtract(startSecondary), translatedStart.add(startSecondary), translatedEnd.add(endSecondary), translatedEnd.subtract(endSecondary), colour)
+    return LineGeometry(
+        cameraPos, camera.forwardVector().toVec3(), camera.leftVector().toVec3(), camera.upVector().toVec3(),
+        (mc.options.fov().get() as Number).toDouble(), mc.window.height.toDouble()
+    )
 }
 
 private fun boxEdges(box: AABB): List<Pair<Vec3, Vec3>> {
@@ -154,9 +123,10 @@ fun LevelRenderContext.drawLine(points: Collection<Vec3>, colour: Colour, depth:
     val pose = matrix.last()
     val buffer = bufferSource.getBuffer(layer)
     val pointList = points.toList()
+    val lines = lineGeometry(cameraPos)
 
     for (i in 0 until pointList.size - 1) {
-        addLineSegment(buffer, pose, pointList[i], pointList[i + 1], cameraPos, colour, thickness)
+        lines.addSegment(buffer, pose, pointList[i], pointList[i + 1], colour, thickness)
     }
 
     bufferSource.endBatch(layer)
@@ -176,8 +146,9 @@ fun LevelRenderContext.drawWireFrameBox(aabb: AABB, colour: Colour, thickness: F
     val buffer = bufferSource.getBuffer(layer)
     val legacyThickness = legacyDistanceScaledThickness(cameraPos, aabb.center, thickness)
 
+    val lines = lineGeometry(cameraPos)
     boxEdges(aabb).forEach { (start, end) ->
-        addLineSegment(buffer, pose, start, end, cameraPos, colour, legacyThickness)
+        lines.addSegment(buffer, pose, start, end, colour, legacyThickness)
     }
 
     bufferSource.endBatch(layer)
@@ -249,6 +220,7 @@ fun LevelRenderContext.drawCylinder(
     val angleStep = 2.0 * Math.PI / segments
     val legacyThickness = legacyDistanceScaledThickness(cameraPos, center, thickness)
 
+    val lines = lineGeometry(cameraPos)
     for (i in 0 until segments) {
         val angle1 = i * angleStep
         val angle2 = (i + 1) * angleStep
@@ -264,9 +236,9 @@ fun LevelRenderContext.drawCylinder(
         val bottomStart = Vec3(x1, center.y, z1)
         val bottomEnd = Vec3(x2, center.y, z2)
 
-        addLineSegment(buffer, pose, topStart, topEnd, cameraPos, colour, legacyThickness)
-        addLineSegment(buffer, pose, bottomStart, bottomEnd, cameraPos, colour, legacyThickness)
-        addLineSegment(buffer, pose, bottomStart, topStart, cameraPos, colour, legacyThickness)
+        lines.addSegment(buffer, pose, topStart, topEnd, colour, legacyThickness)
+        lines.addSegment(buffer, pose, bottomStart, bottomEnd, colour, legacyThickness)
+        lines.addSegment(buffer, pose, bottomStart, topStart, colour, legacyThickness)
     }
 
     bufferSource.endBatch(layer)

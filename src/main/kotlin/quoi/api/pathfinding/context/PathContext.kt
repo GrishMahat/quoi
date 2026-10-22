@@ -4,7 +4,7 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet
 import net.minecraft.core.BlockPos
 import quoi.api.pathfinding.PathNode
-import java.util.PriorityQueue
+import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
 
 open class PathContext<N : PathNode>(
@@ -46,6 +46,13 @@ open class PathContext<N : PathNode>(
     @Synchronized
     fun finishNode(long: Long) {
         activeSet.remove(long)
+    }
+
+    @Synchronized
+    fun canImprove(pos: BlockPos, g: Double): Boolean {
+        if (solved) return false
+        val existing = nodeMap[pos.asLong()]
+        return existing == null || g < existing.g
     }
 
     @Synchronized

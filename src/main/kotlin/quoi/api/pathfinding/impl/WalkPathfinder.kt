@@ -4,19 +4,18 @@ import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
 import net.minecraft.world.phys.Vec3
 import quoi.api.pathfinding.AbstractPathfinder
+import quoi.api.pathfinding.PathNode
+import quoi.api.pathfinding.context.WalkContext
+import quoi.module.impl.render.clickgui.impl.PathSettings
+import quoi.utils.ChatUtils.modMessage
 import quoi.utils.WorldUtils.airLike
 import quoi.utils.WorldUtils.collisionShape
 import quoi.utils.WorldUtils.solid
 import quoi.utils.WorldUtils.walkable
 import quoi.utils.distanceTo
-import quoi.api.pathfinding.PathNode
-import quoi.api.pathfinding.context.WalkContext
-import quoi.module.impl.render.clickgui.impl.PathSettings
-import quoi.utils.ChatUtils.modMessage
 import java.util.concurrent.ConcurrentHashMap
 
 object WalkPathfinder : AbstractPathfinder<PathNode, WalkContext>() { // todo smoothing
-
     private val directions = arrayOf(
         intArrayOf(1, 0, 0), // n
         intArrayOf(-1, 0, 0), // s
@@ -66,10 +65,10 @@ object WalkPathfinder : AbstractPathfinder<PathNode, WalkContext>() { // todo sm
             val posPenalty = getPenalty(neighbour, ctx.penaltyCache)
             val gCost = current.g + stepCost + posPenalty
 
-            val hCost = neighbour.distanceTo(ctx.goal) * ctx.hWeight
-
-            val node = PathNode(neighbour.x + 0.5, neighbour.y.toDouble(), neighbour.z + 0.5, neighbour, gCost, hCost, current)
-            ctx.addNode(node)
+            if (ctx.canImprove(neighbour, gCost)) {
+                val hCost = neighbour.distanceTo(ctx.goal) * ctx.hWeight
+                ctx.addNode(PathNode(neighbour.x + 0.5, neighbour.y.toDouble(), neighbour.z + 0.5, neighbour, gCost, hCost, current))
+            }
         }
     }
 
@@ -80,8 +79,7 @@ object WalkPathfinder : AbstractPathfinder<PathNode, WalkContext>() { // todo sm
             val nz = this.z + dir[2]
 
             if (dir[0] != 0 && dir[2] != 0) { // diagonal
-                if (!BlockPos(nx, this.y, this.z).walkable ||
-                    !BlockPos(this.x, this.y, nz).walkable) continue
+                if (!BlockPos(nx, this.y, this.z).walkable || !BlockPos(this.x, this.y, nz).walkable) continue
             }
 
             val neighbour = BlockPos(nx, ny, nz)
@@ -155,8 +153,6 @@ object WalkPathfinder : AbstractPathfinder<PathNode, WalkContext>() { // todo sm
 
         var penalty = 0.0
         var dirs = 0
-
-//        val directions = directions.take(4)
 
         for (i in directions.indices) {
             val dir = directions[i]
