@@ -24,7 +24,7 @@ object ItemUtils {
         get() = this?.get(DataComponents.LORE)?.lines?.map { it.string }
 
     inline val ItemStack?.loreString: String?
-        get() = this?.lore?.joinToString("\n")
+        get() = this?.get(DataComponents.LORE)?.lines?.joinToString("\n") { it.string }
 
     inline val ItemStack?.isShortbow: Boolean
         get() = this?.loreString?.noControlCodes?.contains("Shortbow: Instantly shoots!") == true

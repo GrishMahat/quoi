@@ -88,7 +88,7 @@ object StringUtils {
         options.any { this.startsWith(it, ignoreCase) }
 
     fun String.containsOneOf(vararg options: String, ignoreCase: Boolean = false): Boolean =
-        containsOneOf(options.toList(), ignoreCase)
+        options.any { this.contains(it, ignoreCase) }
 
     fun String.containsOneOf(options: Collection<String>, ignoreCase: Boolean = false): Boolean =
         options.any { this.contains(it, ignoreCase) }
