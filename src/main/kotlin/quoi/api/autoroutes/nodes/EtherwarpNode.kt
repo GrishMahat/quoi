@@ -1,11 +1,13 @@
 package quoi.api.autoroutes.nodes
 
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext
+import net.minecraft.core.BlockPos
 import net.minecraft.world.phys.Vec3
 import quoi.api.autoroutes.RouteNode
 import quoi.api.colour.Colour
 import quoi.api.skyblock.dungeon.odonscanning.tiles.OdonRoom
 import quoi.api.vec.MutableVec3
+import quoi.api.world.RaycastResult
 import quoi.config.TypeName
 import quoi.module.impl.dungeon.autoclear.impl.AutoRoutes
 import quoi.utils.addVec
@@ -39,10 +41,11 @@ class EtherwarpNode : RouteNode() {
 
     override fun update(room: OdonRoom) {
         super.update(room)
+        realYaw = null
 
         if (yaw != null && pitch != null) {
             realYaw = room.getRealYaw(yaw!!)
-            val from = pos.addVec(y = getEyeHeight(false))
+            val from = pos.addVec(y = getEyeHeight(true))
             val to = getLook(realYaw!!, pitch!!).scale(61.0)
 
             realTarget = rayCastVec(from, to).vec
@@ -55,22 +58,14 @@ class EtherwarpNode : RouteNode() {
     override fun execute(pos: MutableVec3): Boolean {
         if (!player.lastSentInput.shift) return false
 
-        val actualTarget = if (realYaw != null) { // legacy convert compat
-            val from = this.pos.addVec(y = getEyeHeight(false))
-            val to = getLook(realYaw!!, pitch!!).scale(61.0)
-            rayCastVec(from, to).vec
-        } else realTarget
-
         val from = pos.add(y = getEyeHeight(true)).immutable()
-        val direction = actualTarget.subtract(from).normalize()
-        val to = actualTarget.add(direction.scale(0.001))
-
-        val ether = traverseVoxels(from, to, true)
-        if (!ether.succeeded || ether.pos == null) return false//true
+        val actualTarget = targetFrom(from)
+        val ether = raycast(from, actualTarget)
+        if (!ether.succeeded || ether.pos == null) return false
 
         if (player.mainHandItem.skyblockId != "ASPECT_OF_THE_VOID") {
             val swap = SwapManager.swapById("ASPECT_OF_THE_VOID")
-            return swap == SwapResult.NOT_FOUND
+            if (!swap.success) return swap == SwapResult.NOT_FOUND
         }
 
         val dir = getDirection(from, actualTarget)
@@ -81,6 +76,22 @@ class EtherwarpNode : RouteNode() {
         pos.y = getEtherwarpLandingY(ether.pos) + 0.05
         pos.z = ether.pos.z + 0.5
         return true
+    }
+
+    private fun targetFrom(from: Vec3): Vec3 = realYaw?.let {
+        rayCastVec(from, getLook(it, pitch!!).scale(61.0)).vec
+    } ?: realTarget
+
+    fun raycast(pos: MutableVec3): RaycastResult {
+        val from = pos.add(y = getEyeHeight(true)).immutable()
+        return raycast(from, targetFrom(from))
+    }
+
+    private fun raycast(from: Vec3, target: Vec3): RaycastResult {
+        if (from.distanceToSqr(target) > 61.0 * 61.0) return RaycastResult.NONE
+        val to = target.add(target.subtract(from).normalize().scale(0.001))
+        val hit = traverseVoxels(from, to, true)
+        return if (hit.pos == BlockPos.containing(to)) hit else RaycastResult.NONE
     }
 
     override fun create(room: OdonRoom): RouteNode? {

@@ -6,12 +6,15 @@ import net.minecraft.world.phys.EntityHitResult
 import quoi.api.autoroutes.AutoRoutesCommand
 import quoi.api.autoroutes.RouteNode
 import quoi.api.autoroutes.RouteRegistry
+import quoi.api.autoroutes.awaits.SecretAwait
 import quoi.api.autoroutes.nodes.BreakerNode
+import quoi.api.autoroutes.nodes.EtherwarpNode
 import quoi.api.colour.Colour
 import quoi.api.colour.withAlpha
 import quoi.api.events.*
 import quoi.api.events.core.on
 import quoi.api.skyblock.dungeon.odonscanning.ScanUtils
+import quoi.api.skyblock.dungeon.Dungeon
 import quoi.api.skyblock.dungeon.odonscanning.tiles.OdonRoom
 import quoi.api.skyblock.dungeon.odonscanning.tiles.RoomType
 import quoi.api.skyblock.location.Island
@@ -32,6 +35,7 @@ import quoi.utils.StringUtils.width
 import quoi.utils.render.DrawContextUtils.drawText
 import quoi.utils.skyblock.player.PlayerUtils
 import quoi.utils.skyblock.player.PlayerUtils.useItem
+import quoi.utils.skyblock.player.SwapManager
 
 object AutoRoutes : Module(
     "Auto Routes",
@@ -67,12 +71,17 @@ object AutoRoutes : Module(
     val routing: Boolean
         get() = !editMode && (executing || pendingInteract != null) && active
     var editMode = false
+        set(value) {
+            if (field != value) resetExecution()
+            field = value
+        }
     var breakerRing: BreakerNode? = null
     var currentChain: String? = null
 
     val routeNodes: ConfigMap<String, MutableList<RouteNode>> by configMap("route_nodes.json")
     private var roomNodes: List<RouteNode> = emptyList()
-    private var pendingInteract: Direction? = null
+    private data class PendingInteract(val direction: Direction, val slot: Int)
+    private var pendingInteract: PendingInteract? = null
     private var position: MutableVec3? = null
     private val batIds = hashSetOf<Int>()
     private var interactDelay = 0
@@ -89,17 +98,16 @@ object AutoRoutes : Module(
 
         on<TickEvent.Start> {
             if (interactDelay > 0) interactDelay--
+            if (editMode || breakerRing != null || roomNodes.isEmpty() || ClearExecutor.routing) {
+                if (position != null || activeNode != null || pendingInteract != null || mimicNode != null) resetExecution()
+                return@on
+            }
             if (mimicNode != null) return@on
 
             pendingInteract?.let {
-                player.useItem(it)
+                if (!SwapManager.swapToSlot(it.slot).success) return@on
+                player.useItem(it.direction)
                 pendingInteract = null
-            }
-
-            if (editMode || roomNodes.isEmpty() || ClearExecutor.routing) {
-                position = null
-                executing = false
-                return@on
             }
 
             if (activeNode?.hasSecretAwait == true) {
@@ -117,7 +125,7 @@ object AutoRoutes : Module(
             val desynced = roomNodes.any { it.inside() && it.triggered }
 
             if (!desynced) {
-                roomNodes.forEach { if (!it.inside()) it.triggered = false }
+                roomNodes.forEach { if (!it.inside() && it.triggered) it.reset() }
                 position = player.position().mutable()
             }
 
@@ -126,7 +134,7 @@ object AutoRoutes : Module(
 
         on<KeyEvent.Input> {
             if (editMode || activeNode == null) return@on
-            input.shift = activeNode!!.unsneak != true
+            input.shift = activeNode is EtherwarpNode || activeNode!!.unsneak != true
         }
 
         on<MouseEvent.Click> {
@@ -153,9 +161,7 @@ object AutoRoutes : Module(
         on<DungeonEvent.Secret.Bat> { activeNode?.onSecret() }
 
         on<DungeonEvent.Room.Enter> {
-            mimicNode = null
-            batIds.clear()
-            updateCache(room ?: return@on)
+            updateCache(room)
         }
 
         on<RenderEvent.World> {
@@ -175,30 +181,22 @@ object AutoRoutes : Module(
         }
 
         on<WorldEvent.Change> {
+            resetExecution()
             roomNodes = emptyList()
-            activeNode = null
-            executing = false
-            forcedNode = null
-            mimicNode = null
-            position = null
-            pendingInteract = null
-            batIds.clear()
-
-            lastChainName = null
-            lastChainIndex = -1
         }
     }
 
     fun skipNode(): Boolean {
-        if (!active || editMode || executing || ClearExecutor.routing) return false
+        if (!active || editMode || breakerRing != null || ClearExecutor.routing || pendingInteract != null) return false
         val pausedNode = mimicNode
-        val pos = if (pausedNode != null) player.position().mutable() else position ?: return false
+        val pos = if (pausedNode != null) player.position().mutable() else position ?: player.position().mutable()
 
         val nodes = (if (pausedNode != null) listOf(pausedNode) else roomNodes).filter { it.inside(pos) }.sortedByDescending { it.priority }
         if (nodes.isEmpty()) return false
 
         val next = (nodes.indexOf(forcedNode) + 1) % nodes.size
         val node = nodes[next]
+        if (activeNode !== node) activeNode?.takeIf { !it.triggered }?.reset()
         mimicNode = null
         forcedNode = node
         activeNode = node
@@ -222,8 +220,10 @@ object AutoRoutes : Module(
     fun handleQueue(playerPos: MutableVec3) {
         if (mimicNode != null) return
 
-        val node = roomNodes
-            .filter { it.inside(playerPos) && !it.triggered }
+        if (forcedNode?.inside(playerPos) == false) forcedNode = null
+        val forced = forcedNode?.takeIf { !it.triggered && it.inside(playerPos) }
+        val node = forced ?: roomNodes.asSequence()
+            .filter { !it.triggered && it.inside(playerPos) }
             .filter { n ->
                 val c = n.chain ?: return@filter true
                 if (c.index == 0) return@filter true
@@ -231,6 +231,7 @@ object AutoRoutes : Module(
             }
             .maxByOrNull { it.priority } ?: run {
 
+            activeNode?.takeIf { !it.triggered }?.reset()
             activeNode = null
             executing = false
 
@@ -241,13 +242,14 @@ object AutoRoutes : Module(
         }
 
         if (activeNode != node) {
+            activeNode?.takeIf { !it.triggered }?.reset()
             activeNode = node
             executing = false
         }
 
         if (interactDelay > 0) return
 
-        if (!executing && !node.checkAwaits()) return
+        if (forced == null && !executing && !node.checkAwaits(playerPos)) return
 
         executing = true
         if (node.execute(playerPos)) {
@@ -264,27 +266,41 @@ object AutoRoutes : Module(
     }
 
     fun queueInteract(dir: Direction) {
-        pendingInteract = dir
+        pendingInteract = PendingInteract(dir, player.inventory.selectedSlot)
     }
 
-    override fun onDisable() {
+    private fun resetExecution() {
+        roomNodes.forEach { it.reset() }
         pendingInteract = null
         activeNode = null
         forcedNode = null
         mimicNode = null
         position = null
         executing = false
+        interactDelay = 0
+        batIds.clear()
+        lastChainName = null
+        lastChainIndex = -1
     }
 
-    fun updateCache(room: OdonRoom) {
-        val nodes = routeNodes[room.name]
-        if (nodes.isNullOrEmpty()) return
-        nodes.forEach { it.update(room) }
-        roomNodes = nodes
+    override fun onEnable() {
+        updateCache(Dungeon.currentRoom)
+    }
+
+    override fun onDisable() {
+        resetExecution()
+        roomNodes = emptyList()
+        AutoRoutesCommand.stopEditing()
+    }
+
+    fun updateCache(room: OdonRoom?) {
+        resetExecution()
+        roomNodes = room?.let { routeNodes[it.name]?.toList() }.orEmpty()
+        if (room != null) roomNodes.forEach { it.update(room) }
     }
 
     private val RouteNode.hasSecretAwait: Boolean
-        get() = this.awaits?.any { it.typeName.lowercase() == "secret" } == true
+        get() = this.awaits?.any { it is SecretAwait } == true
 
     private fun RouteNode.colour() = if (multicolour) colours[this.typeName]?.value ?: Colour.WHITE else AutoRoutes.colour
     private fun RouteNode.fillColour() = if (multicolour) fillColours[this.typeName]?.value ?: Colour.WHITE else fillColour

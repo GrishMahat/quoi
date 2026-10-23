@@ -30,7 +30,7 @@ class BoomNode : RouteNode() {
     private var realYaw = 0f
 
     @Transient
-    private lateinit var realTarget: Vec3
+    private var realTarget: Vec3? = null
 
     override val colour: Colour
         get() = Colour.RED
@@ -41,27 +41,26 @@ class BoomNode : RouteNode() {
     override fun update(room: OdonRoom) {
         super.update(room)
         realYaw = room.getRealYaw(yaw)
-        if (target != null) {
-            realTarget = room.getRealCoords(target!!)
-        }
+        realTarget = target?.let { room.getRealCoords(it) }
     }
 
-    override fun checkAwaits(): Boolean {
+    override fun checkAwaits(pos: MutableVec3): Boolean {
         if (this.pos.distanceToSqr(player.position()) > 0.1) return false
-        return super.checkAwaits()
+        return super.checkAwaits(pos)
     }
 
     override fun execute(pos: MutableVec3): Boolean {
         if (this.pos.distanceToSqr(player.position()) > 0.1) return false
-        val block = if (::realTarget.isInitialized) { // rsa convert compat
-            traverseVoxels(this.pos, realTarget, true).pos
+        val target = realTarget
+        val block = if (target != null) { // rsa convert compat
+            traverseVoxels(pos.immutable().addVec(y = getEyeHeight(true)), target, true).pos
         } else {
             pos.immutable().addVec(y = getEyeHeight(true)).getEtherPos(realYaw, pitch, 6.0).pos
         } ?: return true
 
         if (!player.mainHandItem.skyblockId.equalsOneOf("INFINITE_SUPERBOOM_TNT", "SUPERBOOM_TNT")) {
             val swap = SwapManager.swapById("INFINITE_SUPERBOOM_TNT", "SUPERBOOM_TNT")
-            return swap == SwapResult.NOT_FOUND
+            if (!swap.success) return swap == SwapResult.NOT_FOUND
         }
         AuraManager.interactBlock(block)
         return true

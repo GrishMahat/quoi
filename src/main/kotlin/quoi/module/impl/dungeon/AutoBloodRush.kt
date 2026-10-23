@@ -46,7 +46,7 @@ object AutoBloodRush : Module(
             val now = System.currentTimeMillis()
 
             if (player.eyePosition.distanceToSqr(Vec3.atCenterOf(doorPos)) <= auraRange * auraRange) {
-                if (AutoDoorOpener.enabled || !AuraManager.canInteractBlock || now - lastClick < retryDelay) return@on
+                if (AutoDoorOpener.enabled || now - lastClick < retryDelay) return@on
                 AuraManager.interactBlock(doorPos)
                 lastClick = now
             } else if (now - lastPath >= 1000) {

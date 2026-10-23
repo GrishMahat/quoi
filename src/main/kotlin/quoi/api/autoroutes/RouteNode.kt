@@ -30,8 +30,10 @@ abstract class RouteNode(
 
     @Transient
     lateinit var pos: Vec3
+
     @Transient
     lateinit var aabb: AABB
+
     @Transient
     var triggered = false
 
@@ -56,6 +58,7 @@ abstract class RouteNode(
     }
 
     open fun update(room: OdonRoom) {
+        reset()
         pos = room.getRealCoords(relative)
         val (x, y, z) = pos
         val r = radius ?: 0.5f
@@ -63,6 +66,10 @@ abstract class RouteNode(
             x - r, y, z - r,
             x + r, y + (height ?: 0.1f), z + r
         )
+    }
+
+    open fun reset() {
+        triggered = false
         awaits?.forEach { it.reset() }
     }
 
@@ -95,7 +102,7 @@ abstract class RouteNode(
         awaits?.forEach { it.onSecret() }
     }
 
-    open fun checkAwaits(): Boolean {
-        return awaits?.all { it.check(player, this) } ?: true
+    open fun checkAwaits(pos: MutableVec3): Boolean {
+        return awaits?.all { it.check(pos, this) } ?: true
     }
 }

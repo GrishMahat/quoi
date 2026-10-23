@@ -36,10 +36,11 @@ class UseItemNode : RouteNode() {
     }
 
     override fun execute(pos: MutableVec3): Boolean {
-        val slot = (0..8).find {
-            val stack = player.inventory.getItem(it)
-            item.equalsOneOf(stack.skyblockId, stack.registryPath)
+        fun matches(slot: Int): Boolean {
+            val stack = player.inventory.getItem(slot)
+            return item.equalsOneOf(stack.skyblockId, stack.registryPath)
         }
+        val slot = player.inventory.selectedSlot.takeIf { matches(it) } ?: (0..8).find { matches(it) }
 
         if (slot == null) {
             modMessage("&cItem &e$item&c not found!")
@@ -47,8 +48,7 @@ class UseItemNode : RouteNode() {
         }
 
         if (player.inventory.selectedSlot != slot) {
-            SwapManager.swapToSlot(slot)
-            return false
+            if (!SwapManager.swapToSlot(slot).success) return false
         }
 
         AutoRoutes.queueInteract(Direction(realYaw, pitch))

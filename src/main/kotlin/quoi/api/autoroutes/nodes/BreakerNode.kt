@@ -9,7 +9,6 @@ import quoi.api.skyblock.dungeon.odonscanning.tiles.OdonRoom
 import quoi.api.vec.MutableVec3
 import quoi.config.TypeName
 import quoi.module.impl.dungeon.autoclear.impl.AutoRoutes
-import quoi.utils.Scheduler.scheduleTask
 import quoi.utils.WorldUtils.state
 import quoi.utils.aabb
 import quoi.utils.render.drawFilledBox
@@ -25,7 +24,13 @@ class BreakerNode : RouteNode() {
     var blocks = emptyList<BlockPos>()
 
     @Transient
-    private var active = false
+    private var batch = emptyList<BlockPos>()
+
+    @Transient
+    private var batchIndex = 0
+
+    @Transient
+    private var cooldown = 0
 
     @Transient
     private var realBlocks = emptyList<BlockPos>()
@@ -41,17 +46,25 @@ class BreakerNode : RouteNode() {
         realBlocks = blocks.map { room.getRealCoords(it) }
     }
 
-    override fun checkAwaits(): Boolean {
+    override fun checkAwaits(pos: MutableVec3): Boolean {
         if (!inside()) return false
-        return super.checkAwaits()
+        return super.checkAwaits(pos)
+    }
+
+    override fun reset() {
+        super.reset()
+        batch = emptyList()
+        batchIndex = 0
+        cooldown = 0
     }
 
     override fun execute(pos: MutableVec3): Boolean {
         if (blocks.isEmpty()) return true
-        val toBreak = realBlocks.filter { pos -> level.isLoaded(pos) && !pos.state.isAir }
-
-        if (toBreak.isEmpty()) return true
-        if (active) return false
+        if (realBlocks.none { level.isLoaded(it) && !it.state.isAir }) return true
+        if (cooldown > 0) {
+            cooldown--
+            return false
+        }
 
         val breakerSlot = PlayerUtils.breakerSlot ?: run {
             val hasBreaker = (0..8).any { player.inventory.getItem(it).skyblockId == "DUNGEONBREAKER" }
@@ -59,24 +72,24 @@ class BreakerNode : RouteNode() {
         }
 
         if (player.inventory.selectedSlot != breakerSlot) {
-            SwapManager.swapToSlot(breakerSlot)
-            return false
+            if (!SwapManager.swapToSlot(breakerSlot).success) return false
         }
 
         val initialCharges = getBreakerCharges(player.inventory.getItem(breakerSlot))
         if (initialCharges == 0) return false
 
-        val batch = toBreak.take(initialCharges)
-        active = true
-
         if (AutoRoutes.zeroTickDb) {
+            val batch = realBlocks.asSequence().filter { level.isLoaded(it) && !it.state.isAir }.take(initialCharges)
             batch.forEach { AuraManager.breakBlock(it, immediate = true) }
-            scheduleTask(10) { active = false }
+            cooldown = 9
         } else {
-            batch.forEachIndexed { i, pos ->
-                scheduleTask(i + 1) { AuraManager.breakBlock(pos, immediate = true) }
+            if (batchIndex >= batch.size) {
+                batch = realBlocks.filter { level.isLoaded(it) && !it.state.isAir }.take(initialCharges)
+                batchIndex = 0
             }
-            scheduleTask(batch.size + 1) { active = false }
+            val block = batch[batchIndex++]
+            if (level.isLoaded(block) && !block.state.isAir) AuraManager.breakBlock(block, immediate = true)
+            if (batchIndex == batch.size) cooldown = 1
         }
         return false
     }

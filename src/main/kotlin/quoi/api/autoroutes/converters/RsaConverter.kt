@@ -12,18 +12,17 @@ import quoi.api.autoroutes.nodes.BreakerNode
 import quoi.api.autoroutes.nodes.EtherwarpNode
 import quoi.api.autoroutes.nodes.UseItemNode
 import quoi.config.ConfigSystem.gson
-import quoi.module.impl.dungeon.autoclear.impl.AutoRoutes
 import quoi.utils.addVec
 import quoi.utils.toDirection
 import java.io.File
 
 object RsaConverter {
-    fun convert(file: File) {
+    fun convert(file: File): Map<String, List<RouteNode>> {
         val type = object : TypeToken<Map<String, List<JsonObject>>>() {}.type
         val data: Map<String, List<JsonObject>> = gson.fromJson(file.readText(), type)
 
-        data.forEach { (room, rings) ->
-            val new = AutoRoutes.routeNodes.getOrPut(room) { mutableListOf() }
+        return data.mapValues { (_, rings) ->
+            val new = mutableListOf<RouteNode>()
 
             rings.forEach { ring ->
                 val type = ring.get("type").asString
@@ -58,7 +57,7 @@ object RsaConverter {
                 node.relative = vec(ring.get("localPos"))
                 node.radius = ring.get("radius").asFloat.takeIf { it != 0.5f }
                 node.start = ring.get("start").asBoolean.takeIf { it }
-                node.unsneak = ring.get("sneak")?.asBoolean?.takeIf { it }
+                node.unsneak = ring.get("sneak")?.asBoolean?.not()?.takeIf { it }
 
                 node.awaits = ring.getAsJsonObject("awaits")?.let {
                     listOfNotNull(
@@ -74,6 +73,7 @@ object RsaConverter {
 
                 new.add(node)
             }
+            new
         }
     }
 

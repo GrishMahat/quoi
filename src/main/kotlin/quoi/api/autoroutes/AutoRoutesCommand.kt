@@ -4,6 +4,7 @@ import kotlinx.coroutines.launch
 import net.minecraft.core.BlockPos
 import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket
 import net.minecraft.world.phys.Vec3
+import quoi.QuoiMod.mc
 import quoi.api.autoroutes.RouteRegistry.nodeEntries
 import quoi.api.autoroutes.RouteRegistry.nodeTypes
 import quoi.api.autoroutes.awaits.RaycastAwait
@@ -17,6 +18,8 @@ import quoi.api.commands.internal.SubCommand
 import quoi.api.commands.parsers.arg
 import quoi.api.events.PacketEvent
 import quoi.api.events.TickEvent
+import quoi.api.events.WorldEvent
+import quoi.api.events.DungeonEvent
 import quoi.api.events.core.EventListener
 import quoi.api.events.core.Subscription
 import quoi.api.events.core.asyncScope
@@ -48,11 +51,16 @@ object AutoRoutesCommand : EventListener {
     private var tickListener: Subscription<*>? = null
     private var lastClickedBlock: BlockPos? = null
 
+    init {
+        on<WorldEvent.Change> { stopEditing() }
+        on<DungeonEvent.Room.Enter> { stopEditing() }
+    }
+
     fun register() {
         ar.sub("em") {
             editMode = !editMode
             modMessage("Edit mode ${if (editMode) "&aenabled" else "&cdisabled"}&r!")
-            unsubscribeDBEditor()
+            stopEditing()
         }.description("Toggles edit mode.")
 
         ar.sub("add") { type: String, args: GreedyString? ->
@@ -73,9 +81,7 @@ object AutoRoutesCommand : EventListener {
                 val nodes = routeNodes[room.name]?.filter { it.chain?.name == chainName } ?: emptyList()
 
                 val next = if (nodes.isEmpty()) 0 else nodes.maxOf { it.chain?.index ?: 0 } + 1
-                val i = (args.index ?: next).coerceAtMost(next)
-
-                shiftChain(room.name, chainName, i, 1)
+                val i = (args.index ?: next).coerceIn(0, next)
                 routeChain = RouteChain(chainName, i)
             }
 
@@ -89,7 +95,9 @@ object AutoRoutesCommand : EventListener {
                 chain = routeChain
             }
 
-            val node = base.create(room) ?: return@sub modMessage("Failed blah blah blah")
+            val node = base.create(room) ?: return@sub modMessage("&cCould not create &e$type&c at this position.")
+
+            routeChain?.let { shiftChain(room.name, it.name, it.index, 1) }
 
             val nodes = routeNodes.getOrPut(room.name) { mutableListOf() }
             nodes.add(node)
@@ -110,9 +118,10 @@ object AutoRoutesCommand : EventListener {
 
             if (lower == "last") {
                 val removed = nodes.removeAt(nodes.size - 1)
+                removed.chain?.let { shiftChain(room.name, it.name, it.index + 1, -1) }
                 removedNodes.add(listOf(RemovedNode(room.name, removed)))
                 modMessage("Removed last node &e${removed.typeName}&r!")
-                routeNodes.save()
+                save()
                 return@sub
             }
 
@@ -170,7 +179,7 @@ object AutoRoutesCommand : EventListener {
                     ?: return@sub modMessage("&cYou need to stand in a &edungeon_breaker&c ring!")
                 editDBRing(ring as BreakerNode)
             } else {
-                unsubscribeDBEditor()
+                stopEditing()
                 modMessage("Breaker editor &cdisabled&r.")
             }
         }
@@ -199,12 +208,18 @@ object AutoRoutesCommand : EventListener {
             modMessage("Converting..")
             asyncScope.launch {
                 try {
-                    when (from) {
+                    val converted = when (from) {
                         "legacy" -> LegacyConverter.convert(file)
                         "rsa" -> RsaConverter.convert(file)
+                        else -> error("Unknown route format: $from")
                     }
-                    modMessage("Converted. Some nodes can be bugged.")
-                    save()
+                    mc.execute {
+                        routeNodes.putAll(converted.mapValues { (name, nodes) ->
+                            (routeNodes[name].orEmpty() + nodes).toMutableList()
+                        })
+                        AutoRoutes.updateCache(currentRoom)
+                        modMessage("Converted routes.")
+                    }
                 } catch (e: Exception) {
                     modMessage(
                         ChatUtils.button(
@@ -220,6 +235,7 @@ object AutoRoutesCommand : EventListener {
             .suggests("from", "legacy", "rsa")
 
         ar.sub("reload") {
+            stopEditing()
             routeNodes.reload()
             AutoRoutes.updateCache(room)
             modMessage("Reloaded")
@@ -228,7 +244,7 @@ object AutoRoutesCommand : EventListener {
         ar.register()
     }
 
-    private fun unsubscribeDBEditor() {
+    fun stopEditing() {
         interactListener?.unregister()
         interactListener = null
         tickListener?.unregister()
@@ -238,7 +254,7 @@ object AutoRoutesCommand : EventListener {
     }
 
     private fun editDBRing(ring: BreakerNode) {
-        if (interactListener != null) unsubscribeDBEditor()
+        if (interactListener != null) stopEditing()
         breakerRing = ring
 
         modMessage("Breaker editor &aenabled&r.")
@@ -288,19 +304,21 @@ object AutoRoutesCommand : EventListener {
         val str = input?.string?.lowercase()?.trim() ?: ""
         val new = parseArgs(node.typeName, input)
 
-        if (str.contains("radius:")) node.radius = new.radius
-        if (str.contains("height:")) node.height = new.height
-        if (str.contains("start")) node.start = new.start
-        if (str.contains("unsneak")) node.unsneak = new.unsneak
+        val keys = str.split(Regex("\\s+")).map { it.substringBefore(":") }.toSet()
+        if ("radius" in keys) node.radius = new.radius
+        if ("height" in keys) node.height = new.height
+        if ("start" in keys) node.start = new.start
+        if ("unsneak" in keys) node.unsneak = new.unsneak
         if (new.awaits.isNotEmpty()) node.awaits = new.awaits.toMutableList()
 
-        val newName = new.chain ?: node.chain?.name
-        val index = str.contains("index:")
-        val chain = str.contains("chain:")
+        val newName = if ("chain" in keys) new.chain?.takeIf { it.isNotEmpty() } else node.chain?.name
+        val index = "index" in keys
+        val chain = "chain" in keys
 
-        if (index || chain) { // I wanna kms
+        if (index || chain) {
             val old = node.chain
 
+            node.chain = null
             old?.let { shiftChain(room.name, it.name, it.index + 1, -1) }
 
             if (newName != null) {
@@ -310,7 +328,7 @@ object AutoRoutesCommand : EventListener {
 
                 val i = // new chain then force index to 0 else use curr/new index
                     if (chain && !index && nodes.isEmpty()) 0
-                    else (new.index ?: node.chain?.index ?: next).coerceAtMost(next)
+                    else (new.index ?: old?.index ?: next).coerceIn(0, next)
 
                 shiftChain(room.name, newName, i, 1)
                 node.chain = RouteChain(newName, i)
@@ -324,9 +342,9 @@ object AutoRoutesCommand : EventListener {
     }
 
     private fun parseArgs(type: String, input: GreedyString?): NodeArgs {
-        val str = input?.string?.lowercase()?.trim()
+        val str = input?.string?.trim()
         if (str.isNullOrBlank()) return NodeArgs()
-        val ether = type == "etherwarp"
+        val ether = type.equals("etherwarp", true)
 
         var radius: Float? = null
         var height: Float? = null
@@ -336,22 +354,22 @@ object AutoRoutesCommand : EventListener {
         var index: Int? = null
         val awaits = mutableListOf<RouteAwait>()
 
-        str.split(" ").forEach { arg ->
+        str.split(Regex("\\s+")).forEach { arg ->
             val parts = arg.split(":", limit = 2)
-            val key = parts[0]
+            val key = parts[0].lowercase()
             val value = parts.getOrNull(1) ?: ""
 
             when (key) {
-                "radius" -> radius = value.toFloatOrNull()
-                "height" -> height = value.toFloatOrNull()
-                "start" -> start = true
-                "unsneak" -> unsneak = !ether
+                "radius" -> radius = value.toFloatOrNull()?.takeIf { it.isFinite() && it > 0 }
+                "height" -> height = value.toFloatOrNull()?.takeIf { it.isFinite() && it > 0 }
+                "start" -> start = value.isEmpty() || value.equals("true", true)
+                "unsneak" -> unsneak = !ether && (value.isEmpty() || value.equals("true", true))
                 "chain" -> chain = value
                 "index" -> index = value.toIntOrNull()
                 "await" -> {
-                    when (value) {
+                    when (value.lowercase()) {
                         "raycast" if (ether) -> awaits.add(RaycastAwait())
-                        else -> awaits.add(SecretAwait(value.toIntOrNull() ?: 1))
+                        else -> awaits.add(SecretAwait((value.toIntOrNull() ?: 1).coerceAtLeast(0)))
                     }
                 }
             }
@@ -396,6 +414,7 @@ object AutoRoutesCommand : EventListener {
     }
 
     private fun save() {
+        breakerRing?.let { if (it !in routeNodes[room.name].orEmpty()) stopEditing() }
         AutoRoutes.updateCache(room)
         routeNodes.save()
     }

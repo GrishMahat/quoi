@@ -13,16 +13,15 @@ import quoi.api.autoroutes.nodes.EtherwarpNode
 import quoi.api.autoroutes.nodes.RotateNode
 import quoi.api.autoroutes.nodes.UseItemNode
 import quoi.config.ConfigSystem.gson
-import quoi.module.impl.dungeon.autoclear.impl.AutoRoutes
 import java.io.File
 
 object LegacyConverter {
-    fun convert(file: File) {
+    fun convert(file: File): Map<String, List<RouteNode>> {
         val type = object : TypeToken<Map<String, List<JsonObject>>>() {}.type
         val data: Map<String, List<JsonObject>> = gson.fromJson(file.readText(), type)
 
-        data.forEach { (room, rings) ->
-            val new = AutoRoutes.routeNodes.getOrPut(room) { mutableListOf() }
+        return data.mapValues { (_, rings) ->
+            val new = mutableListOf<RouteNode>()
 
             val chains = mutableMapOf<String, Int>()
             val starts = rings.filter { it.getAsJsonObject("action").get("type").asString == "start" }.map {
@@ -101,6 +100,7 @@ object LegacyConverter {
 
                 new.add(node)
             }
+            new
         }
     }
 }
