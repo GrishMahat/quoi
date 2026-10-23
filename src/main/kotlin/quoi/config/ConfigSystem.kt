@@ -10,6 +10,7 @@ import com.google.gson.stream.JsonReader
 import com.google.gson.stream.JsonWriter
 import net.minecraft.core.BlockPos
 import net.minecraft.world.phys.Vec3
+import quoi.QuoiMod.logger
 import quoi.api.autoroutes.RouteAwait
 import quoi.api.autoroutes.RouteRegistry
 import quoi.api.autoroutes.RouteNode
@@ -27,6 +28,9 @@ import kotlin.reflect.full.findAnnotation
 // https://github.com/Noamm9/CatgirlAddons/blob/main/src/main/kotlin/catgirlroutes/utils/ConfigSystem.kt
 val configPath = File("config/quoi!")
 object ConfigSystem {
+    @PublishedApi
+    internal val failedLoads = mutableSetOf<File>()
+
     val gson: Gson = GsonBuilder()
         .registerTypeHierarchyAdapter(Vec3::class.java, Vec3Adapter())
         .registerTypeHierarchyAdapter(BlockPos::class.java, BlockPosAdapter())
@@ -39,20 +43,30 @@ object ConfigSystem {
         .create()
 
     inline fun <reified T : Any> load(file: File, default: () -> T): T {
+        val key = file.absoluteFile.normalize()
         if (!file.exists()) {
             file.parentFile.mkdirs()
             val initial = default()
+            failedLoads.remove(key)
             save(file, initial)
             return initial
         }
         return try {
-            file.reader().use { gson.fromJson(it, object : TypeToken<T>() {}.type) } ?: default()
-        } catch (_: Exception) {
+            val loaded = file.reader().use { gson.fromJson<T>(it, object : TypeToken<T>() {}.type) }
+                ?: throw JsonParseException("Config is empty or null.")
+            failedLoads.remove(key)
+            loaded
+        } catch (error: Exception) {
+            failedLoads.add(key)
+            logger.error("Could not load ${file.absolutePath}. Saving is blocked until the file is successfully reloaded.", error)
             default()
         }
     }
 
     fun save(file: File, data: Any) = runCatching {
+        check(file.absoluteFile.normalize() !in failedLoads) {
+            "Saving ${file.absolutePath} is blocked because loading failed. Fix the config and reload it first."
+        }
         val tmpFile = File(file.parent, "${file.name}.tmp") // should prevent corruption on err
         tmpFile.writer().use { gson.toJson(data, it) }
         Files.move(
@@ -109,7 +123,7 @@ inline fun <reified T : Any> configList(name: String): ReadOnlyProperty<Any?, Co
     val wrapper = ConfigList(loaded, {
         ConfigSystem.save(file, loaded)
     }, {
-        val new = ConfigSystem.load<MutableList<T>>(file) { mutableListOf() }
+        val new = ConfigSystem.load<MutableList<T>>(file) { loaded.toMutableList() }
         loaded.clear()
         loaded.addAll(new)
     })
@@ -148,7 +162,7 @@ inline fun <reified K : Any, reified V : Any> configMap(name: String): ReadOnlyP
     val wrapper = ConfigMap(loaded, {
         ConfigSystem.save(file, loaded)
     }, {
-        val new = ConfigSystem.load<MutableMap<K, V>>(file) { mutableMapOf() }
+        val new = ConfigSystem.load<MutableMap<K, V>>(file) { loaded.toMutableMap() }
         loaded.clear()
         loaded.putAll(new)
     })
