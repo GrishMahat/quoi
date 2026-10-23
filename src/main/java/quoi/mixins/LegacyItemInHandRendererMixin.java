@@ -4,10 +4,12 @@ package quoi.mixins;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.ItemInHandRenderer;
 import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemDisplayContext;
@@ -30,6 +32,8 @@ public abstract class LegacyItemInHandRendererMixin {
     )
     private float quoi$itemAnimationsSwing(LocalPlayer instance, float v, Operation<Float> original) {
         if (!ItemAnimations.INSTANCE.getEnabled()) return original.call(instance, v);
+        InteractionHand hand = instance.swingingArm != null ? instance.swingingArm : InteractionHand.MAIN_HAND;
+        if (ItemAnimations.isMap(instance.getItemInHand(hand))) return original.call(instance, v);
 
         return ItemAnimations.getSwingAnimation(v);
     }
@@ -40,6 +44,7 @@ public abstract class LegacyItemInHandRendererMixin {
             cancellable = true
     )
     private void quoi$itemAnimationsReequip(ItemStack itemStack, ItemStack itemStack2, CallbackInfoReturnable<Boolean> cir) {
+        if (ItemAnimations.isMap(itemStack) || ItemAnimations.isMap(itemStack2)) return;
         if (ItemAnimations.disableReequip()) cir.setReturnValue(true);
     }
 
@@ -49,6 +54,7 @@ public abstract class LegacyItemInHandRendererMixin {
             require = 1
     )
     private float quoi$itemAnimationsBob(LocalPlayer instance, float v, Operation<Float> original) {
+        if (ItemAnimations.isMap(instance.getMainHandItem())) return original.call(instance, v);
         if (ItemAnimations.disableReequip() || ItemAnimations.disableSwingBob()) return 1f;
         return original.call(instance, v);
     }
@@ -59,7 +65,7 @@ public abstract class LegacyItemInHandRendererMixin {
             cancellable = true
     )
     private void quoi$applyEquipOffset(PoseStack poseStack, HumanoidArm humanoidArm, float f, CallbackInfo ci) {
-        if (ItemAnimations.disableReequip()) {
+        if (ItemAnimations.disableReequip(humanoidArm)) {
             int i = humanoidArm == HumanoidArm.RIGHT ? 1 : -1;
             poseStack.translate((float)i * 0.56f, -0.52f, -0.72f);
             ci.cancel();
@@ -67,15 +73,16 @@ public abstract class LegacyItemInHandRendererMixin {
     }
 
     @Inject(
-            method = "renderHandsWithItems",
+            method = "renderArmWithItem",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/client/renderer/ItemInHandRenderer;renderArmWithItem(Lnet/minecraft/client/player/AbstractClientPlayer;FFLnet/minecraft/world/InteractionHand;FLnet/minecraft/world/item/ItemStack;FLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;I)V",
-                    ordinal = 0
+                    target = "Lcom/mojang/blaze3d/vertex/PoseStack;pushPose()V",
+                    shift = At.Shift.AFTER
             ),
             require = 1
     )
-    private void quoi$itemAnimationsMainTransform(float f, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, LocalPlayer localPlayer, int i, CallbackInfo ci) {
+    private void quoi$itemAnimationsMainTransform(CallbackInfo ci, @Local(argsOnly = true) ItemStack itemStack, @Local(argsOnly = true) PoseStack poseStack) {
+        if (ItemAnimations.isMap(itemStack)) return;
         ItemAnimations.applyTransformations(poseStack);
     }
 
@@ -92,8 +99,8 @@ public abstract class LegacyItemInHandRendererMixin {
             at = @At(value = "STORE"),
             ordinal = 4
     )
-    private float quoi$disableSwingTrans1(float f) {
-        return ItemAnimations.disableSwingTranslation() ? 0f : f;
+    private float quoi$disableSwingTrans1(float f, @Local(argsOnly = true) HumanoidArm arm) {
+        return ItemAnimations.disableSwingTranslation(arm) ? 0f : f;
     }
 
     @ModifyVariable(
@@ -101,8 +108,8 @@ public abstract class LegacyItemInHandRendererMixin {
             at = @At(value = "STORE"),
             ordinal = 5
     )
-    private float quoi$disableSwingTrans2(float f) {
-        return ItemAnimations.disableSwingTranslation() ? 0f : f;
+    private float quoi$disableSwingTrans2(float f, @Local(argsOnly = true) HumanoidArm arm) {
+        return ItemAnimations.disableSwingTranslation(arm) ? 0f : f;
     }
 
     @ModifyVariable(
@@ -110,28 +117,16 @@ public abstract class LegacyItemInHandRendererMixin {
             at = @At(value = "STORE"),
             ordinal = 6
     )
-    private float quoi$disableSwingTrans3(float f) {
-        return ItemAnimations.disableSwingTranslation() ? 0f : f;
+    private float quoi$disableSwingTrans3(float f, @Local(argsOnly = true) HumanoidArm arm) {
+        return ItemAnimations.disableSwingTranslation(arm) ? 0f : f;
     }
 
     @WrapOperation(
             method = "swingArm",
             at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/PoseStack;translate(FFF)V")
     )
-    private void quoi$disableSwingTransGeneral(PoseStack instance, float f, float g, float h, Operation<Void> original) {
-        if (ItemAnimations.disableSwingTranslation()) return;
+    private void quoi$disableSwingTransGeneral(PoseStack instance, float f, float g, float h, Operation<Void> original, @Local(argsOnly = true) HumanoidArm arm) {
+        if (ItemAnimations.disableSwingTranslation(arm)) return;
         original.call(instance, f, g, h);
-    }
-
-    @Inject(
-            method = "renderMap",
-            at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/SubmitNodeCollector;submitCustomGeometry(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/rendertype/RenderType;Lnet/minecraft/client/renderer/SubmitNodeCollector$CustomGeometryRenderer;)V"),
-            require = 1
-    )
-    private void quoi$mapScale2(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, ItemStack itemStack, CallbackInfo ci) {
-        if (!ItemAnimations.INSTANCE.getEnabled()) return;
-        poseStack.translate(64f, 64f, 0f);
-        ItemAnimations.applyScale(poseStack);
-        poseStack.translate(-64f, -64f, 0f);
     }
 }

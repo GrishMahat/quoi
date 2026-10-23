@@ -19,6 +19,7 @@ public abstract class FirstPersonHandsAndItemsMixin {
             cancellable = true
     )
     private void quoi$itemAnimationsReequip(ItemStack current, ItemStack expected, LocalPlayer player, CallbackInfoReturnable<Boolean> cir) {
+        if (ItemAnimations.isMap(current) || ItemAnimations.isMap(expected)) return;
         if (ItemAnimations.disableReequip()) cir.setReturnValue(true);
     }
 
@@ -27,6 +28,7 @@ public abstract class FirstPersonHandsAndItemsMixin {
             at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/LocalPlayer;getItemSwapScale(F)F")
     )
     private float quoi$itemAnimationsBob(LocalPlayer instance, float partialTick, Operation<Float> original) {
+        if (ItemAnimations.isMap(instance.getMainHandItem())) return original.call(instance, partialTick);
         if (ItemAnimations.disableReequip() || ItemAnimations.disableSwingBob()) return 1f;
         return original.call(instance, partialTick);
     }

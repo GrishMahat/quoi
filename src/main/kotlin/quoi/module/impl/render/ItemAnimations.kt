@@ -3,13 +3,17 @@ package quoi.module.impl.render
 import com.mojang.blaze3d.vertex.PoseStack
 import com.mojang.math.Axis
 import net.minecraft.client.renderer.entity.state.FishingHookRenderState
+import net.minecraft.core.component.DataComponents
 import net.minecraft.world.effect.MobEffectUtil
 import net.minecraft.world.effect.MobEffects
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.entity.projectile.FishingHook
+import net.minecraft.world.entity.HumanoidArm
+import net.minecraft.world.item.EmptyMapItem
 import net.minecraft.world.item.FishingRodItem
 import net.minecraft.world.item.ItemDisplayContext
 import net.minecraft.world.item.ItemStack
+import net.minecraft.world.item.MapItem
 import quoi.api.events.TickEvent
 import quoi.api.events.core.on
 import quoi.module.Module
@@ -96,8 +100,18 @@ object ItemAnimations : Module(
     @JvmStatic fun disableReequip(): Boolean = enabled && noReequipReset
 
     @JvmStatic
-    fun disableSwingTranslation(): Boolean {
-        return enabled && inplaceSwing
+    fun disableReequip(arm: HumanoidArm): Boolean {
+        return disableReequip() && !isMap(player.getItemHeldByArm(arm))
+    }
+
+    @JvmStatic
+    fun isMap(stack: ItemStack): Boolean {
+        return stack.item is MapItem || stack.item is EmptyMapItem || stack.has(DataComponents.MAP_ID)
+    }
+
+    @JvmStatic
+    fun disableSwingTranslation(arm: HumanoidArm): Boolean {
+        return enabled && inplaceSwing && !isMap(player.getItemHeldByArm(arm))
     }
 
     @JvmStatic
@@ -157,6 +171,7 @@ object ItemAnimations : Module(
 
     @JvmStatic
     fun applyScale(pose: PoseStack, stack: ItemStack?, context: ItemDisplayContext?) {
+        if (stack != null && isMap(stack)) return
         val itemAnimationScale = if (enabled) 2.0.pow(scale).toFloat() else 1f
         if (itemAnimationScale != 1f) pose.scale(itemAnimationScale, itemAnimationScale, itemAnimationScale)
     }
