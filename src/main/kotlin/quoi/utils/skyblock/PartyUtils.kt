@@ -69,7 +69,7 @@ object PartyUtils : EventListener, Shortcuts {
 
             joinedSelf.find(unformatted)?.let {
                 addMember(it.groupValues[2])
-                updateLeader(it.groupValues[2])
+                partyLeader = it.groupValues[2]
                 addMember(player.gameProfile.name)
                 return@on
             }
@@ -85,24 +85,24 @@ object PartyUtils : EventListener, Shortcuts {
             transferBy.find(unformatted)?.let {
                 addMember(it.groupValues[2])
                 addMember(it.groupValues[4])
-                updateLeader(it.groupValues[2])
+                partyLeader = it.groupValues[2]
                 return@on
             }
 
             transferLeave.find(unformatted)?.let {
                 addMember(it.groupValues[2])
-                updateLeader(it.groupValues[2])
+                partyLeader = it.groupValues[2]
                 removeMember(it.groupValues[4])
                 return@on
             }
 
             leaderDisconnected.find(unformatted)?.let {
-                updateLeader(it.groupValues[2])
+                partyLeader = it.groupValues[2]
                 return@on
             }
 
             leaderRejoined.find(unformatted)?.let {
-                updateLeader(it.groupValues[2])
+                partyLeader = it.groupValues[2]
                 return@on
             }
 
@@ -115,13 +115,13 @@ object PartyUtils : EventListener, Shortcuts {
 
             partyInvite.find(unformatted)?.let {
                 addMember(it.groupValues[2])
-                if (partyLeader == null) updateLeader(it.groupValues[2])
+                if (partyLeader == null) partyLeader = it.groupValues[2]
                 return@on
             }
 
             queuedInFinder.find(unformatted)?.let {
                 addMember(player.gameProfile.name)
-                if (partyLeader == null) updateLeader(player.gameProfile.name)
+                if (partyLeader == null) partyLeader = player.gameProfile.name
                 return@on
             }
 
@@ -135,7 +135,7 @@ object PartyUtils : EventListener, Shortcuts {
                 match.groupValues[2].split(" ●").forEach { segment ->
                     val memberMatch = memberFormat.find(segment.trim()) ?: return@forEach
                     addMember(memberMatch.groupValues[2])
-                    if (type == "Leader") updateLeader(memberMatch.groupValues[2])
+                    if (type == "Leader") partyLeader = memberMatch.groupValues[2]
 
                     return@on
                 }
@@ -164,47 +164,24 @@ object PartyUtils : EventListener, Shortcuts {
             return
         }
 
-        val created = !isInParty
-
         isInParty = true
         partyMembers.add(playerName)
 
-        if (created) PartyEvent.Create().post()
         PartyEvent.Member.Join(playerName, clazz).post()
     }
 
     private fun removeMember(playerName: String) {
         if (!partyMembers.remove(playerName)) return
 
-        PartyEvent.Member.Leave(playerName).post()
-
         if (partyMembers.isEmpty()) disband()
-    }
-
-    private fun updateLeader(newLeader: String) {
-        val oldLeader = partyLeader
-        if (oldLeader == newLeader) return
-
-        partyLeader = newLeader
-
-        PartyEvent.Leader.Change(oldLeader, newLeader).post()
     }
 
     private fun disband() {
         if (!isInParty && partyMembers.isEmpty() && partyLeader == null) return
 
-        val members = partyMembers.toList()
-        val oldLeader = partyLeader
-
         partyMembers.clear()
         partyLeader = null
         isInParty = false
-
-        members.forEach { PartyEvent.Member.Leave(it).post() }
-
-        if (oldLeader != null) {
-            PartyEvent.Leader.Change(oldLeader, null).post()
-        }
 
         PartyEvent.Disband().post()
     }

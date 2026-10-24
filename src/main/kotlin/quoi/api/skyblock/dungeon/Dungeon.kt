@@ -64,9 +64,6 @@ object Dungeon : EventListener, Shortcuts {
     inline val secretCount: Int
         get() = dungeonStats.secretsFound
 
-    inline val knownSecrets: Int
-        get() = ScoreCalculation.totalSecrets
-
     inline val secretPercentage: Float
         get() = dungeonStats.secretsPercent
 
@@ -132,9 +129,6 @@ object Dungeon : EventListener, Shortcuts {
 
     val isPaul: Boolean
         get() = ScoreCalculation.isPaul
-
-    inline val getBonusScore: Int
-        get() = ScoreCalculation.bonusScore
 
     inline val bloodDone: Boolean
         get() = dungeonStats.bloodDone

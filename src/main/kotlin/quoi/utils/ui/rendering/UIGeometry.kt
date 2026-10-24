@@ -180,58 +180,6 @@ object UIGeometry {
         return out
     }
 
-    /**
-     * Offsets a closed clockwise outline along its averaged edge normals. Positive values
-     * expand outwards, negative values contract inwards. Point count is preserved so the
-     * result can be paired with the source outline using [bandToQuads].
-     */
-    fun offsetClosedOutline(source: FloatArray, amount: Float): FloatArray {
-        val outline = dedupeClosedOutline(source)
-        val pointCount = outline.size / 2
-        if (pointCount < 2) return FloatArray(0)
-        val out = FloatArray(outline.size)
-        for (i in 0 until pointCount) {
-            val px = outline[((i - 1 + pointCount) % pointCount) * 2]
-            val py = outline[((i - 1 + pointCount) % pointCount) * 2 + 1]
-            val cx = outline[i * 2]
-            val cy = outline[i * 2 + 1]
-            val nx2 = outline[((i + 1) % pointCount) * 2]
-            val ny2 = outline[((i + 1) % pointCount) * 2 + 1]
-
-            // edge normals (clockwise polygon => outward normal is (-dy, dx) negated)
-            var n1x = -(cy - py); var n1y = cx - px
-            var n2x = -(ny2 - cy); var n2y = nx2 - cx
-            val l1 = sqrt(n1x * n1x + n1y * n1y)
-            val l2 = sqrt(n2x * n2x + n2y * n2y)
-            if (l1 > 1e-6f) { n1x /= l1; n1y /= l1 }
-            if (l2 > 1e-6f) { n2x /= l2; n2y /= l2 }
-
-            var mx: Float
-            var my: Float
-            var scale = 1f
-            if (l1 <= 1e-6f || l2 <= 1e-6f) {
-                // degenerate neighbour edge: fall back to the valid normal, no miter
-                mx = if (l2 > 1e-6f) n2x else n1x
-                my = if (l2 > 1e-6f) n2y else n1y
-            } else {
-                mx = n1x + n2x
-                my = n1y + n2y
-                val ml = sqrt(mx * mx + my * my)
-                if (ml > 1e-6f) {
-                    mx /= ml; my /= ml
-                    // miter scale, clamped to avoid spikes on very sharp joins
-                    scale = 1f / (mx * n2x + my * n2y).coerceAtLeast(0.5f)
-                } else {
-                    mx = n2x; my = n2y
-                }
-            }
-
-            out[i * 2] = cx - mx * amount * scale
-            out[i * 2 + 1] = cy - my * amount * scale
-        }
-        return out
-    }
-
     /** Removes coincident consecutive points from a closed outline, incl. the wraparound. */
     fun dedupeClosedOutline(outline: FloatArray): FloatArray {
         val pointCount = outline.size / 2

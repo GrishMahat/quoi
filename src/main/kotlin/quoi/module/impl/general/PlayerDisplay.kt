@@ -2,6 +2,7 @@ package quoi.module.impl.general
 
 import kotlin.reflect.KProperty0
 import net.minecraft.network.chat.Component
+import net.minecraft.network.chat.Style
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.block.Blocks
 import quoi.api.abobaui.constraints.impl.positions.Centre
@@ -30,6 +31,7 @@ import quoi.module.settings.Setting.Companion.json
 import quoi.module.settings.UIComponent.Companion.childOf
 import quoi.utils.commas
 import quoi.utils.ui.rendering.NVGRenderer.minecraftFont
+import java.util.Optional
 
 object PlayerDisplay : Module(
     "Player Display",
@@ -203,21 +205,42 @@ object PlayerDisplay : Module(
     fun modifyActionBar(text: Component): Component {
         if (!this.enabled) return text
 
-        return Component.literal(
-            listOf(
-                health to HP_REGEX,
-                mana to MANA_REGEX,
-                overflowMana to OVERFLOW_REGEX,
-                vitality to VITALITY_REGEX,
-                defence to DEF_REGEX,
-                stacks to STACKS_REGEX,
-                salvation to SALVATION_REGEX,
-                manaUsage to MANA_USAGE_REGEX,
-                secrets to SECRETS_REGEX
-            ).fold(text.string) { acc, (hud, regex) ->
-                if (hud.enabled) acc.replace(regex, "") else acc
-            }.trim()
-        )
+        val content = text.string
+        val removed = BooleanArray(content.length)
+        listOf(
+            health to HP_REGEX,
+            mana to MANA_REGEX,
+            overflowMana to OVERFLOW_REGEX,
+            vitality to VITALITY_REGEX,
+            defence to DEF_REGEX,
+            stacks to STACKS_REGEX,
+            salvation to SALVATION_REGEX,
+            manaUsage to MANA_USAGE_REGEX,
+            secrets to SECRETS_REGEX
+        ).forEach { (hud, regex) ->
+            if (hud.enabled) regex.findAll(content).forEach { match ->
+                match.range.forEach { removed[it] = true }
+            }
+        }
+        if (removed.none { it }) return text
+
+        val start = content.indices.firstOrNull { !removed[it] && !content[it].isWhitespace() }
+            ?: return Component.empty()
+        val end = content.indices.last { !removed[it] && !content[it].isWhitespace() }
+        val result = Component.empty()
+        var offset = 0
+        text.visit({ style, segment ->
+            val retained = buildString {
+                segment.forEachIndexed { index, char ->
+                    val position = offset + index
+                    if (position in start..end && !removed[position]) append(char)
+                }
+            }
+            if (retained.isNotEmpty()) result.append(Component.literal(retained).setStyle(style))
+            offset += segment.length
+            Optional.empty<Unit>()
+        }, Style.EMPTY)
+        return result
     }
 
     enum class HudType {

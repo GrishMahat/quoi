@@ -157,7 +157,6 @@ object ChatUtils {
     }
 
     fun modMessage(message: Any?, id: Int? = null, prefix: Any = this.prefix(), chatStyle: Style? = null) {
-//        val p = if (prefix.isEmpty()) "" else "$prefix "
         val p: MutableComponent = when (prefix) {
             is Component -> Component.empty().append(prefix).append(" ")
             is String -> literal(if (prefix.isEmpty()) "" else "$prefix ")

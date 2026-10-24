@@ -19,10 +19,6 @@ import net.minecraft.core.Direction as McDirection
 // todo cleanup
 object TeleportUtils : Shortcuts {
 
-    fun Vec3.getTeleportPos(yaw: Float, pitch: Float, distance: Double = 12.0): RaycastResult {
-        return predictTransmission(this, yaw, pitch, distance)
-    }
-
     fun Vec3.getEtherPos(yaw: Float, pitch: Float, distance: Double = 61.0): RaycastResult {
         val to = getLook(wrapDegrees(yaw), wrapDegrees(pitch)).scale(distance).add(this)
         return traverseVoxels(this, to, true)
@@ -64,9 +60,6 @@ object TeleportUtils : Shortcuts {
         val direction = getDirection(from.add(0.0, TransmissionPredictor.EYE_HEIGHT, 0.0), to)
         return predictTransmission(from, direction.yaw, direction.pitch, distance)
     }
-
-    fun predictWitherImpact(from: Vec3, yaw: Float, pitch: Float): RaycastResult =
-        predictTransmission(from, yaw, pitch, 10.0)
 
     /**
      * Traverses voxels from start to end and returns the first non-air block it hits.

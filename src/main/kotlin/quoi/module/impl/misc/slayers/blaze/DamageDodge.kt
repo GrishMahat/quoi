@@ -1,18 +1,13 @@
 package quoi.module.impl.misc.slayers.blaze
 
 import net.minecraft.core.BlockPos
-import net.minecraft.network.protocol.game.ClientboundLevelParticlesPacket
 import net.minecraft.world.entity.monster.Blaze
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.level.block.state.BlockState
-import quoi.api.colour.Colour
-import quoi.api.colour.withAlpha
 import quoi.api.events.AreaEvent
 import quoi.api.events.BlockEvent
 import quoi.api.events.GuiEvent
 import quoi.api.events.KeyEvent
-import quoi.api.events.PacketEvent
-import quoi.api.events.RenderEvent
 import quoi.api.events.SlayerEvent
 import quoi.api.events.TickEvent
 import quoi.api.events.core.Priority
@@ -31,9 +26,7 @@ import quoi.utils.WorldUtils.firstNearbyBlock
 import quoi.utils.WorldUtils.registryName
 import quoi.utils.WorldUtils.state
 import quoi.utils.WorldUtils.ticksUntilCollision
-import quoi.utils.aabb
 import quoi.utils.distanceToSqr
-import quoi.utils.render.drawFilledBox
 import quoi.utils.skyblock.player.MovementUtils.cancelMovementTask
 import quoi.utils.skyblock.player.MovementUtils.moveTo
 //? if >=26.2 {
@@ -64,22 +57,10 @@ object DamageDodge : ToggleableGroup(BlazeSlayer, "Damage dodge", desc = "Automa
                 player.moveTo(safe)
             }
 
-//            if (fire) demons?.second?.let { pig ->
-//                if (player.distanceToSqr(pig) > 3) return@let
-//                val safePos =
-//                    player.position().nearbyBlocks(2.0f) { it !in ddrBlocks && it !in fireBlocks && it.solid }
-//                        .minByOrNull { it.center.distanceToSqr(player.position()) }?.center
-//                        ?: return@let modMessage("no safe blocks")
-//
-//                val dir = safePos.subtract(pig.position()).normalize()
-//                val safe = safePos.add(dir.scale(0.3))
-//                player.moveTo(safe)
-//            }
         }
 
         on<BlockEvent.Update> {
             if (Slayers.questState != QuestState.KILLING) return@on
-//            if (demons == null && !blazeBoss.canDDR) return@on
 
             if (ddr) {
                 if (pos in ddrBlocks && old.isTerra && !updated.isTerra) {
@@ -120,22 +101,9 @@ object DamageDodge : ToggleableGroup(BlazeSlayer, "Damage dodge", desc = "Automa
             val ticks = ticksUntilCollision(closest) ?: return@on
             if (ticks <= 1.5) {
                 input.stop()
-//                input.shift = true
             }
         }
 
-//        on<RenderEvent.World> { // temp
-//            fireBlocks.forEach {
-//                ctx.drawFilledBox(it.aabb, Colour.CYAN, depth = true)
-//            }
-//            ddrBlocks.forEach {
-//                ctx.drawFilledBox(it.aabb, Colour.PINK.withAlpha(50), depth = true)
-//            }
-//        }
-//
-//        on<PacketEvent.Received, ClientboundLevelParticlesPacket> { // temp
-//            cancel()
-//        }
 
         on<SlayerEvent.State> {
             if (new == QuestState.SLAIN) onDisable()

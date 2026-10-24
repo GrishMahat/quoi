@@ -68,21 +68,6 @@ fun ElementScope<*>.numberField(label: String, value: () -> Double, min: Double 
     }
 }
 
-fun ElementScope<*>.optionalNumberField(label: String, value: () -> Float?, update: (Float?) -> Unit) = column(size(w = 104.px.coerceAtMost(Copying)), gap = 4.px) {
-    text(string = label, size = 14.px, colour = theme.onSurfaceVariant)
-    themedInput(size = size(Copying, 28.px)) {
-        textInput(string = value()?.toString() ?: "", pos = at(x = 8.px, y = Centre), size = 14.px,
-            colour = theme.onSurface, caretColour = theme.primary) {
-            maxWidth(Copying - 16.px)
-            onTextChanged { event ->
-                if (event.string.isBlank()) update(null)
-                else event.string.toFloatOrNull()?.takeIf { it.isFinite() && it >= 0 }?.let(update)
-            }
-            onFocusLost { string = value()?.toString() ?: "" }
-        }
-    }
-}
-
 /**
  * Lays out [fields] using their relative [weights], subtracting the gaps from the available width.
  */

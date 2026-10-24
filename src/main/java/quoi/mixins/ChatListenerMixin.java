@@ -10,7 +10,19 @@ import org.spongepowered.asm.mixin.injection.ModifyArg;
 @Mixin(ChatListener.class)
 public class ChatListenerMixin {
 
-    @ModifyArg(method = "handleSystemMessage", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/Gui;setOverlayMessage(Lnet/minecraft/network/chat/Component;Z)V"), index = 0)
+    @ModifyArg(
+            method = "handleOverlay",
+            at = @At(
+                    value = "INVOKE",
+                    //? if <26.2 {
+                    target = "Lnet/minecraft/client/gui/Gui;setOverlayMessage(Lnet/minecraft/network/chat/Component;Z)V"
+                    //?} else {
+                    /*target = "Lnet/minecraft/client/gui/Hud;setOverlayMessage(Lnet/minecraft/network/chat/Component;Z)V"
+                    *///?}
+            ),
+            index = 0,
+            require = 1
+    )
     private Component modifyOverlayMessage(Component original) {
         return PlayerDisplay.modifyActionBar(original);
     }

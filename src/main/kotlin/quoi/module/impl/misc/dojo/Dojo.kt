@@ -1,7 +1,6 @@
 package quoi.module.impl.misc.dojo
 
 import net.minecraft.world.phys.Vec3
-import quoi.api.events.AreaEvent
 import quoi.api.events.ChatEvent
 import quoi.api.events.RenderEvent
 import quoi.api.events.core.on
@@ -20,7 +19,6 @@ object Dojo : Module(
 
     private val features = setOf(
         Force,
-//        Stamina,
         Mastery,
         Discipline,
         Swiftness,
@@ -35,10 +33,6 @@ object Dojo : Module(
             ctx.drawText(dojoType.name, 0, 0)
         }
 
-//        on<AreaEvent.Sub> {
-//            if (subarea?.contains("dogo") == false)
-//                dojoType = DojoType.NONE
-//        }
     }
 
     val centre = Vec3(-207.0, 99.0, -598.0)

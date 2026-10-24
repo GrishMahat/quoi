@@ -252,7 +252,6 @@ object PetUtils : EventListener, Shortcuts {
 
         val pet = current.copy(level = level)
         updatePet(pet)
-        PetEvent.LevelUp(pet).post()
     }
 
     private fun cachePet(pet: Pet) {

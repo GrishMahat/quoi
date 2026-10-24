@@ -44,7 +44,6 @@ object EventDispatcher {
         private set
 
     private var lastWorld: ClientLevel? = null
-    private var tabLoaded = false
     private val secretBlocks = hashSetOf<BlockPos>()
     private val secretItems = hashSetOf<Int>()
     private val secretBats = hashSetOf<Int>()
@@ -57,10 +56,6 @@ object EventDispatcher {
                 lastWorld = world
             }
 
-            if (!tabLoaded && !mc.connection?.listedOnlinePlayers.isNullOrEmpty()) {
-                tabLoaded = true
-                WorldEvent.Load.End().post()
-            }
             if (mc.level != null && mc.player != null) TickEvent.Start().post()
         }
         ClientTickEvents.END_CLIENT_TICK.register { if (mc.level != null && mc.player != null) TickEvent.End().post() }
@@ -76,7 +71,6 @@ object EventDispatcher {
             secretBats.clear()
             WorldEvent.Change().post()
             totalTicks = 0
-            tabLoaded = false
             lastWorld = null
         }
 

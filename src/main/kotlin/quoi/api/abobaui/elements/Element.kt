@@ -63,7 +63,6 @@ abstract class Element(
 
     var renders: Boolean = true
         get() = field && enabled
-//        private set
 
     var pressed: Boolean = false
 
@@ -261,9 +260,6 @@ abstract class Element(
         if (events != null) {
             val key: Any = if (event is AbobaEvent.NonSpecific) event::class.java else event
             val listeners = events!![key] ?: return false
-//            when (event) {
-//                is Lifetime -> events!!.remove(key)
-//            }
             listeners.forEach { if (it(event)) return true }
         }
         return false

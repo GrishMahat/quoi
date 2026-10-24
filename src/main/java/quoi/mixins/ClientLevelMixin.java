@@ -19,16 +19,6 @@ import quoi.module.impl.render.RenderOptimiser;
 public class ClientLevelMixin {
 
     @Inject(
-            method = "removeEntity",
-            at = @At("HEAD"),
-            cancellable = true
-    )
-    private void quoi$onRemoveEntity(int entityId, Entity.RemovalReason removalReason, CallbackInfo ci) {
-        Entity entity = ((ClientLevel) (Object) this).getEntity(entityId);
-        if (entity != null && new EntityEvent.Despawn(entity, removalReason).post()) ci.cancel();
-    }
-
-    @Inject(
             method = "addEntity",
             at = @At("TAIL")
     )

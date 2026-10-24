@@ -2,7 +2,6 @@ package quoi.mixins;
 
 import quoi.module.impl.general.PlayerDisplay;
 import quoi.module.impl.general.PlayerDisplay.HudType;
-import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.world.entity.player.Player;
@@ -28,17 +27,6 @@ public class LegacyGuiMixin {
             return 0.0F;
         }
         return instance.getAbsorptionAmount();
-    }
-
-    @Inject(
-            method = "render",
-            at = @At(
-                    value = "INVOKE",
-                    target = "Lnet/minecraft/client/gui/Gui;renderSleepOverlay(Lnet/minecraft/client/gui/GuiGraphicsExtractor;Lnet/minecraft/client/DeltaTracker;)V"
-            )
-    )
-    private void render(GuiGraphicsExtractor guiGraphics, DeltaTracker deltaTracker, CallbackInfo ci) {
-//        new RenderEvent.Overlay(guiGraphics, deltaTracker).post();
     }
 
     @Inject(

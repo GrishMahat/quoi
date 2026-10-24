@@ -63,9 +63,10 @@ public abstract class ChatComponentMixin implements IChatComponent {
             method = "addMessageToDisplayQueue",
             at = @At(
                     value = "INVOKE",
-                    target = "Ljava/util/List;add(ILjava/lang/Object;)V"
+                    target = "Ljava/util/List;addFirst(Ljava/lang/Object;)V"
             ),
-            index = 1
+            index = 0,
+            require = 1
     )
     private Object onAddVisibleLine(Object line) {
         if (nextId != 0) {
@@ -91,15 +92,6 @@ public abstract class ChatComponentMixin implements IChatComponent {
     )
     private void onAddMessage(Component message, MessageSignature signatureData, GuiMessageSource source, GuiMessageTag indicator, CallbackInfo ci) {
         if (new ChatEvent.Receive(message.getString(), message, nextId).post()) ci.cancel();
-    }
-
-    @Inject(
-            method = "addMessage(Lnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/MessageSignature;Lnet/minecraft/client/multiplayer/chat/GuiMessageSource;Lnet/minecraft/client/multiplayer/chat/GuiMessageTag;)V",
-            at = @At("TAIL"),
-            cancellable = true
-    )
-    private void onAddMessagePost(Component message, MessageSignature signatureData, GuiMessageSource source, GuiMessageTag indicator, CallbackInfo ci) {
-        if (new ChatEvent.Receive.Post(message.getString(), message, nextId).post()) ci.cancel();
     }
 
     @Inject(

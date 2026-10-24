@@ -147,7 +147,6 @@ object ClickGui : Module(
                         height.animate(0.25.seconds, style = Animation.Style.EaseInOutQuint)
                         redraw()
                         data.extended = !data.extended
-                        println(moduleScopes)
                         true
                     }
 
@@ -313,8 +312,6 @@ object ClickGui : Module(
     }
 
     private fun normaliseSearchText(string: String?) = string.noControlCodes.lowercase().trim()
-
-    private var popup: Popup? = null
 
     fun ElementScope<*>.description(desc: String) {
         if (desc.isEmpty()) return

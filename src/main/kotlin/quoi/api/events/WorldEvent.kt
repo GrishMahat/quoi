@@ -10,6 +10,5 @@ abstract class WorldEvent {
     class Change : UnfilteredEvent()
     abstract class Load {
         class Start : UnfilteredEvent()
-        class End : UnfilteredEvent() // tab list and everything loaded
     }
 }

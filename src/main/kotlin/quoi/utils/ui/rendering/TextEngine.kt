@@ -9,8 +9,6 @@ import quoi.utils.FormattingCodes
  */
 object TextEngine {
 
-    val FORMATTING_CODE = Regex("[§&][0-9a-fk-or]", RegexOption.IGNORE_CASE)
-
     fun stripCodes(text: String): String = FormattingCodes.strip(text)
 
     data class Segment(val text: String, val color: Int, val underline: Boolean, val strike: Boolean)

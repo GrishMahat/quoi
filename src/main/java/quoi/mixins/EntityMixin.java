@@ -4,7 +4,6 @@ import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import net.minecraft.client.Minecraft;
 import quoi.api.events.EntityEvent;
 import quoi.api.world.Direction;
-import quoi.mixininterfaces.IEntityGlow;
 import net.minecraft.world.entity.Entity;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -14,32 +13,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import quoi.utils.skyblock.player.RotationUtils;
 
 @Mixin(Entity.class)
-public class EntityMixin implements IEntityGlow {
+public class EntityMixin {
 
     @Unique
     private int glowColour = 0xFFFFFF;
     @Unique
     private boolean forceGlow = false;
-
-    @Override
-    public int quoi$getGlowColour() {
-        return glowColour;
-    }
-
-    @Override
-    public void quoi$setGlowColour(int colour) {
-        this.glowColour = colour;
-    }
-
-    @Override
-    public boolean quoi$getForceGlow() {
-        return forceGlow;
-    }
-
-    @Override
-    public void quoi$setForceGlow(boolean value) {
-        this.forceGlow = value;
-    }
 
     @Inject(
             method = "isCurrentlyGlowing",

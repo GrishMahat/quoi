@@ -119,24 +119,6 @@ fun BlockPos.rotateToNorth(rotation: Rotations): BlockPos =
         else -> this
     }
 
-//fun Vec3.rotateAroundNorth(rotation: Rotations): Vec3 =
-//    when (rotation) {
-//        Rotations.NORTH -> Vec3(-x, y, -z)
-//        Rotations.WEST  -> Vec3(-z, y, x)
-//        Rotations.SOUTH -> Vec3(x, y, z)
-//        Rotations.EAST  -> Vec3(z, y, -x)
-//        else -> this
-//    }
-//
-//fun Vec3.rotateToNorth(rotation: Rotations): Vec3 =
-//    when (rotation) {
-//        Rotations.NORTH -> Vec3(-x, y, -z)
-//        Rotations.WEST  -> Vec3(z, y, -x)
-//        Rotations.SOUTH -> Vec3(x, y, z)
-//        Rotations.EAST  -> Vec3(-z, y, x)
-//        else -> this
-//    }
-
 fun Vec3.rotateAroundNorth(rotation: Rotations): Vec3 { // fixes my stupidity // I am actually the dumbest person alive.
     val ix = floor(x).toInt()
     val iy = floor(y).toInt()

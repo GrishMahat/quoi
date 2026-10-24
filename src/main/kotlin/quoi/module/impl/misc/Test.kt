@@ -5,7 +5,6 @@ import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.ambient.Bat
 import net.minecraft.world.entity.decoration.ArmorStand
 import net.minecraft.world.level.block.Blocks
-import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.Vec3
 import quoi.api.abobaui.dsl.radius
@@ -106,7 +105,6 @@ object Test : Module("Test", desc = "Dev module for testing.") {
     private val zapto by switch("Zapto", true)
     private val inSB by switch("In skyblock", true)
     private val lobby by switch("Lobby", true)
-//    private val inDung by BooleanSetting("In dungeon", true)
     private val area_ by switch("Area", true)
     private val subarea_ by switch("Subarea", true)
     private val boss by switch("Boss", true)
@@ -139,7 +137,7 @@ object Test : Module("Test", desc = "Dev module for testing.") {
                 }
             }
         }
-    }.withSettings(::hypixel, ::inSB, /*::inDung,*/::lobby, ::area_, ::subarea_, ::boss, ::floor, ::p3Stage, ::p3Players, ::container
+    }.withSettings(::hypixel, ::inSB, ::lobby, ::area_, ::subarea_, ::boss, ::floor, ::p3Stage, ::p3Players, ::container
     ).setting()
 
     private val collectData by switch("Collect mob data")
@@ -150,34 +148,14 @@ object Test : Module("Test", desc = "Dev module for testing.") {
 
         command.sub("inventory") {
             scheduleTask(20) {
-//                ChatUtils.command("/ac")
-//                containerTask(name = "Tes&at") {
-//                    awaitingContainer("Anticheat") {
-//                        pickup("Multi-Select".any).unlessName("ON")
-//                        pickup("NCP".menu).unlessLore("ACTIVE")
-//                        pickup("Grim".any).unlessLore("ACTIVE")
-//                        pickup("Apply".any)
-//                    }
-//                }.run()
-
                 ChatUtils.command("/wd")
                 val start = System.currentTimeMillis()
                 containerTask(name = "wd test") { // idk it feels slow as shit... maybe it's cuz I have 250ms.
-//                    awaitingContainer(Regex("""^\((\d+)/(\d+)\) Armor Sets$""")/*, waitForItems = true*/) {
-////                        pickup(53.menu)
-////                        pickup(45.menu)
-//                        pickup(36.menu)//.unlessName("Equipped")
-//                    }
                     awaitContainer(Regex("""^\((\d+)/(\d+)\) Armor Sets$"""))
                     pickup(36.menu)
                     action { player.closeContainer() }
                     // hypixel reopens and insta closes the window if you close it manually when you trigger reopen
                     awaitContainer(Regex("""^\((\d+)/(\d+)\) Armor Sets$""")) // todo make it conditional or sm (if you don't click anything to trigger reopen)
-
-//                    awaitingContainer(Regex("""^\((\d+)/(\d+)\) Armor Sets$""")) {
-//                        pickup(36.menu)
-//                        action { player.closeContainer() }
-//                    }
 
                     onComplete {
                         modMessage(System.currentTimeMillis() - start)
@@ -225,7 +203,6 @@ object Test : Module("Test", desc = "Dev module for testing.") {
         }
 
         command.sub("mineblock") { custom: Boolean? ->
-//            EventListenerTests.runAll()
             mc.hitResult?.let {
                 if (it !is BlockHitResult) return@let
                 AuraManager.breakBlock(it.blockPos, custom = custom ?: false)
@@ -233,13 +210,9 @@ object Test : Module("Test", desc = "Dev module for testing.") {
         }
 
         command.sub("transpath") {
-//            val room = Dungeon.currentRoom ?: return@sub modMessage("room is null")
-//            pathToMobs(player.position(), room)
-
             val goal = BlockPos(-1900, 65, -1900)
             path = WalkPathfinder.findPath(player.position(), goal, feedback = true)
             path?.let { player.moveTo(it) }
-//            player.moveTo(goal)
         }
 
         command.sub("spawnstarred") {
@@ -250,11 +223,6 @@ object Test : Module("Test", desc = "Dev module for testing.") {
             val room = Dungeon.currentRoom ?: return@sub modMessage("room i snull")
             clusters = MobClusterer.getOrderedClusters(player.position(), room.starredMobs)
         }
-
-//        onAsync<TickEvent.End> {
-//            modMessage(asyncScopes.size)
-//            wait(20)
-//        }
 
         on<RenderEvent.World> {
             if (clusters != null) {
@@ -270,26 +238,8 @@ object Test : Module("Test", desc = "Dev module for testing.") {
 
             if (path != null) {
                 val path = path!!
-//                path.forEach {
-//                    ctx.drawFilledBox(it.aabb, colour = Colour.ORANGE.withAlpha(150))
-//                }
                 ctx.drawLine(path, colour = Colour.WHITE, depth = false)
             }
-//            val a = BlockPos(-1900, 67, -1900)
-//            highlightTest.draw(ctx, a.aabb)
-//            tracerTest.draw(ctx, a.center)
-
-//            val simulation = PlayerSimulation.simulation
-//            val points = mutableListOf<Vec3>()
-//
-//            points.add(player.position())
-//
-//            repeat(20) {
-//                val snapshot = simulation.getSnapshotAt(it + 1)
-//                points.add(snapshot.pos)
-//            }
-//
-//            ctx.drawLine(points, Colour.WHITE, depth = true)
         }
 
         on<DungeonEvent.Room.Scan> {
@@ -305,27 +255,7 @@ object Test : Module("Test", desc = "Dev module for testing.") {
             currRooms.clear()
         }
 
-//        on<TickEvent.Start> {
-////            println("test")
-//        }
-
-//        on<KeyEvent.Input>(Priority.LOW) {
-//            if (!input.moving || player.blocksAtFeet(0.0, fire).any()) return@on
-//            val ticks = ticksUntilCollision(BlockPos(-1900, 66, -1900)) ?: return@on
-//            if (ticks <= 1) {
-//                input.forward = false
-//                input.backward = false
-//                input.left = false
-//                input.right = false
-//                input.shift = true
-//            }
-//        }
-
         command.register()
-    }
-
-    private val fire: (BlockPos, BlockState) -> Boolean = { _, state ->
-        state.block == Blocks.FIRE
     }
 
     private var clusters: List<MobCluster>? = null
@@ -389,7 +319,6 @@ object Test : Module("Test", desc = "Dev module for testing.") {
         Data("Zapto", { Location.onZapto }, { zapto }),
         Data("Skyblock", { Location.inSkyblock }, { inSB }),
         Data("Lobby", { Location.currentServer ?: "None" }, { lobby }),
-//        Data("Dungeon", { Dungeon.inDungeons }, { inDung }),
         Data("Area", { Location.currentArea }, { area_ }),
         Data("Subarea", { Location.subarea ?: "None" }, { subarea_ }),
         Data("Boss", { Dungeon.inBoss }, { boss }),

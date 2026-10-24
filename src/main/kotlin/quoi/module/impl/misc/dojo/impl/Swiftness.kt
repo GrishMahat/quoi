@@ -25,8 +25,6 @@ import quoi.utils.skyblock.player.RotationUtils.rotateSmoothly
 
 // todo fix it randomly stopping
 object Swiftness : ToggleableGroup(Dojo, "Swiftness", subarea = "dojo arena") { // kinda rng but good enough for 2-3k
-//    private val tracer = tracer(distance = null) // I doubt it's even useful since it goes crazy after around 1k score..
-//    private val auto by switch("Auto")
     private val fullStop by switch("Full stop", desc = "Fully stops after walking.") // doesn't really change anything lowkey
     private val magicNumber by slider("Magic number", 0.3, 0.0, 0.5, 0.05, desc = "Adjust it and maybe it will suck less.")
     private val magicNumber2 by slider("Magic number 2", 9, 4, 9, 0.5, desc = "Adjust it and maybe it will suck less 2.") // todo maybe get rid of these and fucking improve moveto.

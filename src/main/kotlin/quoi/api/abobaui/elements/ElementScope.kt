@@ -158,6 +158,3 @@ open class ElementScope<E : Element>(val element: E) {
 
     fun transform(transform: Transform) = element.addTransform(transform)
 }
-
-@DslMarker
-annotation class AbobaDSL

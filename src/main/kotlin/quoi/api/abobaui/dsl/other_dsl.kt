@@ -4,7 +4,6 @@ import quoi.api.abobaui.AbobaUI
 import quoi.api.abobaui.elements.Element
 import quoi.api.abobaui.elements.ElementScope
 import quoi.api.abobaui.elements.impl.Group
-import quoi.api.abobaui.events.AbobaEvent
 import quoi.api.abobaui.transforms.impl.Alpha
 import quoi.api.abobaui.transforms.impl.Rotation
 import quoi.api.abobaui.transforms.impl.Scale
@@ -13,9 +12,6 @@ import quoi.utils.sf
 import quoi.utils.ui.data.Radii
 
 fun aboba(title: String = "", block: ElementScope<Group>.() -> Unit): AbobaUI.Instance {
-//    val ui = AbobaUI(title)
-//    ElementScope(ui.main).block()
-//    return ui
     return AbobaUI.Instance(title, block)
 }
 
@@ -114,12 +110,6 @@ fun Element.withScale(block: () -> Unit) {
 
         block()
     }
-}
-
-
-
-fun ElementScope<*>.passEvent(event: AbobaEvent, to: ElementScope<*>) {
-    ui.eventManager.postToAll(event, to.element)
 }
 
 fun <E : Element> ElementScope<E>.toggle(): ElementScope<E> {

@@ -42,7 +42,6 @@ object LeapMenu : Module(
     val customOrder by ListSetting("Custom sorting", mutableListOf<String>())
     private val shadow by switch("Shadow")
     private val onlyClass by switch("Only class", desc = "Renders only classes.")
-//    private val renderHeads by BooleanSetting("Render heads", desc = "Renders teammate heads.")
     private val bgCol by colourPicker("Background colour", Colour.MINECRAFT_DARK_GRAY.withAlpha(150), allowAlpha = true, desc = "Leap menu background colour.")
     private val scale by slider("Scale", 5.0f, 0.1f, 15.0f, 0.1f, desc = "Leap menu scale.")
     private val gap by slider("Gap", 50, 0, 500, 10)

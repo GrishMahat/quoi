@@ -8,14 +8,7 @@ abstract class PartyEvent {
 
     abstract class Member {
         class Join(val name: String, val clazz: DungeonClass? = null) : Event()
-        class Leave(val name: String) : Event()
     }
-
-    abstract class Leader {
-        class Change(val old: String?, val new: String?) : Event()
-    }
-
-    class Create : Event()
 
     class Disband : Event()
 }

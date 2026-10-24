@@ -17,7 +17,6 @@ import quoi.module.impl.misc.dojo.DojoType
 import quoi.module.settings.group.ToggleableGroup
 import quoi.utils.BlockPos
 import quoi.utils.aabb
-import quoi.utils.floorPos
 import quoi.utils.skyblock.player.MovementUtils.cancelMovementTask
 
 object Tenacity : ToggleableGroup(Dojo, "Tenacity", subarea = "dojo arena") {
@@ -26,7 +25,6 @@ object Tenacity : ToggleableGroup(Dojo, "Tenacity", subarea = "dojo arena") {
     private val style = highlight(glow = false).childOf(::highlight)
     private val line = tracer("Line", colour = null).childOf(::highlight)
 
-//    private val auto by switch("Auto dodge")
 
     private val fireballs = mutableListOf<Fireball>()
 
@@ -62,13 +60,6 @@ object Tenacity : ToggleableGroup(Dojo, "Tenacity", subarea = "dojo arena") {
 
         on<TickEvent.End> {
             penis()
-//            if (!auto) return@on
-//            val dangerBlocks = fireballs.flatMapTo(mutableSetOf()) { it.blocks }
-//
-//            val floor = player.position().floorPos
-//
-//            if (floor !in dangerBlocks) return@on
-//            // todo find optimal block and move
             // no fucking idea how legits do this shit. it's cancer.
         }
 
@@ -101,12 +92,7 @@ object Tenacity : ToggleableGroup(Dojo, "Tenacity", subarea = "dojo arena") {
             it.end = hit.location
             it.box = AABB.ofSize(hit.location, 3.0, 0.1, 3.0)
 
-//            val blocks = BlockPos.betweenClosed(bp.x - 1, 98, bp.z - 1, bp.x + 1, 98, bp.z + 1).toMutableSet()
             val blocks = mutableSetOf<BlockPos>()
-//            val bp = hit.blockPos
-//            for (x in bp.x - 1..bp.x + 1)
-//                for (z in bp.z - 1..bp.z + 1)
-//                    blocks += BlockPos(x, 98, z)
 
             val path = hit.location.subtract(start)
             val distance = path.length()

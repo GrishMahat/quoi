@@ -57,7 +57,6 @@ class ResizableHud(
             var resizing = false
 
             onClick {
-//                if (!Keyboard.Modifier.isShiftDown) return@onClick false
                 clickedX = ui.mx
                 clickedY = ui.my
                 w = width.value
@@ -73,7 +72,6 @@ class ResizableHud(
 
             onMouseMove {
                 if (!resizing) return@onMouseMove false
-                println("TEST")
                 val diffX = ui.mx - clickedX
                 val diffY = ui.my - clickedY
 
