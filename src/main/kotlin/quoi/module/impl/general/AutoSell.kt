@@ -120,6 +120,7 @@ object AutoSell : Module(
     private fun normalizeSellEntry(name: String, reforge: String? = null): String {
         val normalized = name.noControlCodes
             .replace(UPGRADE_REGEX, "")
+            .replace("◆", "")
             .trim()
             .replace(STACK_SIZE_REGEX, "")
             .trim()
