@@ -12,6 +12,7 @@ import quoi.api.autoroutes.nodes.EtherwarpNode
 import quoi.api.colour.Colour
 import quoi.api.colour.withAlpha
 import quoi.api.events.*
+import quoi.api.events.core.EventDispatcher
 import quoi.api.events.core.on
 import quoi.api.skyblock.dungeon.odonscanning.ScanUtils
 import quoi.api.skyblock.dungeon.Dungeon
@@ -83,7 +84,6 @@ object AutoRoutes : Module(
     private data class PendingInteract(val direction: Direction, val slot: Int)
     private var pendingInteract: PendingInteract? = null
     private var position: MutableVec3? = null
-    private val batIds = hashSetOf<Int>()
     private var interactDelay = 0
 
     private var activeNode: RouteNode? = null
@@ -111,11 +111,8 @@ object AutoRoutes : Module(
             }
 
             if (activeNode?.hasSecretAwait == true) {
-                EntityUtils.getEntities<Bat>(radius = 10.0) { it.maxHealth.equalsOneOf(100f, 200f, 400f, 800f) && it.id !in batIds }
-                    .forEach { bat ->
-                        batIds.add(bat.id)
-                        activeNode?.onSecret()
-                    }
+                EntityUtils.getEntities<Bat>(radius = 10.0) { it.maxHealth.equalsOneOf(100f, 200f, 400f, 800f) }
+                    .forEach { EventDispatcher.onSecretBat(it.id) }
             }
 
             if (position == null) {
@@ -278,7 +275,6 @@ object AutoRoutes : Module(
         position = null
         executing = false
         interactDelay = 0
-        batIds.clear()
         lastChainName = null
         lastChainIndex = -1
     }

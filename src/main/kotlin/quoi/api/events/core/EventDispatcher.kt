@@ -13,13 +13,16 @@ import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents
 import net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents
 import net.minecraft.client.multiplayer.ClientLevel
+import net.minecraft.core.BlockPos
 import net.minecraft.network.protocol.Packet
 import net.minecraft.network.protocol.common.ClientboundPingPacket
 import net.minecraft.network.protocol.game.*
 import net.minecraft.resources.Identifier
 import net.minecraft.sounds.SoundEvents
 import net.minecraft.world.InteractionHand
+import net.minecraft.world.entity.ambient.Bat
 import net.minecraft.world.entity.item.ItemEntity
+import net.minecraft.world.phys.Vec3
 import quoi.QuoiMod
 import quoi.QuoiMod.mc
 import quoi.api.events.*
@@ -28,6 +31,7 @@ import quoi.api.events.*
 *///?}
 import quoi.api.skyblock.dungeon.Dungeon
 import quoi.api.skyblock.dungeon.Dungeon.dungeonItemDrops
+import quoi.utils.EntityUtils
 import quoi.utils.StringUtils.containsOneOf
 import quoi.utils.StringUtils.noControlCodes
 import quoi.utils.equalsOneOf
@@ -41,6 +45,9 @@ object EventDispatcher {
 
     private var lastWorld: ClientLevel? = null
     private var tabLoaded = false
+    private val secretBlocks = hashSetOf<BlockPos>()
+    private val secretItems = hashSetOf<Int>()
+    private val secretBats = hashSetOf<Int>()
 
     init {
         ClientTickEvents.START_CLIENT_TICK.register {
@@ -64,6 +71,9 @@ object EventDispatcher {
         ClientLifecycleEvents.CLIENT_STOPPING.register { GameEvent.Unload().post() }
 
         ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE.register { _, _ ->
+            secretBlocks.clear()
+            secretItems.clear()
+            secretBats.clear()
             WorldEvent.Change().post()
             totalTicks = 0
             tabLoaded = false
@@ -79,6 +89,9 @@ object EventDispatcher {
         }
 
         ClientPlayConnectionEvents.DISCONNECT.register { handler, _ ->
+            secretBlocks.clear()
+            secretItems.clear()
+            secretBats.clear()
             WorldEvent.Change().post()
             ServerEvent.Disconnect(handler.serverData?.ip ?: "SinglePlayer").post()
         }
@@ -121,27 +134,18 @@ object EventDispatcher {
             }
             is ClientboundTakeItemEntityPacket -> {
                 val player = mc.player ?: return false
-                if (!Dungeon.inClear) return false
+                if (!Dungeon.inClear || packet.playerId != player.id) return false
                 val entity = mc.level?.getEntity(packet.itemId) as? ItemEntity ?: return false
-                if (entity.item.hoverName.string.containsOneOf(dungeonItemDrops, true) && entity.distanceTo(player) <= 6)
+                if (entity.item.hoverName.string.containsOneOf(dungeonItemDrops, true) && entity.distanceTo(player) <= 6 && secretItems.add(entity.id))
                     DungeonEvent.Secret.Item(entity).post()
                 else false
             }
-            is ClientboundRemoveEntitiesPacket -> {
-                val player = mc.player ?: return false
-                if (!Dungeon.inClear) return false
-                packet.entityIds.forEach { id ->
-                    val entity = mc.level?.getEntity(id) as? ItemEntity ?: return@forEach
-                    if (entity.item.hoverName.string.containsOneOf(dungeonItemDrops, true) && entity.distanceTo(player) <= 6)
-                        DungeonEvent.Secret.Item(entity).post()
-                }
-                false
-            }
             is ClientboundSoundPacket -> {
                 if (!Dungeon.inClear) return false
-                if (packet.sound.value().equalsOneOf(SoundEvents.BAT_HURT, SoundEvents.BAT_DEATH) && packet.volume == 0.1f)
-                    DungeonEvent.Secret.Bat(packet).post()
-                else false
+                if (!packet.sound.value().equalsOneOf(SoundEvents.BAT_HURT, SoundEvents.BAT_DEATH) || packet.volume != 0.1f) return false
+                val pos = Vec3(packet.x, packet.y, packet.z)
+                val bat = EntityUtils.getEntities<Bat>(pos, 1.0).minByOrNull { it.distanceToSqr(pos) } ?: return false
+                onSecretBat(bat.id)
             }
             else -> false
         }
@@ -156,10 +160,16 @@ object EventDispatcher {
             is ServerboundUseItemOnPacket -> {
                 if (!Dungeon.inDungeons || packet.hand == InteractionHand.OFF_HAND) return false
                 val pos = packet.hitResult.blockPos
-                DungeonEvent.Secret.Interact(pos, mc.level?.getBlockState(pos)?.takeIf { Dungeon.isSecret(it, pos) } ?: return false).post()
+                val state = mc.level?.getBlockState(pos)?.takeIf { Dungeon.isSecret(it, pos) } ?: return false
+                if (secretBlocks.add(pos.immutable())) DungeonEvent.Secret.Interact(pos, state).post()
                 false
             }
             else -> false
         }
+    }
+
+    fun onSecretBat(entityId: Int): Boolean {
+        if (!secretBats.add(entityId)) return false
+        return DungeonEvent.Secret.Bat().post()
     }
 }

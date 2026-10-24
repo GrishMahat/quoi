@@ -1,7 +1,6 @@
 package quoi.api.events
 
 import net.minecraft.core.BlockPos
-import net.minecraft.network.protocol.game.ClientboundSoundPacket
 import net.minecraft.world.entity.item.ItemEntity
 import net.minecraft.world.level.block.state.BlockState
 import quoi.api.events.core.Event
@@ -18,7 +17,7 @@ abstract class DungeonEvent {
     abstract class Secret {
         class Interact(val blockPos: BlockPos, val blockState: BlockState) : Event()
         class Item(val entity: ItemEntity) : Event()
-        class Bat(val packet: ClientboundSoundPacket) : Event()
+        class Bat : Event()
     }
 
     abstract class Room {
