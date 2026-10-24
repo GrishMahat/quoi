@@ -92,6 +92,11 @@ dependencies {
     }
     compileOnly("com.terraformersmc:modmenu:${property("modmenu_version")}")
 
+    testImplementation(platform("org.junit:junit-bom:${property("junit_version")}"))
+    testImplementation(kotlin("test-junit5"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
     property("classgraph_version").let {
         implementation("io.github.classgraph:classgraph:$it")
         listOf("classgraph", "classgraph-classpath", "classgraph-vfs", "classgraph-base").forEach { artifact ->
@@ -133,6 +138,10 @@ loom {
 }
 
 tasks {
+    test {
+        useJUnitPlatform()
+    }
+
     register<Sync>("collectJar") {
         group = "build"
         description = "Collects this Minecraft version's JAR in the root build/libs directory."
