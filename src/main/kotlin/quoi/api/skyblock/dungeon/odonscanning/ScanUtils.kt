@@ -98,6 +98,10 @@ object ScanUtils : EventListener, Shortcuts {
             MapRenderer.refresh()
         }
 
+        on<DungeonEvent.Room.State> {
+            MapRenderer.refresh()
+        }
+
         on<DungeonEvent.Enter> { MapScan.initFloor(floor.floorNumber) }
 
         on<PacketEvent.ReceivedPost> {
@@ -237,6 +241,7 @@ object ScanUtils : EventListener, Shortcuts {
             }
         }
         if (other.data.state.ordinal < room.data.state.ordinal) room.data.state = other.data.state
+        room.secretsFound = listOfNotNull(room.secretsFound, other.secretsFound).maxOrNull()
         if (room.highestBlock == null) room.highestBlock = other.highestBlock
         grid.indices.filter { grid[it] === other }.forEach { grid[it] = room }
         uniqueRooms.entries.filter { it.value === other }.forEach { it.setValue(room) }

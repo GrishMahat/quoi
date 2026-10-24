@@ -7,7 +7,9 @@ import quoi.api.events.TickEvent
 import quoi.api.events.WorldEvent
 import quoi.api.events.core.EventListener
 import quoi.api.events.core.on
+import quoi.api.skyblock.dungeon.Dungeon
 import quoi.api.skyblock.dungeon.Dungeon.getMageCooldownMultiplier
+import quoi.api.skyblock.dungeon.odonscanning.ScanUtils
 import quoi.utils.Scheduler.scheduleLoop
 import quoi.utils.Shortcuts
 import quoi.utils.StringUtils.capitaliseFirst
@@ -116,6 +118,10 @@ object SkyblockPlayer : EventListener, Shortcuts {
             SECRETS_REGEX.find(message)?.destructured?.let { (current, max) ->
                 currentSecrets = current.toInt()
                 maxSecrets = max.toInt()
+                if (Dungeon.inClear) {
+                    val room = ScanUtils.getRoomFromPos(player.x, player.z)
+                    if (room != null && room.data.secrets == maxSecrets) room.secretsFound = currentSecrets
+                }
             } ?: run {
                 currentSecrets = -1
                 maxSecrets = -1

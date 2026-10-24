@@ -11,6 +11,7 @@ import quoi.api.colour.Colour
 import quoi.api.colour.mix
 import quoi.api.colour.multiply
 import quoi.api.events.DungeonEvent
+import quoi.api.skyblock.dungeon.odonscanning.MapRenderer
 import quoi.api.skyblock.dungeon.odonscanning.ScanUtils
 import quoi.api.vec.MutableVec3
 import quoi.module.impl.dungeon.DungeonMap
@@ -31,6 +32,14 @@ class OdonRoom(
     val identified get() = data.cores.isNotEmpty()
     var highestBlock: Int? = null
     val ready get() = identified && rotation != Rotations.NONE && highestBlock != null
+
+    var secretsFound: Int? = null
+        get() = if (data.state == RoomState.GREEN || identified && data.secrets == 0) data.secrets else field
+        set(value) {
+            if (field == value) return
+            field = value
+            MapRenderer.refresh()
+        }
 
     val colour: Colour get() = if (this === ScanUtils.mimicRoom) data.colour.mix(DungeonMap.mimicRoom) else data.colour
 

@@ -66,6 +66,7 @@ object InteractiveMap : Module(
 
     private val visuals by text("Visuals")
     private val scale by slider("Map scale", 5f, 1f, 10f, 0.5f).childOf(::visuals)
+    private val showHelp by switch("Show help", true, desc = "Shows the controls below the map.").childOf(::visuals)
     val roomInCol by colourPicker("Highlight colour", Colour.GREY.withAlpha(0.5f), allowAlpha = true, desc = "Room the player currently in colour.").childOf(::visuals)
 
     val mapOpen: Boolean
@@ -94,7 +95,8 @@ object InteractiveMap : Module(
         )
 
         val infoScale = cfg.fontScale.coerceAtLeast(1f)
-        val availableHeight = (mc.window.height - (100f * infoScale + 116f)).coerceAtLeast(128f)
+        val helpHeight = if (showHelp) 72f * infoScale + 52f else 0f
+        val availableHeight = (mc.window.height - (28f * infoScale + 64f + helpHeight)).coerceAtLeast(128f)
         val mapConfig = cfg.copy(scale = cfg.scale * (availableHeight / cfg.height).coerceAtMost(1f))
 
         column(constrain(w = Copying - 32.px), gap = 12.px) {
@@ -110,7 +112,7 @@ object InteractiveMap : Module(
 
             renderMap(config = mapConfig).element.constraints.x = Centre
 
-            block(
+            if (showHelp) block(
                 constrain(x = Centre, w = (1240f * infoScale).px.coerceAtMost(Copying), h = Bounding + 12.px),
                 Colour.BLACK.withAlpha(0.8f),
                 6.radius()

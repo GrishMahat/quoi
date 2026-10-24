@@ -95,12 +95,15 @@ object MapRenderer {
                 }
                 for (room in ScanUtils.scannedRooms) {
                     val view = roomViews.getOrPut(room) { RoomView(rooms.group(size(Copying, Copying)).element) }
-                    val label = if (room.identified) room.name else "?"
+                    val label = buildList {
+                        addAll((if (room.identified) room.name else "?").split(" "))
+                        if (DungeonMap.showSecretCount && room.identified) add("${room.secretsFound ?: 0}/${room.data.secrets}")
+                    }
                     if (!resized && view.tiles == room.tiles && view.label == label) continue
                     view.element.removeAll()
                     ElementScope(view.element).apply {
                         renderTiles(new, room)
-                        renderName(new, room)
+                        renderName(new, room, label)
                     }
                     view.tiles = room.tiles.toSet()
                     view.label = label
@@ -154,7 +157,7 @@ object MapRenderer {
 
     private class RoomView(val element: Element) {
         var tiles: Set<RoomTile> = emptySet()
-        var label: String? = null
+        var label: List<String>? = null
     }
 
     private fun ElementScope<*>.renderDoor(config: MapConfig, door: OdonDoor): Element {
@@ -327,9 +330,8 @@ object MapRenderer {
         }
     }
 
-    private fun ElementScope<*>.renderName(config: MapConfig, room: OdonRoom) {
+    private fun ElementScope<*>.renderName(config: MapConfig, room: OdonRoom, lines: List<String>) {
         val (scale, _, font, fontScale, shadow) = config
-        val lines = (if (room.identified) room.name else "?").split(" ")
         val textSize = 18f * fontScale * (scale / 5f)
 
         lines.forEachIndexed { i, line ->
