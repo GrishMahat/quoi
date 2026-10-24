@@ -21,6 +21,7 @@ import quoi.module.impl.misc.slayers.enderman.BeaconESP
 import quoi.module.impl.misc.slayers.enderman.EndermanSlayer
 import quoi.module.settings.UIComponent.Companion.visibleIf
 import quoi.module.settings.group.SettingGroup.Companion.childOf
+import quoi.module.settings.group.SettingGroup.Companion.json
 import quoi.utils.ChatUtils.modMessage
 import quoi.utils.EntityUtils.getEntity
 import quoi.utils.EntityUtils.interpolatedBox
@@ -44,8 +45,10 @@ object Slayers : Module(
 ) {
     private val slayers: Set<ISlayer> = setOf(BlazeSlayer, EndermanSlayer)
 
-    internal val beaconHighlight = highlight(colour = Colour.RED, fillColour = Colour.RED, glow = false).childOf(BeaconESP.component)
-    internal val beaconTracer = tracer(colour = Colour.RED, distance = null).childOf(BeaconESP.component)
+    internal val beaconHighlight = highlight(colour = Colour.RED, fillColour = Colour.RED, glow = false)
+        .json("Enderman Beacon ESP Style").childOf(BeaconESP.component)
+    internal val beaconTracer = tracer(colour = Colour.RED, distance = null)
+        .json("Enderman Beacon ESP Tracer").childOf(BeaconESP.component)
 
     private val esp by switch("Boss ESP")
     private val highlight = highlight(aabbOffset = true).childOf(::esp)
