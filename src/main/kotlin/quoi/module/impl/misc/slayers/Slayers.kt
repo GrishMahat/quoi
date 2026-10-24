@@ -259,14 +259,15 @@ object Slayers : Module(
     private fun LevelRenderContext.drawSlayer(entity: LivingEntity?, colour: Colour? = null, main: Boolean = true) {
         if (entity == null || entity.isInvisible || entity.isDeadOrDying) return
         if (!main && colour == null) return
+        val box = entity.interpolatedBox
         highlight.draw(
             this,
-            entity.interpolatedBox,
+            box,
             colour = colour ?: Colour.WHITE,
             fillColour = colour?.withAlpha(highlight.fill.alpha) ?: Colour.WHITE.withAlpha(67)
         )
 
-        tracer.draw(this, entity, colour = colour ?: Colour.WHITE)
+        tracer.draw(this, box.center, colour = colour ?: Colour.WHITE)
     }
 
     private val debugStrings = buildList {
