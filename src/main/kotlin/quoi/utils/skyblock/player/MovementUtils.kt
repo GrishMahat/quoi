@@ -1,6 +1,5 @@
 package quoi.utils.skyblock.player
 
-import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.ceil
 import kotlin.math.cos
@@ -132,7 +131,12 @@ object MovementUtils : EventListener, Shortcuts {
 
             val slide = slideVec(deltaMovement.x, deltaMovement.z)
             val pPos = position().add(slide.x.toDouble(), 0.0, slide.y.toDouble())
-            if (isLast && pPos.distanceTo2D(target) < 0.5) {
+
+            val dx = if (isLast) target.x - pPos.x else target.x - x
+            val dz = if (isLast) target.z - pPos.z else target.z - z
+            val dist = hypot(dx, dz)
+
+            if (isLast && dist < 0.5) {
                 this.resetInput()
                 onFinish?.invoke()
                 return@movementTask true
@@ -140,9 +144,6 @@ object MovementUtils : EventListener, Shortcuts {
 
             val s = sin(yaw.rad)
             val c = cos(yaw.rad)
-
-            val dx = if (isLast) target.x - pPos.x else target.x - x
-            val dz = if (isLast) target.z - pPos.z else target.z - z
 
             val vx = dx * -s + dz * c
             val vz = dx * c + dz * s
@@ -187,11 +188,7 @@ object MovementUtils : EventListener, Shortcuts {
 
                 val clear = blockPosition().above(1).airLike && blockPosition().above(2).airLike
 
-                val gap = abs(target.y - y) < 0.6 && !stuck && run { // todo make it not shit
-                    val dx = target.x - x
-                    val dz = target.z - z
-                    val dist = hypot(dx, dz)
-
+                val gap = !stuck && run { // todo make it not shit
                     if (dist <= 1.1) return@run false
 
                     val gapBlock = (1..3).firstNotNullOfOrNull { step ->
@@ -205,10 +202,10 @@ object MovementUtils : EventListener, Shortcuts {
                     } ?: return@run false
 
                     val ticks = ticksUntilCollision(gapBlock)
-                    ticks != null && ticks < 1.5
+                    ticks != null && ticks < if (higher) 0.6 else 1.5
                 }
 
-                input.jump = (higher || stuck || gap) && clear
+                input.jump = (gap || (higher && dist < 1.2) || stuck) && clear
 
                 if (gap && input.jump) {
                     jumpedGap = true

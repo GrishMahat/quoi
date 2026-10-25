@@ -14,6 +14,10 @@ object MirrorverseSolvers : Module(
     desc = "Automatically completes Mirrorverse puzzles: Lava Maze, Lava Parkour, Craft Room, Red Green, Tiny Dancer, and Tubulator.",
     subarea = "Mirrorverse"
 ) {
+    override fun onDisable() {
+        LavaParkour.onDisable()
+    }
+
     init {
         LavaMaze
         LavaParkour

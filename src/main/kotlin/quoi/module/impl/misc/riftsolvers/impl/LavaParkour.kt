@@ -3,6 +3,7 @@ package quoi.module.impl.misc.riftsolvers.impl
 import net.minecraft.world.phys.Vec3
 import quoi.api.colour.Colour
 import quoi.api.events.*
+import quoi.api.events.core.Event
 import quoi.api.events.core.on
 import quoi.module.impl.misc.riftsolvers.MirrorverseSolvers
 import quoi.module.settings.group.ToggleableGroup
@@ -11,15 +12,18 @@ import quoi.utils.Vec3
 import quoi.utils.aabb
 import quoi.utils.getDirection
 import quoi.utils.render.drawFilledBox
+import quoi.utils.skyblock.player.MovementUtils.cancelMovementTask
+import quoi.utils.skyblock.player.MovementUtils.moveTo
 import quoi.utils.skyblock.player.MovementUtils.stop
 import quoi.utils.skyblock.player.RotationUtils.rotate
 import kotlin.math.abs
 import kotlin.math.hypot
 
-object LavaParkour : ToggleableGroup(MirrorverseSolvers, "Lava parkour") { // super schizo but works so I don't care
+object LavaParkour : ToggleableGroup(MirrorverseSolvers, "Lava parkour") {
     private var active = false
     private var current = 0
     private var waitingTicks = 0
+    private var movementInProgress = false
 
     init {
         on<TickEvent.End> {
@@ -36,10 +40,11 @@ object LavaParkour : ToggleableGroup(MirrorverseSolvers, "Lava parkour") { // su
                 val targetPos = points[current]
 
                 if (hasLanded(targetPos)) {
+                    cancelMovementTask()
+                    movementInProgress = false
                     player.stop()
-                    mc.options.keyJump.isDown = false
-                    waitingTicks = 5
-                } else {
+                    waitingTicks = 3
+                } else if (!movementInProgress) {
                     move(targetPos)
                 }
             }
@@ -53,7 +58,7 @@ object LavaParkour : ToggleableGroup(MirrorverseSolvers, "Lava parkour") { // su
         }
 
         on<RenderEvent.World> {
-            if (!active) ctx.drawFilledBox(points[0].aabb.expandTowards(-1.0, 0.0, -1.0).move(0.0, -1.0, 0.0), Colour.GREEN, depth = true)
+            ctx.drawFilledBox(points[current].aabb.expandTowards(-1.0, 0.0, -1.0).move(0.0, -1.0, 0.0), Colour.GREEN, depth = true)
         }
 
         on<GuiEvent.Open> {
@@ -63,23 +68,29 @@ object LavaParkour : ToggleableGroup(MirrorverseSolvers, "Lava parkour") { // su
         on<MouseEvent.Move> {
             if (active) cancel()
         }
+
+        on<WorldEvent.Change> {
+            reset()
+        }
+
+        on<AreaEvent.Sub> {
+            if (!inEnvironment()) reset()
+        }
+    }
+
+    override fun shouldHandle(event: Event): Boolean =
+        event is WorldEvent.Change || event is AreaEvent.Sub || super.shouldHandle(event)
+
+    override fun onDisable() {
+        reset()
     }
 
     private fun move(target: Vec3) {
-        val prev = points.getOrElse(current - 1) { points[0] }
-        val dir = getDirection(player.eyePosition, target)
-        player.rotate(yaw = dir.yaw)
-
-        val dist = hypot(player.x - prev.x, player.z - prev.z)
-        val distNext = hypot(target.x - player.x, target.z - player.z)
-        val totalDist = hypot(target.x - prev.x, target.z - prev.z)
-
-        val edge = dist >= 0.95 && distNext > totalDist / 2
-        mc.options.keyJump.isDown = player.onGround() && edge
-        mc.options.keyShift.isDown = distNext < 0.7 && !edge
-
-        mc.options.keyUp.isDown = true
-        mc.options.keySprint.isDown = true
+        movementInProgress = true
+        player.rotate(yaw = getDirection(target).yaw)
+        player.moveTo(target) {
+            movementInProgress = false
+        }
     }
 
     private fun waiting() = waitingTicks <= 0 || --waitingTicks != 0
@@ -98,7 +109,7 @@ object LavaParkour : ToggleableGroup(MirrorverseSolvers, "Lava parkour") { // su
         val dx = player.x - pos.x
         val dz = player.z - pos.z
         val dy = abs(player.y - pos.y)
-        return hypot(dx, dz) <= 0.03 && dy <= 1.0
+        return hypot(dx, dz) <= 0.5 && dy <= 1.0
     }
 
     private fun start() {
@@ -109,13 +120,17 @@ object LavaParkour : ToggleableGroup(MirrorverseSolvers, "Lava parkour") { // su
     }
 
     private fun reset() {
+        if (active) {
+            cancelMovementTask()
+            if (inGame) player.stop()
+        }
         active = false
         waitingTicks = 0
         current = 0
-        player.stop()
+        movementInProgress = false
     }
 
-    private val points = listOf(
+    private val points = listOf( // https://github.com/hannibal002/SkyHanni-REPO/blob/main/constants/RiftUpsideDownParkour.json
         Vec3(-121, 39, -108), Vec3(-125, 39, -108), Vec3(-129, 39, -108), Vec3(-133, 40, -108),
         Vec3(-137, 39, -104), Vec3(-133, 40, -100), Vec3(-137, 41, -96), Vec3(-141, 42, -100),
         Vec3(-145, 40, -104), Vec3(-145, 40, -108), Vec3(-141, 39, -112), Vec3(-137, 40, -116),
