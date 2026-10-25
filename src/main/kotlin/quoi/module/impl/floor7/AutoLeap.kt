@@ -1,9 +1,8 @@
 package quoi.module.impl.floor7
 
 import com.google.gson.JsonObject
-import net.minecraft.network.protocol.game.*
+import net.minecraft.network.protocol.game.ClientboundContainerSetSlotPacket
 import net.minecraft.world.phys.AABB
-import net.minecraft.world.phys.Vec3
 import quoi.api.events.*
 import quoi.api.events.core.on
 import quoi.api.skyblock.dungeon.Dungeon
@@ -15,7 +14,6 @@ import quoi.api.skyblock.dungeon.enums.Phase
 import quoi.api.skyblock.dungeon.enums.Stage
 import quoi.api.skyblock.location.Island
 import quoi.config.configMap
-import quoi.mixins.accessors.ClientboundMoveEntityPacketAccessor
 import quoi.module.Module
 import quoi.module.settings.Saving
 import quoi.module.settings.Setting.Companion.json
@@ -25,6 +23,7 @@ import quoi.utils.skyblock.item.ItemUtils.skyblockId
 import quoi.utils.skyblock.player.LeapManager
 
 // TODO: rewrite this
+// TODO: better descriptions (this is horrible omg)
 object AutoLeap : Module(
     "Auto Leap",
     desc = "Automatically leaps to predefined targets.",
@@ -51,14 +50,12 @@ object AutoLeap : Module(
 
     private val crystalLeap by switch("Crystal leap", desc = "Leaps to crystal checkpointer.")
     private val crystalAuto by switch("Auto", desc = "Automatically leaps when you pick up an Energy Crystal in P1.").json("Crystal leap auto").childOf(::crystalLeap)
+
     private val p1Leap by switch("P1 leap", desc = "Leaps in P1.").json("Pre P2 leap")
-    private val p1Auto by switch("Auto", desc = "Automatically leaps after Maxor died.").json("P1 leap auto").childOf(::p1Leap) // TODO: check if trigger is still accurate
+    private val p1Auto by switch("Auto", desc = "Automatically leaps after Maxor died.").json("P1 leap auto").childOf(::p1Leap)
 
     private val predevLeap by switch("Predev leap", desc = "Leaps before Storm dev.")
     private val predevAuto by switch("Auto", desc = "Automatically leaps before Storm's lightning.").json("Predev leap auto").childOf(::predevLeap)
-
-    private val greenLeap by switch("Green pad leap", desc = "Leaps on green pad.")
-    private val greenAuto by switch("Auto", desc = "Automatically leaps after the first Storm crush.").json("Green pad leap auto").childOf(::greenLeap)
 
     private val yellowLeap by switch("Yellow pad leap", desc = "Leaps on yellow pad.")
     private val yellowAuto by switch("Auto", desc = "Automatically leaps after the second Storm crush.").json("Yellow pad leap auto").childOf(::yellowLeap)
@@ -66,11 +63,11 @@ object AutoLeap : Module(
     private val purpleLeap by switch("Purple pad leap", desc = "Leaps on purple pad.")
     private val purpleAuto by switch("Auto", desc = "Automatically leaps when Storm is enraged.").json("Purple pad leap auto").childOf(::purpleLeap)
 
-    private val pyHealerLeap by switch("PY healer leap", desc = "Leaps on PY healer wait spot.") // TODO: rename or smth idk
-    private val pyHealerAuto by switch("Auto", desc = "Leaps on after first Strom crush.").json("PY healer auto").childOf(::pyHealerLeap)
+    private val betweenPyPadLeap by switch("PY healer leap", desc = "Leaps while being between purple and yellow pad.") // TODO: rename or smth idk
+    private val betweenPyPadAuto by switch("Auto", desc = "Automatically leaps on first Storm crush.").json("Between PY Pad leap auto").childOf(::betweenPyPadLeap)
 
     private val stormDeathLeap by switch("Storm death leap", desc = "Leaps on storm death.")
-    private val stormDeathAuto by switch("Auto", desc = "Leaps on after first Strom crush.").json("Storm death auto").childOf(::stormDeathLeap)
+    private val stormDeathAuto by switch("Auto", desc = "Automatically leaps when Storm dies.").json("Storm death auto").childOf(::stormDeathLeap)
 
     private val i4Leap by switch("I4 leap", desc = "Leaps on Pre4 dev.").json("Pre4 leap")
     private val i4Auto by switch("Auto", desc = "Automatically leaps when Pre4 is done.").json("Pre4 leap auto").childOf(::i4Leap)
@@ -92,10 +89,10 @@ object AutoLeap : Module(
     private val crystalName by textInput("Target", length = 16).json("Crystal leap name").childOf(::crystalLeap) { crystalLeap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
     private val p1Name by textInput("Target", "P1", length = 16).json("P1 leap name").childOf(::p1Leap) { p1Leap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
     private val predevName by textInput("Target", length = 16).json("Predev leap name").childOf(::predevLeap) { predevLeap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
-    private val greenName by textInput("Target", length = 16).json("Green leap name").childOf(::greenLeap) { greenLeap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
     private val yellowName by textInput("Target", length = 16).json("Yellow leap name").childOf(::yellowLeap) { yellowLeap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
     private val purpleName by textInput("Target", length = 16).json("Purple leap name").childOf(::purpleLeap) { purpleLeap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
-    private val pyHealerName by textInput("Target", length = 16).json("PY healer leap name").childOf(::pyHealerLeap) { pyHealerLeap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
+    private val betweenPyPadName by textInput("Target", length = 16).json("Between PY Pad Name").childOf(::betweenPyPadLeap) { betweenPyPadLeap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
+
     private val stormLeapName by textInput("Target", length = 16).json("Storm death leap name").childOf(::stormDeathLeap) { stormDeathLeap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
     private val i4Name by textInput("Target", length = 16).json("Pre4 leap name").childOf(::i4Leap) { i4Leap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
     private val s1Name by textInput("S1 leap", length = 16).childOf(::p3Leap) { p3Leap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
@@ -109,10 +106,9 @@ object AutoLeap : Module(
     private val crystalClass by selector("Target", DungeonClass.Unknown).json("Crystal leap class").childOf(::crystalLeap) { crystalLeap && leapMode.selected == LeapMode.Class }
     private val p1Class by selector("Target", DungeonClass.Unknown).json("P1 leap class").childOf(::p1Leap) { p1Leap && leapMode.selected == LeapMode.Class }
     private val predevClass by selector("Target", DungeonClass.Unknown).json("Predev leap class").childOf(::predevLeap) { predevLeap && leapMode.selected == LeapMode.Class }
-    private val greenClass by selector("Target", DungeonClass.Unknown).json("Green leap class").childOf(::greenLeap) { greenLeap && leapMode.selected == LeapMode.Class }
     private val yellowClass by selector("Target", DungeonClass.Unknown).json("Yellow leap class").childOf(::yellowLeap) { yellowLeap && leapMode.selected == LeapMode.Class }
     private val purpleClass by selector("Target", DungeonClass.Unknown).json("Purple leap class").childOf(::purpleLeap) { purpleLeap && leapMode.selected == LeapMode.Class }
-    private val pyHealerClass by selector("Target", DungeonClass.Unknown).json("PY healer class").childOf(::pyHealerLeap) { pyHealerLeap && leapMode.selected == LeapMode.Class }
+    private val betweenPyPadClass by selector("Target", DungeonClass.Unknown).json("Between PY Pad class").childOf(::betweenPyPadLeap) { betweenPyPadLeap && leapMode.selected == LeapMode.Class }
     private val stormDeathClass by selector("Target", DungeonClass.Unknown).json("Storm death class").childOf(::stormDeathLeap) { stormDeathLeap && leapMode.selected == LeapMode.Class }
     private val i4Class by selector("Target", DungeonClass.Unknown).json("Pre4 leap class").childOf(::i4Leap) { i4Leap && leapMode.selected == LeapMode.Class }
     private val s1Class by selector("S1 leap", DungeonClass.Healer).json("S1 leap class").childOf(::p3Leap) { p3Leap && leapMode.selected == LeapMode.Class }
@@ -134,10 +130,9 @@ object AutoLeap : Module(
 
     private val leftCrystalBox = AABB(78.0, 233.0, 46.0, 87.0, 243.0, 55.0)
     private val rightCrystalBox = AABB(60.0, 233.0, 46.0, 69.0, 243.0, 55.0)
-    private val greenPadBox = AABB(24.0, 170.0, 4.0, 41.0, 172.0, 21.0)
     private val yellowPadBox = AABB(24.0, 170.0, 86.0, 41.0, 172.0, 103.0)
-    private val purplePadBox = AABB(95.0, 165.0, 86.0, 123.0, 172.0, 103.0)
-    private val healerPyBox = AABB(52.0, 169.0, 63.0, 59.0, 171.0, 70.0)
+    private val purplePadBox = AABB(106.0, 170.0, 86.0, 125.0, 172.0, 103.0)
+    private val betweenPyPadBox = AABB(41.0, 163.0, 86.0, 106.0, 172.0, 103.0)
     private val middleBox = AABB(47.0, 64.0, 69.0, 62.0, 75.0, 84.0)
     private val pre4Box = AABB(62.0, 127.0, 34.0, 65.0, 130.0, 37.0)
 
@@ -190,9 +185,8 @@ object AutoLeap : Module(
                 when (++oofCount) {
                     1 -> {
                         if (purpleLeap && purpleAuto && isInPurplePad()) leapToConfigured(purpleName, purpleClass.selected)
-                        if (greenLeap && greenAuto && isInGreenPad()) leapToConfigured(greenName, greenClass.selected)
+                        if (betweenPyPadLeap && betweenPyPadAuto && isInBetweenPyPad()) leapToConfigured(betweenPyPadName, betweenPyPadClass.selected)
                     }
-
                     2 -> if (yellowLeap && yellowAuto && isInYellowPad()) leapToConfigured(yellowName, yellowClass.selected)
                 }
             }
@@ -235,33 +229,6 @@ object AutoLeap : Module(
             if (packet.containerId != 0 || packet.slot != 44 || packet.item.skyblockId !in relicIds) return@on
 
             leapToConfigured(relicName, relicClass.selected)
-        }
-
-        // based on https://github.com/Noamm9/NoammAddons/blob/b8e865539d7f45096d2603dacf80967821087cdc/src/main/kotlin/com/github/noamm9/features/impl/floor7/LeapCounter.kt#L45-L79
-        on<PacketEvent.ReceivedPost> {
-            if (!Floor7.inF7Boss) return@on
-            if (!pyHealerLeap || !pyHealerAuto || oofCount != 1 || leapedHealerPy || !isInHealerPy()) return@on
-
-            val movedEntityId = when (packet) {
-                is ClientboundTeleportEntityPacket -> packet.id
-                is ClientboundAddEntityPacket -> packet.id
-                is ClientboundMoveEntityPacket -> (packet as ClientboundMoveEntityPacketAccessor).entityId
-                is ClientboundEntityPositionSyncPacket -> packet.id
-                else -> return@on
-            }
-            if (dungeonTeammatesNoSelf.none { it.entity?.id == movedEntityId }) return@on
-
-            val movedPosition = when (packet) {
-                is ClientboundTeleportEntityPacket -> packet.change.position
-                is ClientboundAddEntityPacket -> Vec3(packet.x, packet.y, packet.z)
-                is ClientboundMoveEntityPacket -> level.getEntity(movedEntityId)?.positionCodec?.base
-                is ClientboundEntityPositionSyncPacket -> packet.values.position
-                else -> return@on
-            } ?: return@on
-            if (!healerPyBox.contains(movedPosition)) return@on
-
-            leapedHealerPy = true
-            leapToConfigured(pyHealerName, pyHealerClass.selected)
         }
 
         on<MouseEvent.Click> {
@@ -375,11 +342,10 @@ object AutoLeap : Module(
     private fun isInP1() = Floor7.inPhaseAt(Phase.P1) && (!crystalLeap || !isAtCrystal())
     private fun isInPredev() = Floor7.inPhaseAt(Phase.P3) && Floor7.inPhase(Phase.P1, Phase.P2)
     private fun isInRelic() = Floor7.inPhaseAt(Phase.P5)
-    private fun isInGreenPad() = isIn(greenPadBox)
     private fun isInYellowPad() = isIn(yellowPadBox)
     private fun isInPurplePad() = isIn(purplePadBox)
-    private fun isInHealerPy() = isIn(healerPyBox) && Floor7.inPhase(Phase.P2)
-    private fun isInP2() = Floor7.inPhaseAt(Phase.P2) && !isInPurplePad() && !isInGreenPad() && !isInYellowPad()
+    private fun isInBetweenPyPad() = isIn(betweenPyPadBox)
+    private fun isInP2() = Floor7.inPhaseAt(Phase.P2) && !isInPurplePad() && !isInYellowPad() && !isInBetweenPyPad()
     private fun isInMiddle() = isIn(middleBox)
     private fun isAtPre4() = isIn(pre4Box)
     private fun isOutsideMiddle() = Floor7.inPhaseAt(Phase.P4) && !isInMiddle()
@@ -402,10 +368,9 @@ object AutoLeap : Module(
             relicLeap && isInRelic() -> leapToConfigured(relicName, relicClass.selected)
             p1Leap && isInP1() -> leapToConfigured(p1Name, p1Class.selected)
             p4Leap && isInMiddle() -> leapToConfigured(p4Name, p4Class.selected)
-            greenLeap && isInGreenPad() -> leapToConfigured(greenName, greenClass.selected)
             yellowLeap && isInYellowPad() -> leapToConfigured(yellowName, yellowClass.selected)
             purpleLeap && isInPurplePad() -> leapToConfigured(purpleName, purpleClass.selected)
-            pyHealerLeap && isInHealerPy() -> leapToConfigured(pyHealerName, pyHealerClass.selected)
+            betweenPyPadLeap && isInBetweenPyPad() -> leapToConfigured(betweenPyPadName, betweenPyPadClass.selected)
             stormDeathLeap && isInP2() -> leapToConfigured(stormLeapName, stormDeathClass.selected)
             middleLeap && isOutsideMiddle() -> leapToConfigured(middleName, middleClass.selected)
             i4Leap && isAtPre4() -> leapToPre4Target()
