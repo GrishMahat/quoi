@@ -147,16 +147,12 @@ object AutoLeap : Module(
 
     init {
         command.sub("leap") { target: String ->
-            val clazz = DungeonClass.entries.firstOrNull {
-                it != DungeonClass.Unknown && it.name.equals(target, ignoreCase = true)
-            }
-
-            if (clazz != null) leap(clazz)
-            else leap(target)
+            DungeonClass.entries
+                .firstOrNull { it != DungeonClass.Unknown && it.name.equals(target, true) }
+                ?.let { leap(it) } ?: leap(target)
         }.description("Leaps to a dungeon teammate by name or class.")
             .suggests("target") {
-                dungeonTeammatesNoSelf.map { it.name } +
-                        DungeonClass.entries.filter { it != DungeonClass.Unknown }.map { it.name }
+                dungeonTeammatesNoSelf.map { it.name } + (DungeonClass.entries - DungeonClass.Unknown).map { it.name }
             }
 
         on<WorldEvent.Change> { reset() }

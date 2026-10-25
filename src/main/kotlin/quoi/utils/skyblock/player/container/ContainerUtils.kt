@@ -1,19 +1,13 @@
 package quoi.utils.skyblock.player.container
 
 import net.minecraft.client.player.LocalPlayer
-import net.minecraft.network.protocol.Packet
-import net.minecraft.network.protocol.game.ClientGamePacketListener
-import net.minecraft.network.protocol.game.ClientboundContainerClosePacket
-import net.minecraft.network.protocol.game.ClientboundContainerSetContentPacket
-import net.minecraft.network.protocol.game.ClientboundContainerSetSlotPacket
-import net.minecraft.network.protocol.game.ClientboundOpenScreenPacket
-import net.minecraft.network.protocol.game.ServerboundContainerClosePacket
+import net.minecraft.network.protocol.game.*
+import net.minecraft.world.inventory.AbstractContainerMenu
 import net.minecraft.world.inventory.ContainerInput
 import net.minecraft.world.inventory.MenuType
-import net.minecraft.world.inventory.AbstractContainerMenu
-import quoi.api.events.ContainerEvent
 import quoi.annotations.Init
 import quoi.annotations.Internal
+import quoi.api.events.ContainerEvent
 import quoi.api.events.PacketEvent
 import quoi.api.events.TickEvent
 import quoi.api.events.WorldEvent
@@ -35,6 +29,7 @@ object ContainerUtils : EventListener, Shortcuts {
     @Volatile
     var containerId = 0
         private set
+
     @Volatile
     var lastStateId = 0
         private set
@@ -89,31 +84,12 @@ object ContainerUtils : EventListener, Shortcuts {
             }
             if (owner != null) cancel()
             if (cancelled) {
-                val connection = mc.connection ?: return@on
-                val level = mc.level
-                // 26.1 handles queued packets before mc.execute tasks, so the menu must use the packet queue too
-                mc.packetProcessor().scheduleIfPossible(connection, object : Packet<ClientGamePacketListener> {
-                    override fun type() = packet.type()
-
-                    override fun handle(listener: ClientGamePacketListener) {
-                        val player = mc.player ?: return
-                        if (mc.connection !== connection || mc.level !== level) return
-                        // a catch may have been registered while this open was queued
-                        if (owner != null && takeCatch(packet.title.string, owner)) {
-                            connection.send(ServerboundContainerClosePacket(packet.containerId))
-                            return
-                        }
-                        // task was cancelled while the open packet was queued
-                        if (owner != null && (owner.cancellationRequested || owner.completed || ContainerManager.activeTask !== owner)) {
-                            connection.send(ServerboundContainerClosePacket(packet.containerId))
-                            return
-                        }
-                        containerServerSide = true
-                        player.containerMenu = packet.type.create(packet.containerId, player.inventory)
-                        if (owner != null) owner.ownedMenu = player.containerMenu
-                        opened(packet, player.containerMenu)
-                    }
-                })
+                val player = mc.player ?: return@on
+                val menu = packet.type.create(packet.containerId, player.inventory)
+                containerServerSide = true
+                player.containerMenu = menu
+                if (owner != null) owner.ownedMenu = menu
+                opened(packet, menu)
             }
         }
         on<PacketEvent.ReceivedPost>(Priority.LOWEST) {
@@ -175,8 +151,8 @@ object ContainerUtils : EventListener, Shortcuts {
         else catches.removeAll { it.owner === task }
     }
 
-    private fun takeCatch(title: String, owner: ContainerTask? = null): Boolean {
-        val index = catches.indexOfFirst { (owner == null || it.owner === owner) && it.name.containsMatchIn(title) }
+    private fun takeCatch(title: String): Boolean {
+        val index = catches.indexOfFirst { it.name.containsMatchIn(title) }
         if (index == -1) return false
         catches.removeAt(index)
         return true
