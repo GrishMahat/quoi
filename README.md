@@ -224,6 +224,8 @@ Download the JAR for your Minecraft version from [Releases](https://github.com/j
   - **Red Green** - Automates movement and interactions.
   - **Tiny Dancer** - Performs movement, jumps, sneaks, and punches to the beats.
   - **Tubulator** - Climbs the parkour route automatically.
+- **Rift**
+  - **Wilted Berberis** - Tracks bushes from particles and highlights learned respawn sequences in Dreadfarm while holding a Farming Wand.
 - **Slayers**
   - Adds boss ESP, spawn alerts, and spawn and kill time messages.
   - **Enderman** - Highlights the Yang Glyph beacon and draws a tracer.
