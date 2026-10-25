@@ -43,9 +43,8 @@ object EquipmentSwapper {
             openContainer("stats", "Stats & Equipment")
 
             quickMove(item(matches).inv)
+            catchContainer("Stats & Equipment")
             closeContainer()
-
-            awaitContainer("Stats & Equipment")
 
             onFinished { result ->
                 if (result is ContainerTaskResult.Failure) modMessage("&c${result.message}.")

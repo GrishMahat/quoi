@@ -13,7 +13,9 @@ import net.minecraft.world.inventory.MenuType
 import net.minecraft.world.inventory.AbstractContainerMenu
 import quoi.api.events.ContainerEvent
 import quoi.annotations.Init
+import quoi.annotations.Internal
 import quoi.api.events.PacketEvent
+import quoi.api.events.TickEvent
 import quoi.api.events.WorldEvent
 import quoi.api.events.core.EventListener
 import quoi.api.events.core.Priority
@@ -21,9 +23,15 @@ import quoi.api.events.core.on
 import quoi.utils.Shortcuts
 import quoi.utils.skyblock.player.container.task.ContainerAction
 import quoi.utils.skyblock.player.container.task.ContainerManager
+import quoi.utils.skyblock.player.container.task.ContainerTask
 
 @Init
+@OptIn(Internal::class)
 object ContainerUtils : EventListener, Shortcuts {
+    private data class ContainerCatch(val owner: ContainerTask, val name: Regex, var ticksRemaining: Int)
+
+    private val catches = mutableListOf<ContainerCatch>()
+
     @Volatile
     var containerId = 0
         private set
@@ -68,6 +76,12 @@ object ContainerUtils : EventListener, Shortcuts {
             }
         }
         on<PacketEvent.Received, ClientboundOpenScreenPacket>(Priority.LOWEST - 1, acceptCancelled = true) {
+            // close caught reopens before creating a silent menu
+            if (takeCatch(packet.title.string)) {
+                cancel()
+                mc.connection?.send(ServerboundContainerClosePacket(packet.containerId))
+                return@on
+            }
             val owner = ContainerManager.activeTask?.takeIf { task ->
                 task.settings.silent && task.actions.any {
                     it is ContainerAction.AwaitContainer && it.containerName.containsMatchIn(packet.title.string)
@@ -84,6 +98,11 @@ object ContainerUtils : EventListener, Shortcuts {
                     override fun handle(listener: ClientGamePacketListener) {
                         val player = mc.player ?: return
                         if (mc.connection !== connection || mc.level !== level) return
+                        // a catch may have been registered while this open was queued
+                        if (owner != null && takeCatch(packet.title.string, owner)) {
+                            connection.send(ServerboundContainerClosePacket(packet.containerId))
+                            return
+                        }
                         // task was cancelled while the open packet was queued
                         if (owner != null && (owner.cancellationRequested || owner.completed || ContainerManager.activeTask !== owner)) {
                             connection.send(ServerboundContainerClosePacket(packet.containerId))
@@ -115,17 +134,52 @@ object ContainerUtils : EventListener, Shortcuts {
             }
         }
         on<PacketEvent.Sent, ServerboundContainerClosePacket>(Priority.HIGHEST + 1) {
+            if (current?.menu?.containerId == packet.containerId) current = null
             if (packet.containerId != containerId) return@on
             containerId = 0
             lastStateId = 0
             containerServerSide = false
         }
+        on<TickEvent.Server> { catches.removeAll { --it.ticksRemaining <= 0 } }
         on<WorldEvent.Change> {
+            catches.clear()
             containerId = 0
             lastStateId = 0
             containerServerSide = false
             current = null
         }
+    }
+
+    /**
+     * Registers a catch for [task], or closes a matching container that has already reopened
+     */
+    @Internal
+    internal fun catchContainer(task: ContainerTask, name: Regex, timeout: Int) {
+        if (timeout == 0) return
+        val open = current
+        if (open != null && open.revision > task.containerRevision && name.containsMatchIn(open.title) &&
+            mc.player?.containerMenu === open.menu
+        ) {
+            mc.player?.closeContainer()
+            return
+        }
+        if (timeout > 0) catches.add(ContainerCatch(task, name, timeout))
+    }
+
+    /**
+     * Removes catches for [task], or all catches if [task] is null
+     */
+    @Internal
+    internal fun clearCatches(task: ContainerTask? = null) {
+        if (task == null) catches.clear()
+        else catches.removeAll { it.owner === task }
+    }
+
+    private fun takeCatch(title: String, owner: ContainerTask? = null): Boolean {
+        val index = catches.indexOfFirst { (owner == null || it.owner === owner) && it.name.containsMatchIn(title) }
+        if (index == -1) return false
+        catches.removeAt(index)
+        return true
     }
 
     private fun opened(packet: ClientboundOpenScreenPacket, menu: AbstractContainerMenu) {

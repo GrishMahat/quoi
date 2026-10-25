@@ -4,6 +4,7 @@ import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import quoi.QuoiMod.mc
 import quoi.annotations.Init
+import quoi.annotations.Internal
 import quoi.api.events.ChatEvent
 import quoi.api.events.TickEvent
 import quoi.api.events.WorldEvent
@@ -24,6 +25,7 @@ import quoi.utils.skyblock.player.container.task.*
 
 // TODO: redo?
 @Init
+@OptIn(Internal::class)
 object LeapManager : EventListener {
     private data class LeapRequest(
         val target: DungeonPlayer,

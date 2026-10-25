@@ -12,6 +12,7 @@ import net.minecraft.client.gui.screens.inventory.InventoryScreen
 import quoi.QuoiMod.logger
 import quoi.QuoiMod.mc
 import quoi.annotations.Init
+import quoi.annotations.Internal
 import quoi.api.events.*
 import quoi.api.events.core.EventListener
 import quoi.api.events.core.Priority
@@ -31,6 +32,7 @@ import quoi.utils.skyblock.player.container.ContainerUtils
  * Only one task can run at a time, including its end delay and cleanup
  */
 @Init
+@OptIn(Internal::class)
 object ContainerManager : EventListener {
     @Volatile
     var activeTask: ContainerTask? = null
@@ -91,6 +93,10 @@ object ContainerManager : EventListener {
         }
     }
 
+    /**
+     * Submits [task] to the manager. Called by [ContainerTask.run]
+     */
+    @Internal
     fun execute(task: ContainerTask): ContainerTask {
         check(mc.isSameThread) { "Container tasks must be submitted on the client thread" }
         if (task.completed || activeTask === task) return task
@@ -102,17 +108,23 @@ object ContainerManager : EventListener {
             task.finish(ContainerTaskResult.Cancelled)
             return task
         }
+        ContainerUtils.clearCatches()
         task.containerRevision = ContainerUtils.revision
         activeTask = task
         return task
     }
 
+    /**
+     * Cancels [task] and removes its pending container catches
+     */
+    @Internal
     fun cancel(task: ContainerTask) {
         if (!mc.isSameThread) {
             mc.execute { cancel(task) }
             return
         }
         task.cancellationRequested = true
+        ContainerUtils.clearCatches(task)
         if (activeTask !== task) {
             if (!task.completed) task.finish(ContainerTaskResult.Cancelled)
             return
@@ -198,6 +210,7 @@ object ContainerManager : EventListener {
     }
 
     private fun finish(task: ContainerTask, result: ContainerTaskResult) {
+        if (result != ContainerTaskResult.Success) ContainerUtils.clearCatches(task)
         if (activeTask === task) {
             activeTask = null
             job = null

@@ -52,8 +52,8 @@ object WardrobeUtils {
             check("Wardrobe slot $slot is not ready") { state != WardrobeState.UNKNOWN }
 
             pickup(targetSlot.menu).unless { disableUnequip && it.wardrobeState() == WardrobeState.EQUIPPED }
+            catchContainer("(1/3) Armor Sets")
             closeContainer()
-            awaitContainer("(1/3) Armor Sets")
 
             onFinished { result ->
                 when (result) {

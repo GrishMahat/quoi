@@ -46,8 +46,8 @@ object LoadoutSwapper {
                 mc.player?.containerMenu?.items?.getOrNull(targetSlot)?.isLoadoutButton() == true
             }
             pickup(targetSlot.menu)
+            catchContainer("(1/3) Loadouts")
             closeContainer()
-            awaitContainer("(1/3) Loadouts")
 
             onFinished { result ->
                 when (result) {

@@ -4,6 +4,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import net.minecraft.world.inventory.AbstractContainerMenu
 import net.minecraft.world.inventory.ContainerInput
+import quoi.annotations.Internal
 import quoi.QuoiMod.logger
 import quoi.utils.ChatUtils
 import quoi.utils.skyblock.player.container.ContainerOptions
@@ -25,6 +26,7 @@ sealed interface ContainerTaskResult {
  * Represents a sequence of [ContainerAction]s to be executed in [ContainerManager]
  * Each task can only be run once
  */
+@OptIn(Internal::class)
 class ContainerTask(
     val name: String?,
     val actions: List<ContainerAction>,
@@ -85,10 +87,18 @@ class ContainerTask(
      */
     fun cancel() = ContainerManager.cancel(this)
 
+    /**
+     * Starts the fast mode input block for the task's container
+     */
+    @Internal
     internal fun beginFastBlock() {
         if (settings.fastMode && !fastBlockFinished) fastBlockActive = true
     }
 
+    /**
+     * Counts a completed or skipped click and ends the fast mode block after the last click
+     */
+    @Internal
     internal fun finishClick() {
         if (clicksRemaining > 0) clicksRemaining--
         if (clicksRemaining == 0) {
@@ -97,6 +107,10 @@ class ContainerTask(
         }
     }
 
+    /**
+     * Completes the task once and resumes callers waiting in [await]
+     */
+    @Internal
     internal fun finish(result: ContainerTaskResult) {
         if (this.result != null) return
         this.result = result
@@ -187,6 +201,22 @@ class ContainerTaskBuilder(val force: Boolean) {
         action { ChatUtils.command(command) }
         awaitContainer(name, waitForItems, timeout)
     }
+
+    /**
+     * Suppresses the next matching container reopen without waiting for it
+     * A missing reopen does not fail the task
+     *
+     * Call after the triggering click and before [closeContainer]. Skipped clicks are ignored
+     * Catches remain after success and are cleared on failure, cancellation, a new task or world change
+     *
+     * @param name container name to catch
+     * @param timeout time to keep the catch active (server ticks). 0 disables the catch, must not be negative
+     */
+    fun catchContainer(name: Regex, timeout: Int = 20) =
+        actions.add(ContainerAction.CatchContainer(name, timeout))
+
+    fun catchContainer(name: String, timeout: Int = 20) =
+        catchContainer(Regex(Regex.escape(name), RegexOption.IGNORE_CASE), timeout)
 
     fun closeContainer() = actions.add(ContainerAction.Close()) // only closes the task's container
 

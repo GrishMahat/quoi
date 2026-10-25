@@ -153,9 +153,8 @@ object Test : Module("Test", desc = "Dev module for testing.") {
                 containerTask(name = "wd test") { // idk it feels slow as shit... maybe it's cuz I have 250ms.
                     awaitContainer(Regex("""^\((\d+)/(\d+)\) Armor Sets$"""))
                     pickup(36.menu)
+                    catchContainer(Regex("""^\((\d+)/(\d+)\) Armor Sets$"""))
                     action { player.closeContainer() }
-                    // hypixel reopens and insta closes the window if you close it manually when you trigger reopen
-                    awaitContainer(Regex("""^\((\d+)/(\d+)\) Armor Sets$""")) // todo make it conditional or sm (if you don't click anything to trigger reopen)
 
                     onComplete {
                         modMessage(System.currentTimeMillis() - start)

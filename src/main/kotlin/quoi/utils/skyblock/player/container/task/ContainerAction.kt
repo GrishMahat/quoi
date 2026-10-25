@@ -2,6 +2,7 @@ package quoi.utils.skyblock.player.container.task
 
 import net.minecraft.world.inventory.ContainerInput
 import net.minecraft.world.item.ItemStack
+import quoi.annotations.Internal
 import quoi.api.events.ContainerEvent
 import quoi.api.events.TickEvent
 import quoi.api.events.core.await
@@ -17,6 +18,7 @@ abstract class ItemAction : ContainerAction {
     var skipIf: ((ItemStack) -> Boolean)? = null
 }
 
+@OptIn(Internal::class)
 interface ContainerAction {
     val failureReason: String get() = "Container action failed"
 
@@ -82,6 +84,23 @@ interface ContainerAction {
     class Close : ContainerAction {
         override suspend fun ContainerManager.execute(): Boolean {
             activeTask?.let { closeOwnedMenu(it) }
+            return true
+        }
+    }
+
+    /**
+     * Registers a container reopen catch without waiting for the container
+     */
+    class CatchContainer(val containerName: Regex, val timeout: Int) : ContainerAction {
+        init {
+            require(timeout >= 0) { "Container catch timeout must not be negative" }
+        }
+
+        override suspend fun ContainerManager.execute(): Boolean {
+            val task = activeTask ?: return false
+            val skipped = task.skippedLast
+            task.skippedLast = false
+            if (!skipped) ContainerUtils.catchContainer(task, containerName, timeout)
             return true
         }
     }
