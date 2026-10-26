@@ -29,6 +29,7 @@ object AutoClicker: Module(
 ) {
     private val breakBlocks by switch("Allow breaking blocks", desc = "Allows the player to break blocks.").json("Break blocks")
     private val stopOnSwap by switch("Stop on item swap", desc = "Stops clicking on item swap.")
+    private val stopWhileSneaking by switch("Stop while sneaking", desc = "Pauses auto clicking while sneaking.")
     private val favouriteItems by switch("Whitelist only", desc = "Only click when holding a whitelisted item.").json("Favourite items only")
     private val favLeft by ListSetting("FAVOURITE_ITEMS_LEFT", mutableListOf<String>())
     private val favRight by ListSetting("FAVOURITE_ITEMS_RIGHT", mutableListOf<String>())
@@ -57,6 +58,7 @@ object AutoClicker: Module(
 
     private fun shouldClick(isLeft: Boolean): Boolean {
         if (mc.screen != null) return false
+        if (stopWhileSneaking && player.isShiftKeyDown) return false
         if (blockDungeonBreaker && player.mainHandItem.skyblockId == "DUNGEONBREAKER") return false
 
         val favList = if (isLeft) favLeft else favRight
