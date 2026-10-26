@@ -23,101 +23,100 @@ import quoi.utils.skyblock.item.ItemUtils.skyblockId
 import quoi.utils.skyblock.player.LeapManager
 
 // TODO: rewrite this
-// TODO: better descriptions (this is horrible omg)
 object AutoLeap : Module(
     "Auto Leap",
-    desc = "Automatically leaps to predefined targets.",
+    desc = "Leaps to location-based targets. Left-click a Spirit Leap, or enable Auto for each leap.",
     area = Island.Dungeon
 ) {
     private val presets by configMap<String, JsonObject>("auto_leap_presets.json")
 
-    private val leapMode by selector("Leap mode", LeapMode.Name, "Leap mode for the module.").open()
+    private val leapMode by selector("Leap mode", LeapMode.Name, "Choose boss leap targets by player name or class.").open()
     private val blockInputs by switch("Block inputs", desc = "Blocks keyboard and mouse input while leaping.")
-    private val fastMode by switch("Fast mode", desc = "Blocks movement and input only from the leap menu opening until the target click.")
-    private val swapBack by switch("Swap back", desc = "Switches back to the previously held item after leaping.")
+    private val fastMode by switch("Fast mode", desc = "Skips click delay. Only blocks movement/input from menu open to target click.")
+    private val swapBack by switch("Swap back", desc = "Restores your previous hotbar slot after leaping.")
 
-    private var presetName by textInput("Preset name", length = 32, placeholder = "My preset").suggests { presets.keys.sorted() }
-
-    @Suppress("unused")
-    private val savePreset by button("Save preset", desc = "Saves the current Auto Leap settings under this preset name.") { savePreset() }
+    private var presetName by textInput("Preset name", length = 32, desc = "Preset to save or load.", placeholder = "My preset").suggests { presets.keys.sorted() }
 
     @Suppress("unused")
-    private val loadPreset by button("Load preset", desc = "Loads the Auto Leap settings saved under this preset name.") { loadPreset() }
+    private val savePreset by button("Save preset", desc = "Saves current settings. Overwrites presets with the same name.") { savePreset() }
 
-    private val doorOpenerLeap by switch("Door opener leap", desc = "Outside of F7 boss, fast leap to the last wither door opener.")
-    private val doorOpenerAuto by switch("Auto", desc = "Automatically leaps to a teammate when they open a Wither or Blood door.").json("Door opener auto").childOf(::doorOpenerLeap)
-    private val disableAfterBloodOpen by switch("Disable after Blood Open", desc = "Disables Door Fast Leap after the Blood Room has been opened.").childOf(::doorOpenerLeap)
+    @Suppress("unused")
+    private val loadPreset by button("Load preset", desc = "Loads the selected preset.") { loadPreset() }
 
-    private val crystalLeap by switch("Crystal leap", desc = "Leaps to crystal checkpointer.")
-    private val crystalAuto by switch("Auto", desc = "Automatically leaps when you pick up an Energy Crystal in P1.").json("Crystal leap auto").childOf(::crystalLeap)
+    private val doorOpenerLeap by switch("Door opener leap", desc = "Leap to the last Wither or Blood door opener during clear.")
+    private val doorOpenerAuto by switch("Auto", desc = "Leap when a teammate opens a Wither or Blood door.").json("Door opener auto").childOf(::doorOpenerLeap)
+    private val disableAfterBloodOpen by switch("Disable after Blood Open", desc = "Stops door opener leaps once Blood is open.").childOf(::doorOpenerLeap)
 
-    private val p1Leap by switch("P1 leap", desc = "Leaps in P1.").json("Pre P2 leap")
-    private val p1Auto by switch("Auto", desc = "Automatically leaps after Maxor died.").json("P1 leap auto").childOf(::p1Leap)
+    private val crystalLeap by switch("Crystal leap", desc = "Leap from either P1 crystal platform.")
+    private val crystalAuto by switch("Auto", desc = "Leap on Energy Crystal pickup.").json("Crystal leap auto").childOf(::crystalLeap)
 
-    private val predevLeap by switch("Predev leap", desc = "Leaps before Storm dev.")
-    private val predevAuto by switch("Auto", desc = "Automatically leaps before Storm's lightning.").json("Predev leap auto").childOf(::predevLeap)
+    private val p1Leap by switch("P1 leap", desc = "Leap from P1. Enabled Crystal leap takes priority on crystal platforms.").json("Pre P2 leap")
+    private val p1Auto by switch("Auto", desc = "Leap on the second Energy Laser charge in P1.").json("P1 leap auto").childOf(::p1Leap)
 
-    private val yellowLeap by switch("Yellow pad leap", desc = "Leaps on yellow pad.")
-    private val yellowAuto by switch("Auto", desc = "Automatically leaps after the second Storm crush.").json("Yellow pad leap auto").childOf(::yellowLeap)
+    private val predevLeap by switch("Predev leap", desc = "Leap from P3 while Maxor or Storm is still active.")
+    private val predevAuto by switch("Auto", desc = "Leap on Storm's lightning dialogue while in P3.").json("Predev leap auto").childOf(::predevLeap)
 
-    private val purpleLeap by switch("Purple pad leap", desc = "Leaps on purple pad.")
-    private val purpleAuto by switch("Auto", desc = "Automatically leaps when Storm is enraged.").json("Purple pad leap auto").childOf(::purpleLeap)
+    private val yellowLeap by switch("Yellow pad leap", desc = "Leap from the yellow pad.")
+    private val yellowAuto by switch("Auto", desc = "Leap after Storm's second crush while on yellow.").json("Yellow pad leap auto").childOf(::yellowLeap)
 
-    private val betweenPyPadLeap by switch("PY healer leap", desc = "Leaps while being between purple and yellow pad.") // TODO: rename or smth idk
-    private val betweenPyPadAuto by switch("Auto", desc = "Automatically leaps on first Storm crush.").json("Between PY Pad leap auto").childOf(::betweenPyPadLeap)
+    private val purpleLeap by switch("Purple pad leap", desc = "Leap from the purple pad.")
+    private val purpleAuto by switch("Auto", desc = "Leap after Storm's first crush while on purple.").json("Purple pad leap auto").childOf(::purpleLeap)
 
-    private val stormDeathLeap by switch("Storm death leap", desc = "Leaps on storm death.")
-    private val stormDeathAuto by switch("Auto", desc = "Automatically leaps when Storm dies.").json("Storm death auto").childOf(::stormDeathLeap)
+    private val betweenPyPadLeap by switch("Between PY pad leap", desc = "Leap from between the purple and yellow pads.")
+    private val betweenPyPadAuto by switch("Auto", desc = "Leap after Storm's first crush while between the pads.").json("Between PY Pad leap auto").childOf(::betweenPyPadLeap)
 
-    private val i4Leap by switch("I4 leap", desc = "Leaps on Pre4 dev.").json("Pre4 leap")
-    private val i4Auto by switch("Auto", desc = "Automatically leaps when Pre4 is done.").json("Pre4 leap auto").childOf(::i4Leap)
-    private val i4LeapMelody by switch("Leap Melody", desc = "Leaps to the player doing Melody when Pre4 is done.").childOf(::i4Leap)
+    private val stormDeathLeap by switch("Storm death leap", desc = "Leap from P2, outside the pads and the area between them.")
+    private val stormDeathAuto by switch("Auto", desc = "Leap on Storm's death message, from any position.").json("Storm death auto").childOf(::stormDeathLeap)
 
-    private val p3Leap by switch("P3 leap", desc = "Leaps in terminal phase.")
-    private val p3Auto by switch("Auto", desc = "Automatically leaps when a section is finished.").json("P3 leap auto").childOf(::p3Leap)
-    private val whenBlown by switch("Only when gate blown", desc = "Only leaps when gate is blown").childOf(::p3Auto)
+    private val i4Leap by switch("I4 leap", desc = "Leap from the I4 device.").json("Pre4 leap")
+    private val i4Auto by switch("Auto", desc = "Leap after completing I4 during section 1 or 2.").json("Pre4 leap auto").childOf(::i4Leap)
+    private val i4LeapMelody by switch("Leap Melody", desc = "Uses the last Melody progress sender in party chat, otherwise the I4 target.").childOf(::i4Leap)
 
-    private val middleLeap by switch("Middle leap", desc = "Leaps in middle.")
-    private val middleAuto by switch("Auto", desc = "Automatically leaps when instamid would trigger.").json("Middle leap auto").childOf(::middleLeap)
+    private val p3Leap by switch("P3 leap", desc = "Leap to your P3 section's target when no other leap applies.")
+    private val p3Auto by switch("Auto", desc = "Leap when a section's objectives finish, unless you are ahead or at I4.").json("P3 leap auto").childOf(::p3Leap)
+    private val whenBlown by switch("Only when gate blown", desc = "Also waits for the gate, or the Core entrance in section 4.").childOf(::p3Auto)
 
-    private val p4Leap by switch("P4 leap", desc = "Leaps at P5 start.").json("P5 leap")
-    private val p4Auto by switch("Auto", desc = "Automatically leaps when Necron reaches less than 5%.").json("P5 leap auto").childOf(::p4Leap)
+    private val middleLeap by switch("Middle leap", desc = "Leap from P4, outside the middle platform.")
+    private val middleAuto by switch("Auto", desc = "Leap on Necron's 'Goodbye.' while outside middle in P4.").json("Middle leap auto").childOf(::middleLeap)
 
-    private val relicLeap by switch("Relic leap", desc = "Leaps in relic.")
-    private val relicAuto by switch("Auto", desc = "Automatically leaps after picking up a relic.").json("Relic leap auto").childOf(::relicLeap)
+    private val p4Leap by switch("P4 leap", desc = "Leap from the P4 middle platform.").json("P5 leap")
+    private val p4Auto by switch("Auto", desc = "Leap once at about 5% Necron HP while in P4.").json("P5 leap auto").childOf(::p4Leap)
 
-    private val crystalName by textInput("Target", length = 16).json("Crystal leap name").childOf(::crystalLeap) { crystalLeap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
-    private val p1Name by textInput("Target", "P1", length = 16).json("P1 leap name").childOf(::p1Leap) { p1Leap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
-    private val predevName by textInput("Target", length = 16).json("Predev leap name").childOf(::predevLeap) { predevLeap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
-    private val yellowName by textInput("Target", length = 16).json("Yellow leap name").childOf(::yellowLeap) { yellowLeap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
-    private val purpleName by textInput("Target", length = 16).json("Purple leap name").childOf(::purpleLeap) { purpleLeap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
-    private val betweenPyPadName by textInput("Target", length = 16).json("Between PY Pad Name").childOf(::betweenPyPadLeap) { betweenPyPadLeap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
+    private val relicLeap by switch("Relic leap", desc = "Leap during M7 P5.")
+    private val relicAuto by switch("Auto", desc = "Leap when a relic enters hotbar slot 9 in P5.").json("Relic leap auto").childOf(::relicLeap)
 
-    private val stormLeapName by textInput("Target", length = 16).json("Storm death leap name").childOf(::stormDeathLeap) { stormDeathLeap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
-    private val i4Name by textInput("Target", length = 16).json("Pre4 leap name").childOf(::i4Leap) { i4Leap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
-    private val s1Name by textInput("S1 leap", length = 16).childOf(::p3Leap) { p3Leap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
-    private val s2Name by textInput("S2 leap", length = 16).childOf(::p3Leap) { p3Leap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
-    private val s3Name by textInput("S3 leap", length = 16).childOf(::p3Leap) { p3Leap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
-    private val s4Name by textInput("S4 leap", length = 16).childOf(::p3Leap) { p3Leap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
-    private val middleName by textInput("Target", length = 16).json("Middle leap name").childOf(::middleLeap) { middleLeap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
-    private val p4Name by textInput("Target", length = 16).json("P5 leap name").childOf(::p4Leap) { p4Leap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
-    private val relicName by textInput("Target", length = 16).json("Relic leap name").childOf(::relicLeap) { relicLeap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
+    private val crystalName by textInput("Target", length = 16, desc = "Target player name. Leave empty to skip.").json("Crystal leap name").childOf(::crystalLeap) { crystalLeap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
+    private val p1Name by textInput("Target", "P1", length = 16, desc = "Target player name. Leave empty to skip.").json("P1 leap name").childOf(::p1Leap) { p1Leap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
+    private val predevName by textInput("Target", length = 16, desc = "Target player name. Leave empty to skip.").json("Predev leap name").childOf(::predevLeap) { predevLeap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
+    private val yellowName by textInput("Target", length = 16, desc = "Target player name. Leave empty to skip.").json("Yellow leap name").childOf(::yellowLeap) { yellowLeap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
+    private val purpleName by textInput("Target", length = 16, desc = "Target player name. Leave empty to skip.").json("Purple leap name").childOf(::purpleLeap) { purpleLeap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
+    private val betweenPyPadName by textInput("Target", length = 16, desc = "Target player name. Leave empty to skip.").json("Between PY Pad Name").childOf(::betweenPyPadLeap) { betweenPyPadLeap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
 
-    private val crystalClass by selector("Target", DungeonClass.Unknown).json("Crystal leap class").childOf(::crystalLeap) { crystalLeap && leapMode.selected == LeapMode.Class }
-    private val p1Class by selector("Target", DungeonClass.Unknown).json("P1 leap class").childOf(::p1Leap) { p1Leap && leapMode.selected == LeapMode.Class }
-    private val predevClass by selector("Target", DungeonClass.Unknown).json("Predev leap class").childOf(::predevLeap) { predevLeap && leapMode.selected == LeapMode.Class }
-    private val yellowClass by selector("Target", DungeonClass.Unknown).json("Yellow leap class").childOf(::yellowLeap) { yellowLeap && leapMode.selected == LeapMode.Class }
-    private val purpleClass by selector("Target", DungeonClass.Unknown).json("Purple leap class").childOf(::purpleLeap) { purpleLeap && leapMode.selected == LeapMode.Class }
-    private val betweenPyPadClass by selector("Target", DungeonClass.Unknown).json("Between PY Pad class").childOf(::betweenPyPadLeap) { betweenPyPadLeap && leapMode.selected == LeapMode.Class }
-    private val stormDeathClass by selector("Target", DungeonClass.Unknown).json("Storm death class").childOf(::stormDeathLeap) { stormDeathLeap && leapMode.selected == LeapMode.Class }
-    private val i4Class by selector("Target", DungeonClass.Unknown).json("Pre4 leap class").childOf(::i4Leap) { i4Leap && leapMode.selected == LeapMode.Class }
-    private val s1Class by selector("S1 leap", DungeonClass.Healer).json("S1 leap class").childOf(::p3Leap) { p3Leap && leapMode.selected == LeapMode.Class }
-    private val s2Class by selector("S2 leap", DungeonClass.Archer).json("S2 leap class").childOf(::p3Leap) { p3Leap && leapMode.selected == LeapMode.Class }
-    private val s3Class by selector("S3 leap", DungeonClass.Mage).json("S3 leap class").childOf(::p3Leap) { p3Leap && leapMode.selected == LeapMode.Class }
-    private val s4Class by selector("S4 leap", DungeonClass.Mage).json("S4 leap class").childOf(::p3Leap) { p3Leap && leapMode.selected == LeapMode.Class }
-    private val middleClass by selector("Target", DungeonClass.Unknown).json("Middle leap class").childOf(::middleLeap) { middleLeap && leapMode.selected == LeapMode.Class }
-    private val p4Class by selector("Target", DungeonClass.Unknown).json("P5 leap class").childOf(::p4Leap) { p4Leap && leapMode.selected == LeapMode.Class }
-    private val relicClass by selector("Target", DungeonClass.Unknown).json("Relic leap class").childOf(::relicLeap) { relicLeap && leapMode.selected == LeapMode.Class }
+    private val stormLeapName by textInput("Target", length = 16, desc = "Target player name. Leave empty to skip.").json("Storm death leap name").childOf(::stormDeathLeap) { stormDeathLeap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
+    private val i4Name by textInput("Target", length = 16, desc = "Target player name. Leave empty to skip.").json("Pre4 leap name").childOf(::i4Leap) { i4Leap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
+    private val s1Name by textInput("S1 leap", length = 16, desc = "Player to leap to from section 1 or when it finishes.").childOf(::p3Leap) { p3Leap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
+    private val s2Name by textInput("S2 leap", length = 16, desc = "Player to leap to from section 2 or when it finishes.").childOf(::p3Leap) { p3Leap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
+    private val s3Name by textInput("S3 leap", length = 16, desc = "Player to leap to from section 3 or when it finishes.").childOf(::p3Leap) { p3Leap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
+    private val s4Name by textInput("S4 leap", length = 16, desc = "Player to leap to from section 4 or when it finishes.").childOf(::p3Leap) { p3Leap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
+    private val middleName by textInput("Target", length = 16, desc = "Target player name. Leave empty to skip.").json("Middle leap name").childOf(::middleLeap) { middleLeap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
+    private val p4Name by textInput("Target", length = 16, desc = "Target player name. Leave empty to skip.").json("P5 leap name").childOf(::p4Leap) { p4Leap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
+    private val relicName by textInput("Target", length = 16, desc = "Target player name. Leave empty to skip.").json("Relic leap name").childOf(::relicLeap) { relicLeap && leapMode.selected == LeapMode.Name }.suggests { allTeammatesNoSelf }
+
+    private val crystalClass by selector("Target", DungeonClass.Unknown, desc = "Target class. Unknown skips this target.").json("Crystal leap class").childOf(::crystalLeap) { crystalLeap && leapMode.selected == LeapMode.Class }
+    private val p1Class by selector("Target", DungeonClass.Unknown, desc = "Target class. Unknown skips this target.").json("P1 leap class").childOf(::p1Leap) { p1Leap && leapMode.selected == LeapMode.Class }
+    private val predevClass by selector("Target", DungeonClass.Unknown, desc = "Target class. Unknown skips this target.").json("Predev leap class").childOf(::predevLeap) { predevLeap && leapMode.selected == LeapMode.Class }
+    private val yellowClass by selector("Target", DungeonClass.Unknown, desc = "Target class. Unknown skips this target.").json("Yellow leap class").childOf(::yellowLeap) { yellowLeap && leapMode.selected == LeapMode.Class }
+    private val purpleClass by selector("Target", DungeonClass.Unknown, desc = "Target class. Unknown skips this target.").json("Purple leap class").childOf(::purpleLeap) { purpleLeap && leapMode.selected == LeapMode.Class }
+    private val betweenPyPadClass by selector("Target", DungeonClass.Unknown, desc = "Target class. Unknown skips this target.").json("Between PY Pad class").childOf(::betweenPyPadLeap) { betweenPyPadLeap && leapMode.selected == LeapMode.Class }
+    private val stormDeathClass by selector("Target", DungeonClass.Unknown, desc = "Target class. Unknown skips this target.").json("Storm death class").childOf(::stormDeathLeap) { stormDeathLeap && leapMode.selected == LeapMode.Class }
+    private val i4Class by selector("Target", DungeonClass.Unknown, desc = "Target class. Unknown skips this target.").json("Pre4 leap class").childOf(::i4Leap) { i4Leap && leapMode.selected == LeapMode.Class }
+    private val s1Class by selector("S1 leap", DungeonClass.Unknown, desc = "Class to leap to from section 1 or when it finishes.").json("S1 leap class").childOf(::p3Leap) { p3Leap && leapMode.selected == LeapMode.Class }
+    private val s2Class by selector("S2 leap", DungeonClass.Unknown, desc = "Class to leap to from section 2 or when it finishes.").json("S2 leap class").childOf(::p3Leap) { p3Leap && leapMode.selected == LeapMode.Class }
+    private val s3Class by selector("S3 leap", DungeonClass.Unknown, desc = "Class to leap to from section 3 or when it finishes.").json("S3 leap class").childOf(::p3Leap) { p3Leap && leapMode.selected == LeapMode.Class }
+    private val s4Class by selector("S4 leap", DungeonClass.Unknown, desc = "Class to leap to from section 4 or when it finishes.").json("S4 leap class").childOf(::p3Leap) { p3Leap && leapMode.selected == LeapMode.Class }
+    private val middleClass by selector("Target", DungeonClass.Unknown, desc = "Target class. Unknown skips this target.").json("Middle leap class").childOf(::middleLeap) { middleLeap && leapMode.selected == LeapMode.Class }
+    private val p4Class by selector("Target", DungeonClass.Unknown, desc = "Target class. Unknown skips this target.").json("P5 leap class").childOf(::p4Leap) { p4Leap && leapMode.selected == LeapMode.Class }
+    private val relicClass by selector("Target", DungeonClass.Unknown, desc = "Target class. Unknown skips this target.").json("Relic leap class").childOf(::relicLeap) { relicLeap && leapMode.selected == LeapMode.Class }
 
     private var lastClick = 0L
     private var crystalCount = 0
