@@ -57,8 +57,8 @@ object LeapManager : EventListener {
 
     init {
         on<ChatEvent.Packet> {
-            if (unformatted != "You cannot use this in a solo dungeon!" &&
-                unformatted != "There are no other players to teleport to!"
+            if (unformatted == "You cannot use this in a solo dungeon!" ||
+                unformatted == "There are no other players to teleport to!"
             ) return@on
 
             if (!inProgress) return@on
@@ -97,14 +97,18 @@ object LeapManager : EventListener {
         on<PacketEvent.Sent, ServerboundUseItemPacket>(Priority.LOWEST - 2, acceptCancelled = true) {
             val leap = activeLeap ?: return@on
             if (!ClickGui.debug) return@on
-            logger.info("Leap use-item event: target={}, hand={}, sequence={}, cancelled={}, item={}",
-                leap.target.name, packet.hand, packet.sequence, cancelled, mc.player?.mainHandItem?.skyblockId)
+            logger.info(
+                "Leap use-item event: target={}, hand={}, sequence={}, cancelled={}, item={}",
+                leap.target.name, packet.hand, packet.sequence, cancelled, mc.player?.mainHandItem?.skyblockId
+            )
         }
         on<PacketEvent.Received, ClientboundOpenScreenPacket>(Priority.HIGHEST + 2, acceptCancelled = true) {
             val leap = activeLeap ?: return@on
             if (!ClickGui.debug) return@on
-            logger.info("Leap received menu: target={}, id={}, title={}",
-                leap.target.name, packet.containerId, packet.title.string)
+            logger.info(
+                "Leap received menu: target={}, id={}, title={}",
+                leap.target.name, packet.containerId, packet.title.string
+            )
         }
     }
 
@@ -150,10 +154,8 @@ object LeapManager : EventListener {
             doLeap(request, preOpened = true)
         } else if (mc.screen != null || ContainerUtils.containerId != 0 || ContainerManager.activeTask != null) {
             queueLeap(request)
-        } else {
-            if (doLeap(request) == LeapStartResult.Retry) {
-                queueLeap(request)
-            }
+        } else if (doLeap(request) == LeapStartResult.Retry) {
+            queueLeap(request)
         }
     }
 
@@ -169,11 +171,13 @@ object LeapManager : EventListener {
                 inProgress -> "leap active"
                 else -> "hotbar swap used this tick"
             }
-            logger.info("Leap queued: target={}, reason={}, screen={}, trackedContainer={}, playerContainer={}, title={}, silent={}, task={}, action={}/{}, activeLeap={}, leapTaskResult={}",
+            logger.info(
+                "Leap queued: target={}, reason={}, screen={}, trackedContainer={}, playerContainer={}, title={}, silent={}, task={}, action={}/{}, activeLeap={}, leapTaskResult={}",
                 request.target.name, reason, screen?.javaClass?.name, ContainerUtils.containerId,
                 mc.player?.containerMenu?.containerId, ContainerUtils.current?.title, ContainerUtils.containerServerSide,
                 runningTask?.name, runningTask?.completedActions, runningTask?.totalActions,
-                activeLeap?.target?.name, task?.result)
+                activeLeap?.target?.name, task?.result
+            )
         }
         modMessage("&eQueued leap to ${formatName(request.target)}")
     }
@@ -202,9 +206,11 @@ object LeapManager : EventListener {
 
         activeLeap = leap
         if (ClickGui.debug) {
-            logger.info("Leap started: target={}, preOpened={}, slot={}, item={}, serverTick={}",
+            logger.info(
+                "Leap started: target={}, preOpened={}, slot={}, item={}, serverTick={}",
                 leap.target.name, preOpened, mc.player?.inventory?.selectedSlot,
-                mc.player?.mainHandItem?.skyblockId, EventDispatcher.totalTicks)
+                mc.player?.mainHandItem?.skyblockId, EventDispatcher.totalTicks
+            )
         }
         val newTask = containerTask(
             name = "Leap to ${leap.target.name}",

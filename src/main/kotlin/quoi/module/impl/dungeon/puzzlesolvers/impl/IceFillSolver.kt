@@ -135,6 +135,7 @@ object IceFillSolver : SettingGroup(PuzzleSolvers, "Ice fill"), Repositionable {
     }
 
     override fun shouldHandle(event: Event): Boolean {
+        if (event is WorldEvent.Change) return true
         if (!super.shouldHandle(event)) return false
 
         if (event is DungeonEvent.Room.Enter) return true

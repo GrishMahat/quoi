@@ -192,9 +192,10 @@ object TicTacToeSolver : SettingGroup(PuzzleSolvers, "Tic tac toe"), Repositiona
     }
 
     override fun shouldHandle(event: Event): Boolean {
+        if (event is WorldEvent.Change) return true
         if (!super.shouldHandle(event)) return false
 
-        if (event is DungeonEvent.Room.Enter || event is WorldEvent.Change) return true
+        if (event is DungeonEvent.Room.Enter) return true
 
         return Dungeon.currentRoom?.name == "Tic Tac Toe"
     }

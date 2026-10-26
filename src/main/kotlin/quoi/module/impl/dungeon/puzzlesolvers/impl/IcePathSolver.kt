@@ -55,6 +55,7 @@ object IcePathSolver : SettingGroup(PuzzleSolvers, "Ice path"), Repositionable {
     private var isMoving = false
 
     override fun shouldHandle(event: Event): Boolean {
+        if (event is WorldEvent.Change) return true
         if (!super.shouldHandle(event)) return false
 
         if (event is DungeonEvent.Room.Enter) return true
