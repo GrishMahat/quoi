@@ -1,6 +1,5 @@
 package quoi.module.impl.render.clickgui
 
-import java.net.URI
 import quoi.annotations.AlwaysActive
 import quoi.annotations.Internal
 import quoi.api.abobaui.AbobaUI
@@ -9,27 +8,7 @@ import quoi.api.abobaui.constraints.impl.positions.Centre
 import quoi.api.abobaui.constraints.impl.size.Bounding
 import quoi.api.abobaui.constraints.impl.size.Copying
 import quoi.api.abobaui.constraints.impl.size.Fill
-import quoi.api.abobaui.dsl.aboba
-import quoi.api.abobaui.dsl.alignOpposite
-import quoi.api.abobaui.dsl.alignRight
-import quoi.api.abobaui.dsl.at
-import quoi.api.abobaui.dsl.bounds
-import quoi.api.abobaui.dsl.constrain
-import quoi.api.abobaui.dsl.copies
-import quoi.api.abobaui.dsl.draggable
-import quoi.api.abobaui.dsl.minus
-import quoi.api.abobaui.dsl.moveToBottom
-import quoi.api.abobaui.dsl.onAdd
-import quoi.api.abobaui.dsl.onClick
-import quoi.api.abobaui.dsl.onMouseExit
-import quoi.api.abobaui.dsl.onRemove
-import quoi.api.abobaui.dsl.onScroll
-import quoi.api.abobaui.dsl.percent
-import quoi.api.abobaui.dsl.px
-import quoi.api.abobaui.dsl.radius
-import quoi.api.abobaui.dsl.seconds
-import quoi.api.abobaui.dsl.size
-import quoi.api.abobaui.dsl.tonalHover
+import quoi.api.abobaui.dsl.*
 import quoi.api.abobaui.elements.ElementScope
 import quoi.api.abobaui.elements.Layout.Companion.divider
 import quoi.api.abobaui.elements.impl.Block.Companion.outline
@@ -67,6 +46,7 @@ import quoi.utils.ui.onHover
 import quoi.utils.ui.rendering.NVGRenderer
 import quoi.utils.ui.rendering.NVGRenderer.defaultFont
 import quoi.utils.ui.screens.UIScreen.Companion.open
+import java.net.URI
 
 //? if <26.3 {
 import net.minecraft.util.Util
@@ -80,6 +60,7 @@ object ClickGui : Module(
     "Click GUI",
     key = Keybinds.KEY_RIGHT_SHIFT
 ) {
+    val debug by switch("Debug", desc = "Writes leap and container diagnostics to latest.log.") // TODO: make actual debug or smth
     val forceSkyblock by switch("Force skyblock")
     val forceDungeons by switch("Force dungeon").onValueChanged { _, new -> if (new) Dungeon.setFloor(dungeonFloor.selected) }
     val dungeonFloor: SelectorComponent<Floor> by selector("Floor", Floor.F7).childOf(::forceDungeons).onValueChanged { _, new ->
@@ -227,9 +208,9 @@ object ClickGui : Module(
                         moduleScopes.forEach { (m, element) ->
                             element.enabled =
                                 query.isEmpty() ||
-                                    normaliseSearchText(m.name).contains(query) ||
-                                    normaliseSearchText(m.desc).contains(query) ||
-                                    m.settings.any { normaliseSearchText(it.name).contains(query) }
+                                        normaliseSearchText(m.name).contains(query) ||
+                                        normaliseSearchText(m.desc).contains(query) ||
+                                        m.settings.any { normaliseSearchText(it.name).contains(query) }
                         }
                     }
                 }
@@ -263,7 +244,7 @@ object ClickGui : Module(
             if (module.tag != Tag.NONE) {
                 val img = when (module.tag) {
                     Tag.LEGACY -> theme.refreshImage
-                    Tag.BETA   -> theme.bugImage
+                    Tag.BETA -> theme.bugImage
                     Tag.NONE -> theme.chevronImage
                 }
 
@@ -322,10 +303,10 @@ object ClickGui : Module(
             if (popup != null) return@onHover
 
             val x =
-                    if (element.x >= ui.main.width / 2)
-                        (element.x - 8).px.alignRight
-                    else
-                        (element.x + element.width + 8).px
+                if (element.x >= ui.main.width / 2)
+                    (element.x - 8).px.alignRight
+                else
+                    (element.x + element.width + 8).px
 
             val y = (element.y + 7 / 2).px
 
@@ -356,6 +337,7 @@ object ClickGui : Module(
             popup = null
         }
     }
+
     private fun modulesFor(category: Category): List<Module> =
         ModuleManager.modules.filter { it.category == category }.sortedWith(moduleSorting.selected.comparator)
 

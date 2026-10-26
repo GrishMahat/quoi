@@ -5,6 +5,7 @@ import net.minecraft.network.protocol.game.*
 import net.minecraft.world.inventory.AbstractContainerMenu
 import net.minecraft.world.inventory.ContainerInput
 import net.minecraft.world.inventory.MenuType
+import quoi.QuoiMod.logger
 import quoi.annotations.Init
 import quoi.annotations.Internal
 import quoi.api.events.ContainerEvent
@@ -14,6 +15,7 @@ import quoi.api.events.WorldEvent
 import quoi.api.events.core.EventListener
 import quoi.api.events.core.Priority
 import quoi.api.events.core.on
+import quoi.module.impl.render.clickgui.ClickGui
 import quoi.utils.Shortcuts
 import quoi.utils.skyblock.player.container.task.ContainerAction
 import quoi.utils.skyblock.player.container.task.ContainerManager
@@ -53,12 +55,6 @@ object ContainerUtils : EventListener, Shortcuts {
             when (packet) {
                 is ClientboundOpenScreenPacket -> {
                     containerId = packet.containerId
-                    lastStateId = 0
-                    containerServerSide = false
-                }
-                is ClientboundContainerClosePacket -> {
-                    if (packet.containerId != containerId) return@on
-                    containerId = 0
                     lastStateId = 0
                     containerServerSide = false
                 }
@@ -105,7 +101,16 @@ object ContainerUtils : EventListener, Shortcuts {
                     if (p.slot == lastMenuSlot) loaded(p.containerId)
                 }
                 is ClientboundContainerClosePacket -> {
-                    if (current?.menu?.containerId == p.containerId) current = null
+                    if (p.containerId != containerId && ClickGui.debug) {
+                        logger.info(
+                            "Server close ID differs: packetId={}, trackedId={}, playerId={}, title={}",
+                            p.containerId, containerId, mc.player?.containerMenu?.containerId, current?.title
+                        )
+                    }
+                    containerId = 0
+                    lastStateId = 0
+                    containerServerSide = false
+                    current = null
                 }
             }
         }
