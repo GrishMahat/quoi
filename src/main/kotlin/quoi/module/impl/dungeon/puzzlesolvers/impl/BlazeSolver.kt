@@ -1,5 +1,6 @@
 package quoi.module.impl.dungeon.puzzlesolvers.impl
 
+import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.player.LocalPlayer
 import net.minecraft.core.BlockPos
 import net.minecraft.world.entity.decoration.ArmorStand
@@ -15,6 +16,8 @@ import quoi.api.events.TickEvent
 import quoi.api.events.WorldEvent
 import quoi.api.events.core.Event
 import quoi.api.events.core.on
+import quoi.api.input.Keyboard
+import quoi.api.input.Mouse
 import quoi.api.skyblock.dungeon.Dungeon
 import quoi.api.skyblock.dungeon.enums.Puzzle
 import quoi.api.skyblock.dungeon.enums.PuzzleStatus
@@ -33,10 +36,12 @@ import quoi.utils.Scheduler.scheduleLoop
 import quoi.utils.render.drawFilledBox
 import quoi.utils.render.drawLine
 import quoi.utils.render.drawStyledBox
-import quoi.utils.skyblock.item.ItemUtils.hasTerminator
 import quoi.utils.skyblock.item.ItemUtils.isShortbow
 import quoi.utils.skyblock.item.ItemUtils.skyblockId
 import quoi.utils.skyblock.item.TeleportUtils.getEtherwarpDirection
+import quoi.utils.skyblock.item.TeleportUtils.getEtherwarpLandingY
+import quoi.utils.skyblock.player.PlayerUtils.at
+import quoi.utils.skyblock.player.PlayerUtils.getEyeHeight
 import quoi.utils.skyblock.player.PlayerUtils.useItem
 import kotlin.math.cos
 import kotlin.math.sin
@@ -63,7 +68,7 @@ object BlazeSolver : SettingGroup(PuzzleSolvers, "Blaze"), Repositionable { // t
     val triggerbot by switch("Triggerbot", desc = "Fires when your aim will hit the next blaze without hitting a wrong blaze.").asParent()
 
     private var blazes = mutableListOf<ArmorStand>()
-    private var lastBlazeCount = 10
+    private var sneakingForReposition = false
 
     override var repositionTicker: Ticker? = null
     private var lastShotTime = 0L
@@ -73,7 +78,7 @@ object BlazeSolver : SettingGroup(PuzzleSolvers, "Blaze"), Repositionable { // t
 
     init {
         scheduleLoop(10) {
-            if (!module.active) return@scheduleLoop
+            if (!module.active) return@scheduleLoop reset()
             if (solver || auto || triggerbot) getBlaze()
         }
 
@@ -90,18 +95,6 @@ object BlazeSolver : SettingGroup(PuzzleSolvers, "Blaze"), Repositionable { // t
                     ctx.drawFilledBox(Dungeon.currentRoom!!.getRealCoords(spot).aabb, colour = Colour.CYAN, depth = true)
                 }
             }
-
-            blazes.removeAll { it.isRemoved || getEntity(it.id) == null }
-
-            if (blazes.isEmpty() && lastBlazeCount == 1) {
-                Dungeon.puzzles.find { it == Puzzle.BLAZE }?.status = PuzzleStatus.Completed
-                if (announce) ChatUtils.command("pc Blaze done!")
-                if (auto && reposition) mc.options.keyShift.isDown = false
-                lastBlazeCount = 0
-                return@on
-            }
-
-            lastBlazeCount = blazes.size
 
             blazes.forEachIndexed { index, entity ->
                 val colour = when (index) {
@@ -120,9 +113,11 @@ object BlazeSolver : SettingGroup(PuzzleSolvers, "Blaze"), Repositionable { // t
         }
 
         on<TickEvent.End> {
+            if (!auto) stopRepositioning()
+            if (!solver && !auto && !triggerbot) return@on
+            pruneBlazes()
             if ((!auto && !triggerbot) || ClearExecutor.active || blazes.isEmpty() || PuzzleSolvers.screenBlocksAuto || Dungeon.isDead) return@on
             if (!auto && mc.screen != null) return@on
-            blazes.removeAll { it.isRemoved || getEntity(it.id) == null }
             val room = Dungeon.currentRoom ?: return@on
 
             if (auto) repositionTicker?.let {
@@ -152,9 +147,9 @@ object BlazeSolver : SettingGroup(PuzzleSolvers, "Blaze"), Repositionable { // t
             }
 
             val blaze = blazes.firstOrNull() ?: return@on
-            if (!player.mainHandItem.isShortbow || currentTime - lastShotTime < PuzzleSolvers.shootCd) return@on
             val hitboxes = blazes.map { BlazeHitbox(getAABB(it, it == blaze), it == blaze) }
-            val isTerminator = player.mainHandItem.skyblockId == "TERMINATOR"
+            val bow = player.mainHandItem.takeIf { it.isShortbow } ?: getRepositionBow(player) ?: return@on
+            val isTerminator = bow.skyblockId == "TERMINATOR"
 
             val hitDir = if (auto) canHit(player.eyePosition, hitboxes, isTerminator) else {
                 val dir = Direction(player.yRot, player.xRot)
@@ -169,6 +164,7 @@ object BlazeSolver : SettingGroup(PuzzleSolvers, "Blaze"), Repositionable { // t
                 return@on
             }
 
+            if (!player.mainHandItem.isShortbow || currentTime - lastShotTime < PuzzleSolvers.shootCd) return@on
             player.useItem(hitDir)
 
             lastShotTime = currentTime
@@ -193,9 +189,11 @@ object BlazeSolver : SettingGroup(PuzzleSolvers, "Blaze"), Repositionable { // t
     private fun getBlaze() {
         val room = Dungeon.currentRoom?.name ?: return
         if (!Dungeon.inDungeons || !room.equalsOneOf("Lower Blaze", "Higher Blaze")) return
+        pruneBlazes()
         val hpMap = mutableMapOf<ArmorStand, Int>()
         blazes.clear()
         getEntities<ArmorStand>().forEach { entity ->
+            if (entity.isRemoved) return@forEach
             if (entity in blazes) return@forEach
             val hp = BLAZE_HEALTH_REGEX.find(entity.name.string)?.groups?.get(1)?.value?.replace(",", "")?.toIntOrNull() ?: return@forEach
             hpMap[entity] = hp
@@ -203,6 +201,16 @@ object BlazeSolver : SettingGroup(PuzzleSolvers, "Blaze"), Repositionable { // t
         }
         if (room == "Lower Blaze") blazes.sortByDescending { hpMap[it] }
         else blazes.sortBy { hpMap[it] }
+    }
+
+    private fun pruneBlazes() {
+        val previousCount = blazes.size
+        blazes.removeAll { it.isRemoved || getEntity(it.id) == null }
+        if (previousCount == 0 || blazes.isNotEmpty()) return
+        stopRepositioning()
+        if (previousCount != 1 || Puzzle.BLAZE.status == PuzzleStatus.Failed) return
+        Dungeon.puzzles.find { it == Puzzle.BLAZE }?.status = PuzzleStatus.Completed
+        if (announce) ChatUtils.command("pc Blaze done!")
     }
 
     private fun canHit(eyePos: Vec3, hitboxes: List<BlazeHitbox>, isTerminator: Boolean): Direction? {
@@ -301,19 +309,24 @@ object BlazeSolver : SettingGroup(PuzzleSolvers, "Blaze"), Repositionable { // t
         return sideArrow
     }
 
+    private fun getRepositionBow(player: LocalPlayer) = (0..8).firstNotNullOfOrNull { slot ->
+        player.inventory.getItem(slot).takeIf { it.isShortbow }
+    }
+
     private fun cyclePosition(player: LocalPlayer, room: OdonRoom) {
         if (repositionTicker != null) return
         val blaze = blazes.firstOrNull() ?: return
         val spots = if (room.name == "Higher Blaze") HIGHER_SPOTS else LOWER_SPOTS
         val hitboxes = blazes.map { BlazeHitbox(getAABB(it, it == blaze), it == blaze) }
-        val isTerm = player.hasTerminator
+        val isTerm = (getRepositionBow(player) ?: return).skyblockId == "TERMINATOR"
 
         var fallback: BlockPos? = null
 
         for (j in spots.indices) {
             val i = (currentSpot + j + 1) % spots.size
             val realSpot = room.getRealCoords(spots[i])
-            val spotEye = realSpot.vec3.add(0.5, 1.62, 0.5)
+            if (player.at(realSpot)) continue
+            val spotEye = Vec3(realSpot.x + 0.5, getEtherwarpLandingY(realSpot) + getEyeHeight(true), realSpot.z + 0.5)
 
             val dir = getEtherwarpDirection(realSpot)
 
@@ -325,32 +338,59 @@ object BlazeSolver : SettingGroup(PuzzleSolvers, "Blaze"), Repositionable { // t
 
             if (dir != null) {
                 currentSpot = i
-                reposition(realSpot, bow = true)
+                repositionTo(realSpot)
                 return
             }
 
             for (link in spots) {
                 val realLink = room.getRealCoords(link)
+                if (player.at(realLink)) continue
                 if (getEtherwarpDirection(realLink) == null) continue
 
-                val linkEye = realLink.vec3.add(0.5, 1.62, 0.5)
+                val linkEye = Vec3(realLink.x + 0.5, getEtherwarpLandingY(realLink) + getEyeHeight(true), realLink.z + 0.5)
                 if (getEtherwarpDirection(linkEye, realSpot) != null) {
                     currentSpot = i
-                    reposition(realLink)
+                    repositionTo(realLink)
                     return
                 }
             }
         }
-        fallback?.let { reposition(it) }
+        fallback?.let { repositionTo(it) }
+    }
+
+    private fun repositionTo(spot: BlockPos) {
+        val wasSneaking = mc.options.keyShift.isDown
+        reposition(spot, bow = true)
+        if (repositionTicker != null && !wasSneaking) sneakingForReposition = true
+    }
+
+    private fun stopRepositioning() {
+        repositionTicker = null
+        if (sneakingForReposition) {
+            val key = mc.options.keyShift.key
+            val physicallyDown = key.value >= 0 && when (key.type) {
+                //? if <26.3 {
+                InputConstants.Type.MOUSE -> Mouse.isButtonDown(key.value)
+                InputConstants.Type.KEYSYM -> Keyboard.isKeyDown(key.value)
+                InputConstants.Type.SCANCODE -> false
+                //?} else {
+                /*InputConstants.Type.MOUSE -> Mouse.isSDLButtonDown(key.value)
+                InputConstants.Type.KEYBOARD -> Keyboard.isKeyDown(key.value)
+                *///?}
+            }
+            if (mc.options.keyShift.isDown != physicallyDown) {
+                mc.options.keyShift.isDown = physicallyDown || mc.options.toggleCrouch().get()
+            }
+            sneakingForReposition = false
+        }
     }
 
     private fun reset() {
-        lastBlazeCount = 10
+        stopRepositioning()
         blazes.clear()
 
         lastShotTime = 0
         currentTarget = null
-        repositionTicker = null
         waitingForUpdate = false
         currentSpot = 0
     }

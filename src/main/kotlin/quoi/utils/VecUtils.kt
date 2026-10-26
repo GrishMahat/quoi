@@ -1,7 +1,7 @@
 package quoi.utils
 
-import kotlin.math.*
 import net.minecraft.core.BlockPos
+import net.minecraft.util.Mth.wrapDegrees
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.Vec3
@@ -14,7 +14,7 @@ import quoi.api.world.RaycastResult
 import quoi.utils.WorldUtils.shape
 import quoi.utils.skyblock.item.TeleportUtils.traverseVoxels
 import quoi.utils.skyblock.player.PlayerUtils.eyePosition
-import net.minecraft.util.Mth.wrapDegrees
+import kotlin.math.*
 
 // todo cleanup
 
@@ -59,21 +59,24 @@ fun Vec3.aabb(radius: Double = 0.0) = AABB(
     y + radius,
     z + radius
 )
+
 inline val Vec3.blockPos: BlockPos get() = BlockPos.containing(this)
 inline val Vec3.floorPos: BlockPos get() = BlockPos(x, ceil(y - 1.0), z)
 inline val Vec3.floored: Vec3 get() = Vec3(floor(x), floor(y), floor(z))
 
 inline val BlockPos.aabb: AABB get() = AABB(this)
 inline val BlockPos.vec3: Vec3 get() = Vec3(x.toDouble(), y.toDouble(), z.toDouble())
+
 //? if >=26.2 {
 /*inline val BlockPos.center: Vec3 get() = Vec3(x + 0.5, y + 0.5, z + 0.5)
 *///?}
-inline val BlockPos.bounds: AABB? get() {
-    return level.let { level ->
-        level.getBlockState(this).getShape(level, this).singleEncompassing()
-            .takeIf { !it.isEmpty }?.bounds()
+inline val BlockPos.bounds: AABB?
+    get() {
+        return level.let { level ->
+            level.getBlockState(this).getShape(level, this).singleEncompassing()
+                .takeIf { !it.isEmpty }?.bounds()
+        }
     }
-}
 
 fun Vec3(x: Number, y: Number, z: Number) = Vec3(x.toDouble(), y.toDouble(), z.toDouble())
 fun BlockPos(x: Number, y: Number, z: Number) =
@@ -100,9 +103,9 @@ fun AABB.copy(
 fun BlockPos.rotateAroundNorth(rotation: Rotations): BlockPos =
     when (rotation) {
         Rotations.NORTH -> BlockPos(-this.x, this.y, -this.z)
-        Rotations.WEST ->  BlockPos(-this.z, this.y, this.x)
+        Rotations.WEST -> BlockPos(-this.z, this.y, this.x)
         Rotations.SOUTH -> BlockPos(this.x, this.y, this.z)
-        Rotations.EAST ->  BlockPos(this.z, this.y, -this.x)
+        Rotations.EAST -> BlockPos(this.z, this.y, -this.x)
         else -> this
     }
 
@@ -114,9 +117,9 @@ fun BlockPos.rotateAroundNorth(rotation: Rotations): BlockPos =
 fun BlockPos.rotateToNorth(rotation: Rotations): BlockPos =
     when (rotation) {
         Rotations.NORTH -> BlockPos(-this.x, this.y, -this.z)
-        Rotations.WEST ->  BlockPos(this.z, this.y, -this.x)
+        Rotations.WEST -> BlockPos(this.z, this.y, -this.x)
         Rotations.SOUTH -> BlockPos(this.x, this.y, this.z)
-        Rotations.EAST ->  BlockPos(-this.z, this.y, this.x)
+        Rotations.EAST -> BlockPos(-this.z, this.y, this.x)
         else -> this
     }
 
@@ -131,17 +134,17 @@ fun Vec3.rotateAroundNorth(rotation: Rotations): Vec3 { // fixes my stupidity //
 
     val rx = when (rotation) {
         Rotations.NORTH -> -cx
-        Rotations.WEST  -> -cz
+        Rotations.WEST -> -cz
         Rotations.SOUTH -> cx
-        Rotations.EAST  -> cz
+        Rotations.EAST -> cz
         else -> cx
     }
 
     val rz = when (rotation) {
         Rotations.NORTH -> -cz
-        Rotations.WEST  -> cx
+        Rotations.WEST -> cx
         Rotations.SOUTH -> cz
-        Rotations.EAST  -> -cx
+        Rotations.EAST -> -cx
         else -> cz
     }
 
@@ -159,17 +162,17 @@ fun Vec3.rotateToNorth(rotation: Rotations): Vec3 {
 
     val rx = when (rotation) {
         Rotations.NORTH -> -cx
-        Rotations.WEST  -> cz
+        Rotations.WEST -> cz
         Rotations.SOUTH -> cx
-        Rotations.EAST  -> -cz
+        Rotations.EAST -> -cz
         else -> cx
     }
 
     val rz = when (rotation) {
         Rotations.NORTH -> -cz
-        Rotations.WEST  -> -cx
+        Rotations.WEST -> -cx
         Rotations.SOUTH -> cz
-        Rotations.EAST  -> cx
+        Rotations.EAST -> cx
         else -> cz
     }
 
@@ -253,34 +256,41 @@ fun getArrowDirection(from: Vec3, to: Vec3, isTerminator: Boolean = false): Dire
     }
 
     val origin = getArrowOrigin(from, yaw, isTerminator)
-    val dist = (to.x - origin.x) * (to.x - origin.x) + (to.z - origin.z) * (to.z - origin.z)
+    val dist = hypot(to.x - origin.x, to.z - origin.z)
+    if (dist == 0.0) return Direction(yaw, if (to.y >= origin.y) -90f else 90f)
 
     fun simulateHitY(pitch: Float): Double {
-        val yawRad = yaw.rad
         val pitchRad = pitch.rad
-
-        var (px, py, pz) = origin
-        var mx = -sin(yawRad) * cos(pitchRad) * 3.0
+        var distance = 0.0
+        var py = origin.y
+        var horizontalSpeed = abs(cos(pitchRad)) * 3.0
         var my = -sin(pitchRad) * 3.0
-        var mz = cos(yawRad) * cos(pitchRad) * 3.0
 
         for (tick in 0..100) {
-            px += mx
+            val fraction = (dist - distance) / horizontalSpeed
+            if (fraction <= 1.0) return py + my * fraction
+
+            distance += horizontalSpeed
             py += my
-            pz += mz
-
-            val currDist = (px - origin.x) * (px - origin.x) + (pz - origin.z) * (pz - origin.z)
-            if (currDist >= dist) return py
-
-            mx *= 0.99
+            horizontalSpeed *= 0.99
             my = my * 0.99 - 0.05
-            mz *= 0.99
         }
-        return py
+        return Double.NEGATIVE_INFINITY
     }
 
     var minPitch = -90.0f
     var maxPitch = 90.0f
+    if (simulateHitY(minPitch) < to.y) {
+        var left = -90f
+        var right = 0f
+        repeat(24) {
+            val third = (right - left) / 3f
+            val first = left + third
+            val second = right - third
+            if (simulateHitY(first) > simulateHitY(second)) right = second else left = first
+        }
+        minPitch = (left + right) / 2f
+    }
     repeat(20) {
         val midPitch = (minPitch + maxPitch) / 2f
         if (simulateHitY(midPitch) > to.y) minPitch = midPitch else maxPitch = midPitch
@@ -299,9 +309,9 @@ fun getArrowDirection(from: Vec3, to: BlockPos, isTerminator: Boolean = false): 
 
     val testPoints = listOf(
         c,                                        // centxe
-        c.add(0.0, o, 0.0),  c.add(0.0, -o, 0.0), // top bot
-        c.add(o, 0.0, 0.0),  c.add(-o, 0.0, 0.0), // left right
-        c.add(0.0, 0.0, o),  c.add(0.0, 0.0, -o)  // front back
+        c.add(0.0, o, 0.0), c.add(0.0, -o, 0.0), // top bot
+        c.add(o, 0.0, 0.0), c.add(-o, 0.0, 0.0), // left right
+        c.add(0.0, 0.0, o), c.add(0.0, 0.0, -o)  // front back
     )
 
     for (point in testPoints) {
