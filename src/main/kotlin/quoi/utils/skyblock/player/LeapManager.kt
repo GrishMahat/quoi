@@ -61,11 +61,9 @@ object LeapManager : EventListener {
                 unformatted != "There are no other players to teleport to!"
             ) return@on
 
-            onClientThread {
-                if (!inProgress) return@onClientThread
-                modMessage("&cFailed to leap! You're in a solo dungeon!")
-                task?.cancel() ?: resetActiveLeap()
-            }
+            if (!inProgress) return@on
+            modMessage("&cFailed to leap! You're in a solo dungeon!")
+            task?.cancel() ?: resetActiveLeap()
         }
 
         on<WorldEvent.Change> {
@@ -93,9 +91,7 @@ object LeapManager : EventListener {
         }
 
         on<TickEvent.Server> {
-            onClientThread {
-                if (leapCD > 0) leapCD -= 1
-            }
+            if (leapCD > 0) leapCD -= 1
         }
 
         on<PacketEvent.Sent, ServerboundUseItemPacket>(Priority.LOWEST - 2, acceptCancelled = true) {
@@ -118,12 +114,11 @@ object LeapManager : EventListener {
         fastMode: Boolean = false,
         swapBack: Boolean = false,
     ) {
-        onClientThread {
-            if (name == "" || !inDungeons) return@onClientThread
+        check(mc.isSameThread) { "Leap requests must be submitted on the client thread" }
+        if (name == "" || !inDungeons) return
 
-            val teammate = dungeonTeammatesNoSelf.firstOrNull { !it.isDead && it.name == name }
-            startLeap(teammate, formatName(name), blockInput, fastMode, swapBack)
-        }
+        val teammate = dungeonTeammatesNoSelf.firstOrNull { !it.isDead && it.name == name }
+        startLeap(teammate, formatName(name), blockInput, fastMode, swapBack)
     }
 
     fun leap(
@@ -132,19 +127,11 @@ object LeapManager : EventListener {
         fastMode: Boolean = false,
         swapBack: Boolean = false,
     ) {
-        onClientThread {
-            if (clazz == DungeonClass.Unknown || !inDungeons) return@onClientThread
+        check(mc.isSameThread) { "Leap requests must be submitted on the client thread" }
+        if (clazz == DungeonClass.Unknown || !inDungeons) return
 
-            val teammate = dungeonTeammatesNoSelf.firstOrNull { !it.isDead && it.clazz == clazz }
-            startLeap(teammate, "&${clazz.colourCode}${clazz.name}", blockInput, fastMode, swapBack)
-        }
-    }
-
-    private fun onClientThread(block: () -> Unit) {
-        val level = mc.level
-        mc.execute {
-            if (mc.level === level) block()
-        }
+        val teammate = dungeonTeammatesNoSelf.firstOrNull { !it.isDead && it.clazz == clazz }
+        startLeap(teammate, "&${clazz.colourCode}${clazz.name}", blockInput, fastMode, swapBack)
     }
 
     private fun startLeap(
