@@ -10,12 +10,11 @@ class LoadoutAction(
     var slot: Int = 1,
     var preventMove: Boolean = true,
     var blockInput: Boolean = false,
-    var fastMode: Boolean = false,
 ) : TriggerAction {
     override fun validationError() = if (slot !in 1..12) "Loadout slot must be between 1 and 12." else null
 
     override fun execute(ctx: TriggerContext) {
-        check(LoadoutSwapper.equip(slot, preventMove = preventMove, blockInput = blockInput, fastMode = fastMode)) {
+        check(LoadoutSwapper.equip(slot, preventMove = preventMove, blockInput = blockInput)) {
             "Could not start loadout swap"
         }
     }
@@ -25,7 +24,6 @@ class LoadoutAction(
     override fun ElementScope<*>.draw() = settingRow(
         { intSliderField("Slot", ::slot, 1, 12) },
         { toggleField("Block inputs", ::blockInput) },
-        { toggleField("Fast mode", ::fastMode) },
         { toggleField("Prevent moving", ::preventMove) },
     )
 }

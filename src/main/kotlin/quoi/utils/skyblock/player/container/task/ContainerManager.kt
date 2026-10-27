@@ -1,11 +1,6 @@
 package quoi.utils.skyblock.player.container.task
 
-import kotlin.coroutines.coroutineContext
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import net.minecraft.client.KeyMapping
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.gui.screens.inventory.InventoryScreen
@@ -14,11 +9,7 @@ import quoi.QuoiMod.mc
 import quoi.annotations.Init
 import quoi.annotations.Internal
 import quoi.api.events.*
-import quoi.api.events.core.EventListener
-import quoi.api.events.core.Priority
-import quoi.api.events.core.asyncScope
-import quoi.api.events.core.on
-import quoi.api.events.core.wait
+import quoi.api.events.core.*
 import quoi.utils.StringUtils.noControlCodes
 import quoi.utils.StringUtils.width
 import quoi.utils.render.DrawContextUtils.drawText
@@ -26,6 +17,7 @@ import quoi.utils.scaledHeight
 import quoi.utils.scaledWidth
 import quoi.utils.skyblock.player.MovementUtils.stop
 import quoi.utils.skyblock.player.container.ContainerUtils
+import kotlin.coroutines.coroutineContext
 
 /**
  * Manages execution of [ContainerTask]s
@@ -50,7 +42,7 @@ object ContainerManager : EventListener {
             if (task.stopsMovement) {
                 mc.player?.stop()
                 movementKeysSuppressed = true
-            }
+            } else restoreMovementIfAllowed()
             if (task.ticksSinceLastClick < Int.MAX_VALUE) task.ticksSinceLastClick++
         }
         on<TickEvent.Start>(Priority.HIGHEST) {
@@ -59,7 +51,7 @@ object ContainerManager : EventListener {
             job = asyncScope.launch(start = CoroutineStart.LAZY) { runTask(task) }
             job?.invokeOnCompletion {
                 // if cancelled before starting, runTask's finally block won't run
-                if (!task.completed) finish(task, ContainerTaskResult.Cancelled)
+                if (!task.completed) cancelBeforeStart(task)
             }
             job?.start()
         }
@@ -123,6 +115,7 @@ object ContainerManager : EventListener {
             mc.execute { cancel(task) }
             return
         }
+        if (task.cancellationRequested) return
         task.cancellationRequested = true
         ContainerUtils.clearCatches(task)
         if (activeTask !== task) {
@@ -131,7 +124,15 @@ object ContainerManager : EventListener {
         }
         val runningJob = job
         if (runningJob != null) runningJob.cancel()
-        else finish(task, ContainerTaskResult.Cancelled)
+        else cancelBeforeStart(task)
+    }
+
+    private fun cancelBeforeStart(task: ContainerTask) {
+        try {
+            if (task.cleanupAllowed) closeOwnedMenu(task)
+        } finally {
+            finish(task, ContainerTaskResult.Cancelled)
+        }
     }
 
     private suspend fun runTask(task: ContainerTask) {
@@ -144,7 +145,9 @@ object ContainerManager : EventListener {
             if (mc.screen === inventoryScreen ||
                 (task.settings.silent && mc.screen === previousScreen && player?.containerMenu === player?.inventoryMenu)
             ) player?.closeContainer()
+            task.silentInventoryOpen = false
             inventoryScreen = null
+            restoreMovementIfAllowed()
         }
         try {
             checkNotNull(player) { "Player is unavailable" }
@@ -180,14 +183,16 @@ object ContainerManager : EventListener {
                     result = ContainerTaskResult.Failure("Container changed before click")
                     break
                 }
-                if (!with(action) { execute() }) {
+                val success = with(action) { execute() }
+                coroutineContext.ensureActive()
+                if (!success) {
                     result = ContainerTaskResult.Failure(action.failureReason)
                     break
                 }
                 task.completedActions++
             }
             wait(task.settings.endDelay.sample())
-        } catch (e: CancellationException) {
+        } catch (_: CancellationException) {
             result = ContainerTaskResult.Cancelled
         } catch (e: Exception) {
             logger.error("Container task ${task.name} failed", e)
@@ -207,16 +212,18 @@ object ContainerManager : EventListener {
     internal fun closeOwnedMenu(task: ContainerTask) {
         val player = mc.player ?: return
         if (task.ownedMenu != null && player.containerMenu === task.ownedMenu) player.closeContainer()
+        restoreMovementIfAllowed()
     }
 
     private fun finish(task: ContainerTask, result: ContainerTaskResult) {
-        if (result != ContainerTaskResult.Success) ContainerUtils.clearCatches(task)
+        val finalResult = if (task.cancellationRequested) ContainerTaskResult.Cancelled else result
+        if (finalResult != ContainerTaskResult.Success) ContainerUtils.clearCatches(task)
         if (activeTask === task) {
             activeTask = null
             job = null
             restoreMovementIfAllowed()
         }
-        task.finish(result)
+        task.finish(finalResult)
     }
 
     /**
@@ -229,8 +236,11 @@ object ContainerManager : EventListener {
     }
 
     @JvmStatic
-    fun onSetScreen(screen: Screen?): Boolean =
-        openingInventory && activeTask?.settings?.silent == true && screen is InventoryScreen
+    fun onSetScreen(screen: Screen?): Boolean {
+        if (!openingInventory || activeTask?.settings?.silent != true || screen !is InventoryScreen) return false
+        activeTask?.silentInventoryOpen = true
+        return true
+    }
 
     private fun Pair<Int, Int>.sample(): Int = (first..second).random()
 }

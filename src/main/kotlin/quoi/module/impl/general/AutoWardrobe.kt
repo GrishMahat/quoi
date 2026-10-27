@@ -13,7 +13,6 @@ object AutoWardrobe : Module(
     private val disableUnequip by switch("Disable unequip", desc = "Prevents clicking the currently equipped wardrobe slot.")
     private val preventMoving by switch("Prevent moving", desc = "Stops your movement while a wardrobe equip is in progress.")
     private val blockInputs by switch("Block inputs", desc = "Blocks keyboard and mouse input while a wardrobe equip is in progress.")
-    private val fastMode by switch("Fast mode", desc = "Blocks movement and input only from the menu opening until the target click.")
     private val keybinds by text("Keybinds")
     private val wardrobeKeys = (1..9).map { i ->
         register(
@@ -29,7 +28,6 @@ object AutoWardrobe : Module(
             preventMove = preventMoving,
             blockInput = blockInputs,
             disableUnequip = disableUnequip,
-            fastMode = fastMode,
         )
     }
 }

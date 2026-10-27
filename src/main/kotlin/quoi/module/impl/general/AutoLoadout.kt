@@ -11,7 +11,6 @@ object AutoLoadout : Module(
 ) {
     private val preventMoving by switch("Prevent moving", desc = "Stops your movement while a loadout equip is in progress.")
     private val blockInputs by switch("Block inputs", desc = "Blocks keyboard and mouse input while a loadout equip is in progress.")
-    private val fastMode by switch("Fast mode", desc = "Blocks movement and input only from the menu opening until the target click.")
     private val keybinds by text("Keybinds")
     @Suppress("unused")
     private val loadoutKeys = (1..12).map { i ->
@@ -28,7 +27,6 @@ object AutoLoadout : Module(
             slot,
             preventMove = preventMoving,
             blockInput = blockInputs,
-            fastMode = fastMode,
         )
     }
 }

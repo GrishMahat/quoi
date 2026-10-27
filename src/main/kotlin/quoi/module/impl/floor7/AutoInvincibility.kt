@@ -38,7 +38,6 @@ object AutoInvincibility : Module(
     private val bossOnly by switch("Boss only", desc = "Only triggers while being in boss room.")
     private val p3Only by switch("Phase 3 only", desc = "Only triggers during phase 3.")
     private val blockInputs by switch("Block inputs", desc = "Blocks keyboard and mouse input while equipping masks or swapping through the pet menu. Does not affect Rod Swap.")
-    private val fastMode by switch("Fast mode", desc = "Uses the shortest movement and input block while equipping masks or swapping through the pet menu. Does not affect Rod Swap.")
 
     private var swapping = false
     private var previousPet: String? = null
@@ -122,7 +121,7 @@ object AutoInvincibility : Module(
 
                 modMessage("§eEquipping $maskName.")
 
-                if (!EquipmentSwapper.equip(maskName, blockInput = blockInputs, fastMode = fastMode)) {
+                if (!EquipmentSwapper.equip(maskName, blockInput = blockInputs)) {
                     modMessage("§cFailed to equip $maskName.")
                 }
             } finally {
@@ -152,7 +151,7 @@ object AutoInvincibility : Module(
                     PhoenixSwapMethod.PetMenu -> {
                         modMessage("§eSwapping to Phoenix.")
 
-                        if (!PetSwitcher.switchPet("Phoenix", blockInput = blockInputs, fastMode = fastMode)) {
+                        if (!PetSwitcher.switchPet("Phoenix", blockInput = blockInputs)) {
                             modMessage("§cFailed to queue Phoenix swap.")
                             return@launch
                         }
@@ -215,7 +214,7 @@ object AutoInvincibility : Module(
             when (phoenixSwapMethod.selected) {
                 PhoenixSwapMethod.RodSwap -> triggerRodSwap()
                 PhoenixSwapMethod.PetMenu -> {
-                    if (!PetSwitcher.switchPet(pet, blockInput = blockInputs, fastMode = fastMode)) {
+                    if (!PetSwitcher.switchPet(pet, blockInput = blockInputs)) {
                         modMessage("§cFailed to switch previous pet switch.")
                     }
                 }

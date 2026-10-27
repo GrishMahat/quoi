@@ -10,7 +10,6 @@ class PetAction(
     var name: String = "",
     var item: String = "",
     var blockInput: Boolean = false,
-    var fastMode: Boolean = false,
 ) : TriggerAction {
     override fun validationError() = if (name.isBlank()) "Enter a pet name." else null
 
@@ -19,7 +18,6 @@ class PetAction(
             ctx.expand(name).trim(),
             item = ctx.expand(item).trim().takeIf { it.isNotEmpty() },
             blockInput = blockInput,
-            fastMode = fastMode,
         )) { "Could not start pet swap" }
     }
 
@@ -29,6 +27,5 @@ class PetAction(
         { textField("Pet name", name) { name = it } },
         { textField("Held item (optional)", item) { item = it } },
         { toggleField("Block inputs", ::blockInput) },
-        { toggleField("Fast mode", ::fastMode) },
     )
 }

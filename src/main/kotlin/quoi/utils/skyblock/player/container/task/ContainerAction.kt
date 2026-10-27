@@ -1,5 +1,9 @@
 package quoi.utils.skyblock.player.container.task
 
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.selects.select
 import net.minecraft.world.inventory.ContainerInput
 import net.minecraft.world.item.ItemStack
 import quoi.annotations.Internal
@@ -57,8 +61,6 @@ interface ContainerAction {
                 gameMode.handleContainerInput(menu.containerId, resolved.index, button, input, player)
                 task.ticksSinceLastClick = 0
             }
-            task.finishClick()
-            restoreMovementIfAllowed()
             return true
         }
     }
@@ -143,14 +145,31 @@ interface ContainerAction {
                 return false
             }
             task.ownedMenu = open.menu
-            task.beginFastBlock()
             if (player.containerMenu !== open.menu) return false
             if (!waitForItems || open.itemsLoaded) return true
 
             failureReason = "Timed out waiting for items in ${open.title}"
-            return await<ContainerEvent.Items>(timeout = timeout, serverTicks = true) {
-                container === open
-            } != null && player.containerMenu === open.menu
+            return coroutineScope {
+                val items = async(start = CoroutineStart.UNDISPATCHED) {
+                    await<ContainerEvent.Items>(timeout = timeout, serverTicks = true) { container === open }
+                }
+                val changed = async(start = CoroutineStart.UNDISPATCHED) {
+                    await<TickEvent.Start> { player.containerMenu !== open.menu }
+                }
+                try {
+                    val loaded = select {
+                        items.onAwait { it != null }
+                        changed.onAwait { false }
+                    }
+                    if (player.containerMenu !== open.menu) {
+                        failureReason = "Container changed while waiting for items in ${open.title}"
+                        false
+                    } else loaded
+                } finally {
+                    items.cancel()
+                    changed.cancel()
+                }
+            }
         }
     }
 }

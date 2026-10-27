@@ -32,7 +32,6 @@ object AutoLeap : Module(
 
     private val leapMode by selector("Leap mode", LeapMode.Name, "Choose boss leap targets by player name or class.").open()
     private val blockInputs by switch("Block inputs", desc = "Blocks keyboard and mouse input while leaping.")
-    private val fastMode by switch("Fast mode", desc = "Skips click delay. Only blocks movement/input from menu open to target click.")
     private val swapBack by switch("Swap back", desc = "Restores your previous hotbar slot after leaping.")
 
     private var presetName by textInput("Preset name", length = 32, desc = "Preset to save or load.", placeholder = "My preset").suggests { presets.keys.sorted() }
@@ -272,7 +271,6 @@ object AutoLeap : Module(
         LeapManager.leap(
             name,
             blockInput = blockInputs,
-            fastMode = fastMode,
             swapBack = swapBack,
         )
     }
@@ -281,7 +279,6 @@ object AutoLeap : Module(
         LeapManager.leap(
             clazz,
             blockInput = blockInputs,
-            fastMode = fastMode,
             swapBack = swapBack,
         )
     }

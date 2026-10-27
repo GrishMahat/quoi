@@ -27,7 +27,6 @@ object WardrobeUtils {
         preventMove: Boolean = true,
         blockInput: Boolean = false,
         disableUnequip: Boolean = false,
-        fastMode: Boolean = false,
     ): Boolean {
         if (slot !in 1..9) {
             modMessage("&cInvalid wardrobe slot. Use &e/quoi wardrobe <1-9>&c.")
@@ -40,7 +39,7 @@ object WardrobeUtils {
 
         val newTask = containerTask(
             name = "Wardrobe $slot",
-            settings = menuSettings(preventMovement = preventMove, blockInput = blockInput, fastMode = fastMode),
+            settings = menuSettings(preventMovement = preventMove, blockInput = blockInput),
         ) {
             openContainer("wardrobe", "(1/3) Armor Sets")
 
@@ -53,7 +52,6 @@ object WardrobeUtils {
 
             pickup(targetSlot.menu).unless { disableUnequip && it.wardrobeState() == WardrobeState.EQUIPPED }
             catchContainer("(1/3) Armor Sets")
-            closeContainer()
 
             onFinished { result ->
                 when (result) {

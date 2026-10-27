@@ -28,7 +28,6 @@ object LoadoutSwapper {
         slot: Int,
         preventMove: Boolean = true,
         blockInput: Boolean = false,
-        fastMode: Boolean = false,
     ): Boolean {
         if (slot !in 1..loadoutSlots.size) {
             modMessage("&cInvalid loadout slot. Use &e/quoi loadout <1-${loadoutSlots.size}>&c.")
@@ -39,7 +38,7 @@ object LoadoutSwapper {
         val targetSlot = loadoutSlots[slot - 1]
         val newTask = containerTask(
             name = "Loadout $slot",
-            settings = menuSettings(preventMovement = preventMove, blockInput = blockInput, fastMode = fastMode),
+            settings = menuSettings(preventMovement = preventMove, blockInput = blockInput),
         ) {
             openContainer("loadout", "(1/3) Loadouts")
             check("Loadout slot $slot is not equipable") {
@@ -47,7 +46,6 @@ object LoadoutSwapper {
             }
             pickup(targetSlot.menu)
             catchContainer("(1/3) Loadouts")
-            closeContainer()
 
             onFinished { result ->
                 when (result) {

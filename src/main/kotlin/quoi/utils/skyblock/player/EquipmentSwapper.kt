@@ -25,7 +25,6 @@ object EquipmentSwapper {
     fun equip(
         name: String,
         blockInput: Boolean = false,
-        fastMode: Boolean = false,
     ): Boolean {
         val player = mc.player ?: return false
         if (name.isBlank() || ContainerManager.active) return false
@@ -38,13 +37,12 @@ object EquipmentSwapper {
 
         val newTask = containerTask(
             name = "Equipment",
-            settings = menuSettings(blockInput = blockInput, fastMode = fastMode),
+            settings = menuSettings(blockInput = blockInput),
         ) {
             openContainer("stats", "Stats & Equipment")
 
             quickMove(item(matches).inv)
             catchContainer("Stats & Equipment")
-            closeContainer()
 
             onFinished { result ->
                 if (result is ContainerTaskResult.Failure) modMessage("&c${result.message}.")

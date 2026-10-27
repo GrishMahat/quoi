@@ -43,7 +43,6 @@ object PetKeybinds : Module(
     private val previousPageKeybind by keybind("Previous page", desc = "Goes to the previous page.")
     private val noUnequip by switch("Disable unequip", desc = "Prevents using a pets keybind to unequip a pet. Does not prevent unequip keybind or normal clicking.")
     private val closeIfAlreadyEquipped by switch("Close if already equipped", desc = "If the pet is already equipped, closes the Pets menu instead.")
-    private val fastMode by switch("Fast mode", desc = "Blocks movement and input only while the Pets menu data is being read.")
 
     private val advanced by text("Keybinds")
     private val petKeys = listOf(
@@ -203,7 +202,7 @@ object PetKeybinds : Module(
         var pets = emptyList<ItemStack>()
         val task = containerTask(
             name = "Read pets",
-            settings = menuSettings(fastMode = fastMode, showProgress = false),
+            settings = menuSettings(showProgress = false),
         ) {
             openContainer(
                 "petsmenu",
@@ -220,11 +219,8 @@ object PetKeybinds : Module(
                     .filterIndexed { index, item -> index % 9 != 0 && index % 9 != 8 && !item.isEmpty }
                     .map(ItemStack::copy)
             }
-            closeContainer()
-
         }
 
-        if (mc.isSameThread) task.run() else mc.execute { task.run() }
         val result = task.await()
 
         if (result != ContainerTaskResult.Success) {

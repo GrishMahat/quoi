@@ -2,14 +2,19 @@ package quoi.utils.skyblock.player.container.task
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.withContext
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import net.minecraft.world.inventory.AbstractContainerMenu
 import net.minecraft.world.inventory.ContainerInput
-import quoi.annotations.Internal
-import quoi.QuoiMod.logger
-import quoi.utils.ChatUtils
-import quoi.utils.skyblock.player.container.ContainerOptions
 import net.minecraft.world.item.ItemStack
+import quoi.QuoiMod.logger
+import quoi.QuoiMod.mc
+import quoi.annotations.Internal
+import quoi.utils.ChatUtils
+import quoi.utils.skyblock.item.ItemUtils.loreString
 import quoi.utils.skyblock.player.container.CONTAINER_ZERO
+import quoi.utils.skyblock.player.container.ContainerOptions
 import quoi.utils.skyblock.player.container.IContainerSettings
 
 @DslMarker
@@ -38,7 +43,7 @@ class ContainerTask(
     // copy settings so changing them doesn't affect a running task
     val settings = ContainerOptions(
         settings.startDelay, settings.clickDelay, settings.endDelay,
-        settings.invWalk, settings.silent, settings.blockInput, settings.fastMode, settings.showProgress,
+        settings.invWalk, settings.silent, settings.blockInput, settings.showProgress,
     )
     private val completion = CompletableDeferred<ContainerTaskResult>()
     var result: ContainerTaskResult? = null
@@ -53,18 +58,19 @@ class ContainerTask(
     internal var ownedMenu: AbstractContainerMenu? = null
     internal var cleanupAllowed = true
     internal var cancellationRequested = false
-    internal var fastBlockActive = false
-        private set
-    private var fastBlockFinished = false
-    private var clicksRemaining = actions.count { it is ItemAction }
+    internal var silentInventoryOpen = false
+
+    private val blocksForMenu: Boolean
+        get() = !completed &&
+                (silentInventoryOpen || mc.screen is AbstractContainerScreen<*> ||
+                        mc.player?.let { it.containerMenu !== it.inventoryMenu } == true)
 
     val stopsMovement: Boolean
         get() = (!settings.invWalk || (!force && settings.clickDelay.second > 0 &&
-            actions.any { it is ContainerAction.Click && it.target.inContainer != true })) &&
-            (!settings.fastMode || fastBlockActive)
+                actions.any { it is ContainerAction.Click && it.target.inContainer != true })) && blocksForMenu
 
     internal val blocksInput: Boolean
-        get() = settings.blockInput && (!settings.fastMode || fastBlockActive)
+        get() = settings.blockInput && blocksForMenu
 
     /**
      * Submits this task to the [ContainerManager] for execution on the client thread
@@ -72,10 +78,11 @@ class ContainerTask(
     fun run(): ContainerTask = ContainerManager.execute(this)
 
     /**
-     * Waits for the result of a task submitted with [run]
+     * Submits this task on the client thread if needed and waits for its result
      * Cancelling the caller also cancels the task
      */
     suspend fun await(): ContainerTaskResult = try {
+        if (!completed) withContext(mc.asCoroutineDispatcher()) { run() }
         completion.await()
     } catch (e: CancellationException) {
         cancel()
@@ -86,26 +93,6 @@ class ContainerTask(
      * Cancels the task and any pending waits
      */
     fun cancel() = ContainerManager.cancel(this)
-
-    /**
-     * Starts the fast mode input block for the task's container
-     */
-    @Internal
-    internal fun beginFastBlock() {
-        if (settings.fastMode && !fastBlockFinished) fastBlockActive = true
-    }
-
-    /**
-     * Counts a completed or skipped click and ends the fast mode block after the last click
-     */
-    @Internal
-    internal fun finishClick() {
-        if (clicksRemaining > 0) clicksRemaining--
-        if (clicksRemaining == 0) {
-            fastBlockActive = false
-            fastBlockFinished = true // don't block again if the container reopens
-        }
-    }
 
     /**
      * Completes the task once and resumes callers waiting in [await]
@@ -145,8 +132,20 @@ class ContainerTaskBuilder(val force: Boolean) {
     fun pickup(slot: MenuSlot, button: Int = 0, timeout: Int = 20, failureMessage: String = "Timed out finding item") =
         click(slot, button, ContainerInput.PICKUP, timeout, failureMessage) // right/left click
 
+    fun pickupAll(slot: MenuSlot) = click(slot, 0, ContainerInput.PICKUP_ALL) // double click
+    fun throwOne(slot: MenuSlot) = click(slot, 0, ContainerInput.THROW) // q
+    fun throwAll(slot: MenuSlot) = click(slot, 1, ContainerInput.THROW) // ctrl + q
+
     fun quickMove(target: MenuSlot) = click(target, 0, ContainerInput.QUICK_MOVE) // shift click
     fun swap(target: MenuSlot, hotbarSlot: Int) = click(target, hotbarSlot, ContainerInput.SWAP) // keys 1 to 9
+
+    /**
+     * Picks up [from], then clicks [to]. An occupied destination may leave an item on the cursor
+     */
+    fun moveSlot(from: MenuSlot, to: MenuSlot, button: Int = 0) {
+        pickup(from, button)
+        pickup(to, button)
+    }
 
     /**
      * Awaits for container to open before proceeding
@@ -206,7 +205,7 @@ class ContainerTaskBuilder(val force: Boolean) {
      * Suppresses the next matching container reopen without waiting for it
      * A missing reopen does not fail the task
      *
-     * Call after the triggering click and before [closeContainer]. Skipped clicks are ignored
+     * Call after the triggering click, before the task closes its menu. Skipped clicks are ignored
      * Catches remain after success and are cleared on failure, cancellation, a new task or world change
      *
      * @param name container name to catch
@@ -248,6 +247,10 @@ class ContainerTaskBuilder(val force: Boolean) {
         skipIf = block
         return this
     }
+
+    fun <T : ItemAction> T.unlessName(text: String): T = unless { it.displayName.string.contains(text) }
+
+    fun <T : ItemAction> T.unlessLore(text: String): T = unless { it.loreString?.contains(text) == true }
 }
 
 /**

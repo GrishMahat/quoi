@@ -37,7 +37,6 @@ object LeapManager : EventListener {
     private data class LeapRequest(
         val target: DungeonPlayer,
         val blockInput: Boolean,
-        val fastMode: Boolean,
         val swapBack: Boolean,
     )
 
@@ -115,39 +114,36 @@ object LeapManager : EventListener {
     fun leap(
         name: String,
         blockInput: Boolean = false,
-        fastMode: Boolean = false,
         swapBack: Boolean = false,
     ) {
         check(mc.isSameThread) { "Leap requests must be submitted on the client thread" }
         if (name == "" || !inDungeons) return
 
         val teammate = dungeonTeammatesNoSelf.firstOrNull { !it.isDead && it.name == name }
-        startLeap(teammate, formatName(name), blockInput, fastMode, swapBack)
+        startLeap(teammate, formatName(name), blockInput, swapBack)
     }
 
     fun leap(
         clazz: DungeonClass,
         blockInput: Boolean = false,
-        fastMode: Boolean = false,
         swapBack: Boolean = false,
     ) {
         check(mc.isSameThread) { "Leap requests must be submitted on the client thread" }
         if (clazz == DungeonClass.Unknown || !inDungeons) return
 
         val teammate = dungeonTeammatesNoSelf.firstOrNull { !it.isDead && it.clazz == clazz }
-        startLeap(teammate, "&${clazz.colourCode}${clazz.name}", blockInput, fastMode, swapBack)
+        startLeap(teammate, "&${clazz.colourCode}${clazz.name}", blockInput, swapBack)
     }
 
     private fun startLeap(
         teammate: DungeonPlayer?,
         formattedTarget: String,
         blockInput: Boolean,
-        fastMode: Boolean,
         swapBack: Boolean,
     ) {
         teammate ?: return modMessage("&cFailed to leap! $formattedTarget &cnot found")
 
-        val request = LeapRequest(teammate, blockInput, fastMode, swapBack)
+        val request = LeapRequest(teammate, blockInput, swapBack)
         val openLeapMenu = (mc.screen as? AbstractContainerScreen<*>)?.takeIf { it.title.string == "Spirit Leap" }
 
         if (!inProgress && pendingLeap == null && openLeapMenu != null && ContainerManager.activeTask == null) {
@@ -214,7 +210,7 @@ object LeapManager : EventListener {
         }
         val newTask = containerTask(
             name = "Leap to ${leap.target.name}",
-            settings = menuSettings(blockInput = leap.blockInput, fastMode = leap.fastMode),
+            settings = menuSettings(blockInput = leap.blockInput),
         ) {
             if (!preOpened) {
                 action { PlayerUtils.interact() }
@@ -229,7 +225,6 @@ object LeapManager : EventListener {
         }
 
         task = newTask
-        if (preOpened) newTask.beginFastBlock()
         newTask.run()
         return LeapStartResult.Started
     }

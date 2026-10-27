@@ -10,7 +10,6 @@ interface IContainerSettings {
     val invWalk: Boolean get() = true
     val silent: Boolean get() = true
     val blockInput: Boolean get() = !invWalk
-    val fastMode: Boolean get() = false
     val showProgress: Boolean get() = true
 }
 
@@ -34,7 +33,6 @@ data class ContainerOptions(
     override val invWalk: Boolean = true,
     override val silent: Boolean = true,
     override val blockInput: Boolean = !invWalk,
-    override val fastMode: Boolean = false,
     override val showProgress: Boolean = true,
 ) : IContainerSettings {
     init {
@@ -46,17 +44,14 @@ data class ContainerOptions(
 
 /**
  * Creates settings for menu commands and triggers
- * Fast mode removes the click delay and only blocks movement/input from opening through the last click
  */
 fun menuSettings(
     preventMovement: Boolean = true,
     blockInput: Boolean = false,
-    fastMode: Boolean = false,
     showProgress: Boolean = true,
 ): IContainerSettings = ContainerOptions(
-    clickDelay = if (fastMode) 0 to 0 else 1 to 1,
+    clickDelay = 1 to 1,
     invWalk = !preventMovement,
     blockInput = blockInput,
-    fastMode = fastMode,
     showProgress = showProgress,
 )

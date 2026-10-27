@@ -65,7 +65,6 @@ object PetSwitcher : EventListener {
         name: String,
         item: String? = null,
         blockInput: Boolean = false,
-        fastMode: Boolean = false,
     ): Boolean {
         val cleanedName = Pet.cleanName(name)
         val cleanedItem = item?.let(::cleanPetItemName)?.takeIf(String::isNotEmpty)
@@ -77,7 +76,7 @@ object PetSwitcher : EventListener {
 
         val newTask = containerTask(
             name = "Pet: $cleanedName",
-            settings = menuSettings(blockInput = blockInput, fastMode = fastMode),
+            settings = menuSettings(blockInput = blockInput),
         ) {
             openContainer("petsmenu", menuTitle)
             pickup(target, failureMessage = "Couldn't find $label").unless { stack ->
@@ -88,8 +87,6 @@ object PetSwitcher : EventListener {
                     ?.let { PendingSwitch(it, label) }
                 !summonable
             }
-            closeContainer()
-
             onFinished { result ->
                 if (result != ContainerTaskResult.Success) pendingSwitch = null
 

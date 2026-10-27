@@ -14,7 +14,6 @@ class LeapAction(
     var name: String = "",
     var dungeonClass: DungeonClass = DungeonClass.Unknown,
     var blockInput: Boolean = false,
-    var fastMode: Boolean = false,
     var swapBack: Boolean = false,
 ) : TriggerAction {
     override fun validationError() =
@@ -22,9 +21,9 @@ class LeapAction(
 
     override fun execute(ctx: TriggerContext) {
         if (dungeonClass == DungeonClass.Unknown) {
-            LeapManager.leap(ctx.expand(name).trim(), blockInput = blockInput, fastMode = fastMode, swapBack = swapBack)
+            LeapManager.leap(ctx.expand(name).trim(), blockInput = blockInput, swapBack = swapBack)
         } else {
-            LeapManager.leap(dungeonClass, blockInput = blockInput, fastMode = fastMode, swapBack = swapBack)
+            LeapManager.leap(dungeonClass, blockInput = blockInput, swapBack = swapBack)
         }
     }
 
@@ -53,7 +52,6 @@ class LeapAction(
                     }
                 },
                 { toggleField("Block inputs", ::blockInput) },
-                { toggleField("Fast mode", ::fastMode) },
                 { toggleField("Swap back", ::swapBack) },
             )
         }
