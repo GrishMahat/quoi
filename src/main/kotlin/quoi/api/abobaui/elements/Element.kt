@@ -1,6 +1,5 @@
 package quoi.api.abobaui.elements
 
-import kotlin.experimental.ExperimentalTypeInference
 import quoi.api.abobaui.AbobaUI
 import quoi.api.abobaui.constraints.Constraint
 import quoi.api.abobaui.constraints.Constraints
@@ -17,8 +16,11 @@ import quoi.api.abobaui.events.Lifetime
 import quoi.api.abobaui.events.Mouse
 import quoi.api.abobaui.transforms.Transform
 import quoi.api.colour.Colour
-import quoi.utils.render.DrawContextUtils.pushScissor
+import quoi.utils.sf
 import quoi.utils.ui.rendering.NVGRenderer
+import kotlin.experimental.ExperimentalTypeInference
+import kotlin.math.ceil
+import kotlin.math.floor
 
 abstract class Element(
     val constraints: Constraints,
@@ -60,6 +62,10 @@ abstract class Element(
     var scaleY = 1f
 
     var redraw = false
+        set(value) {
+            field = value
+            if (value && ::ui.isInitialized) ui.layoutDirty = true
+        }
 
     var renders: Boolean = true
         get() = field && enabled
@@ -89,13 +95,18 @@ abstract class Element(
 
     open fun drawCtx() {}
 
-    fun render() {
-        if (!ui.nvgPass && redraw) {
+    fun prepareLayout() {
+        if (redraw) {
             redraw = false
             size()
             positionChildren()
             clip()
         }
+        children?.forEach { it.prepareLayout() }
+        shadows?.forEach { it.prepareLayout() }
+    }
+
+    fun render() {
 
         if (!renders) return
 
@@ -113,7 +124,7 @@ abstract class Element(
             draw()
 
             if (ui.debug) {
-                val col = when(this) {
+                val col = when (this) {
                     is Column -> Colour.CYAN
                     is Grid -> Colour.ORANGE
                     is Row -> Colour.GREEN
@@ -132,17 +143,22 @@ abstract class Element(
             if (scissors) NVGRenderer.popScissor()
             NVGRenderer.pop()
         } else {
-            if (usingCtx) {
+            if (scissors) {
+                val scaled = generateSequence(parent) { it.parent }.firstOrNull { it.scaleX != 1f } ?: this
+                val sx = scaled.x + (x - scaled.x) * scaled.scaleX
+                val sy = scaled.y + (y - scaled.y) * scaled.scaleY
                 ctx.pose().pushMatrix()
-                if (scissors) ctx.pushScissor(x.toInt(), y.toInt(), width.toInt(), height.toInt())
-                draw()
-            }
-
-            children?.forEach { it.render() }
-
-            if (usingCtx) {
-                if (scissors) ctx.disableScissor()
+                ctx.pose().identity().scale(1f / sf, 1f / sf)
+                ctx.enableScissor(floor(sx).toInt(), floor(sy).toInt(), ceil(sx + width * scaled.scaleX).toInt(), ceil(sy + height * scaled.scaleY).toInt())
                 ctx.pose().popMatrix()
+            }
+            if (usingCtx) ctx.pose().pushMatrix()
+            try {
+                if (usingCtx) draw()
+                children?.forEach { it.render() }
+            } finally {
+                if (usingCtx) ctx.pose().popMatrix()
+                if (scissors) ctx.disableScissor()
             }
         }
     }

@@ -1,6 +1,5 @@
 package quoi.utils.render
 
-import com.mojang.blaze3d.vertex.ByteBufferBuilder
 import com.mojang.blaze3d.vertex.VertexConsumer
 import kotlin.math.max
 import kotlin.math.pow
@@ -17,8 +16,6 @@ import quoi.utils.EntityUtils.renderPos
 import quoi.utils.player
 import quoi.utils.skyblock.player.PlayerUtils.eyeHeight
 import quoi.utils.unaryMinus
-
-private val ALLOCATOR = ByteBufferBuilder(1536)
 
 private fun camera() = mc.gameRenderer.mainCamera
 
@@ -42,7 +39,7 @@ private fun lineGeometry(cameraPos: Vec3): LineGeometry {
     val camera = camera()
     return LineGeometry(
         cameraPos, camera.forwardVector().toVec3(), camera.leftVector().toVec3(), camera.upVector().toVec3(),
-        (mc.options.fov().get() as Number).toDouble(), mc.window.height.toDouble()
+        camera.fov.toDouble(), mc.window.height.toDouble()
     )
 }
 
@@ -112,14 +109,14 @@ private fun addFilledBox(buffer: VertexConsumer, pose: com.mojang.blaze3d.vertex
 fun LevelRenderContext.drawLine(points: Collection<Vec3>, colour: Colour, depth: Boolean = false, thickness: Float = 3f) {
     if (points.size < 2) return
     val matrix = poseStack()
-    val layer = if (depth) CustomRenderLayer.TRIANGLE_STRIP else CustomRenderLayer.TRIANGLE_STRIP_ESP
     val cameraPos = camera().position()
     val pointList = points.toList()
 
-    submitNodeCollector().submitCustomGeometry(matrix, layer) { pose, buffer ->
-        val lines = lineGeometry(cameraPos)
+    val lines = lineGeometry(cameraPos)
+    val renderColour = Colour.RGB(colour.rgb)
+    submitNodeCollector().submitOverlayGeometry(matrix, depth) { pose, buffer ->
         for (i in 0 until pointList.size - 1) {
-            lines.addSegment(buffer, pose, pointList[i], pointList[i + 1], colour, thickness)
+            lines.addSegment(buffer, pose, pointList[i], pointList[i + 1], renderColour, thickness)
         }
     }
 }
@@ -131,24 +128,24 @@ fun LevelRenderContext.drawTracer(to: Vec3, colour: Colour, thickness: Float = 6
 
 fun LevelRenderContext.drawWireFrameBox(aabb: AABB, colour: Colour, thickness: Float = 6f, depth: Boolean = false) {
     val matrix = poseStack()
-    val layer = if (depth) CustomRenderLayer.TRIANGLE_STRIP else CustomRenderLayer.TRIANGLE_STRIP_ESP
     val cameraPos = camera().position()
     val legacyThickness = legacyDistanceScaledThickness(cameraPos, aabb.center, thickness)
 
-    submitNodeCollector().submitCustomGeometry(matrix, layer) { pose, buffer ->
-        val lines = lineGeometry(cameraPos)
+    val lines = lineGeometry(cameraPos)
+    val renderColour = Colour.RGB(colour.rgb)
+    submitNodeCollector().submitOverlayGeometry(matrix, depth) { pose, buffer ->
         boxEdges(aabb).forEach { (start, end) ->
-            lines.addSegment(buffer, pose, start, end, colour, legacyThickness)
+            lines.addSegment(buffer, pose, start, end, renderColour, legacyThickness)
         }
     }
 }
 
 fun LevelRenderContext.drawFilledBox(box: AABB, colour: Colour, depth: Boolean = false) {
     val matrix = poseStack()
-    val layer = if (depth) CustomRenderLayer.TRIANGLE_STRIP else CustomRenderLayer.TRIANGLE_STRIP_ESP
     val cameraPos = camera().position()
-    submitNodeCollector().submitCustomGeometry(matrix, layer) { pose, buffer ->
-        addFilledBox(buffer, pose, box, cameraPos, colour)
+    val renderColour = Colour.RGB(colour.rgb)
+    submitNodeCollector().submitOverlayGeometry(matrix, depth) { pose, buffer ->
+        addFilledBox(buffer, pose, box, cameraPos, renderColour)
     }
 }
 
@@ -184,7 +181,7 @@ fun LevelRenderContext.drawText(
     val matrix = stack.last().pose()
     with(scale * 0.025f) {
         val cameraPos = -camera().position()
-        matrix.translate(pos.toVector3f()).translate(cameraPos.x.toFloat(), cameraPos.y.toFloat(), cameraPos.z.toFloat()).rotate(camera().rotation()).scale(this, -this, this)
+        matrix.translate(pos.add(cameraPos).toVector3f()).rotate(camera().rotation()).scale(this, -this, this)
     }
 
     submitNodeCollector().submitText(
@@ -212,13 +209,13 @@ fun LevelRenderContext.drawCylinder(
     depth: Boolean = false
 ) {
     val matrix = poseStack()
-    val layer = if (depth) CustomRenderLayer.TRIANGLE_STRIP else CustomRenderLayer.TRIANGLE_STRIP_ESP
     val cameraPos = camera().position()
     val angleStep = 2.0 * Math.PI / segments
     val legacyThickness = legacyDistanceScaledThickness(cameraPos, center, thickness)
 
-    submitNodeCollector().submitCustomGeometry(matrix, layer) { pose, buffer ->
-        val lines = lineGeometry(cameraPos)
+    val lines = lineGeometry(cameraPos)
+    val renderColour = Colour.RGB(colour.rgb)
+    submitNodeCollector().submitOverlayGeometry(matrix, depth) { pose, buffer ->
         for (i in 0 until segments) {
             val angle1 = i * angleStep
             val angle2 = (i + 1) * angleStep
@@ -234,9 +231,9 @@ fun LevelRenderContext.drawCylinder(
             val bottomStart = Vec3(x1, center.y, z1)
             val bottomEnd = Vec3(x2, center.y, z2)
 
-            lines.addSegment(buffer, pose, topStart, topEnd, colour, legacyThickness)
-            lines.addSegment(buffer, pose, bottomStart, bottomEnd, colour, legacyThickness)
-            lines.addSegment(buffer, pose, bottomStart, topStart, colour, legacyThickness)
+            lines.addSegment(buffer, pose, topStart, topEnd, renderColour, legacyThickness)
+            lines.addSegment(buffer, pose, bottomStart, bottomEnd, renderColour, legacyThickness)
+            lines.addSegment(buffer, pose, bottomStart, topStart, renderColour, legacyThickness)
         }
     }
 }

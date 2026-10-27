@@ -41,6 +41,7 @@ class UIContainer(ui: AbobaUI.Instance, val cancelling: Boolean = true) : UIHand
         ui.ctx = ctx
         mouseMove(mx, my)
 
+        ui.prepareFrame()
         NVGSpecialRenderer.draw(ctx, 0, 0, ctx.guiWidth(), ctx.guiHeight()) {
             ui.render(true)
         }

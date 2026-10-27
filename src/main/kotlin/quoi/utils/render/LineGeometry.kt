@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack
 import com.mojang.blaze3d.vertex.VertexConsumer
 import net.minecraft.world.phys.Vec3
 import quoi.api.colour.Colour
+import kotlin.math.hypot
 import kotlin.math.tan
 
 internal class LineGeometry(
@@ -16,26 +17,30 @@ internal class LineGeometry(
 ) {
     private val tanHalfFov = tan(Math.toRadians(fovDegrees) / 2.0)
 
-    private fun halfWidth(point: Vec3, thickness: Float): Double {
-        val depth = point.subtract(cameraPos).dot(forward).coerceAtLeast(0.05)
-        return ((thickness / 2.0) * (2.0 * depth * tanHalfFov) / windowHeight).coerceAtLeast(0.0015)
-    }
-
     fun addSegment(buffer: VertexConsumer, pose: PoseStack.Pose, start: Vec3, end: Vec3, colour: Colour, thickness: Float) {
-        val direction = end.subtract(start)
-        if (direction.lengthSqr() <= 1.0E-6) return
+        if (thickness <= 0f || windowHeight <= 0.0) return
+        var a = start.subtract(cameraPos)
+        var b = end.subtract(cameraPos)
+        var startDepth = a.dot(forward)
+        var endDepth = b.dot(forward)
+        val near = 0.05
+        if (startDepth < near && endDepth < near) return
 
-        val normalized = direction.normalize()
-        val perpendicular = left.scale(-normalized.dot(up)).add(up.scale(normalized.dot(left)))
-        val primary = if (perpendicular.lengthSqr() > 1.0E-6) perpendicular.normalize() else up
-        val secondary = direction.cross(primary).normalize()
-        val startWidth = halfWidth(start, thickness)
-        val endWidth = halfWidth(end, thickness)
-        val translatedStart = start.subtract(cameraPos)
-        val translatedEnd = end.subtract(cameraPos)
+        if (startDepth < near) {
+            a = a.lerp(b, (near - startDepth) / (endDepth - startDepth))
+            startDepth = near
+        } else if (endDepth < near) {
+            b = b.lerp(a, (near - endDepth) / (startDepth - endDepth))
+            endDepth = near
+        }
 
-        addQuad(buffer, pose, translatedStart, translatedEnd, primary.scale(startWidth), primary.scale(endWidth), colour)
-        addQuad(buffer, pose, translatedStart, translatedEnd, secondary.scale(startWidth), secondary.scale(endWidth), colour)
+        val dx = b.dot(left) / endDepth - a.dot(left) / startDepth
+        val dy = b.dot(up) / endDepth - a.dot(up) / startDepth
+        val length = hypot(dx, dy)
+        if (length <= 1.0E-9) return
+        val perpendicular = left.scale(-dy / length).add(up.scale(dx / length))
+        val pixelWidth = thickness * tanHalfFov / windowHeight
+        addQuad(buffer, pose, a, b, perpendicular.scale(startDepth * pixelWidth), perpendicular.scale(endDepth * pixelWidth), colour)
     }
 
     private fun addQuad(buffer: VertexConsumer, pose: PoseStack.Pose, start: Vec3, end: Vec3, startOffset: Vec3, endOffset: Vec3, colour: Colour) {

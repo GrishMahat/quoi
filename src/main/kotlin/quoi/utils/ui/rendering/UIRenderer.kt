@@ -102,6 +102,11 @@ object NVGRenderer {
         backend.text(text, x, y, size, color, font)
 
     fun formattedText(text: String, x: Float, y: Float, size: Float, colour: Int, font: Font, shadow: Boolean = false) {
+        if (text.isEmpty()) return
+        if ('§' !in text && '&' !in text) {
+            text(text, x, y, size, if (shadow) colour.multiply(0.25f) else colour, font)
+            return
+        }
         var x = x
         for (segment in TextEngine.parse(text, colour)) {
             val color = if (shadow) segment.color.multiply(0.25f) else segment.color

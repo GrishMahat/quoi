@@ -33,6 +33,7 @@ class UIScreen(val instance: AbobaUI.Instance, val background: Boolean = true ) 
         val mouseY = ctx.mouseY()
         *///?}
         instance.eventManager.onMouseMove(mouseX * sf.toFloat(), mouseY * sf.toFloat())
+        instance.prepareFrame()
         NVGSpecialRenderer.draw(ctx, 0, 0, ctx.guiWidth(), ctx.guiHeight()) {
             instance.render(true)
         }

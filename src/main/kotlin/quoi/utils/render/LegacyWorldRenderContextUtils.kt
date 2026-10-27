@@ -47,7 +47,7 @@ private fun lineGeometry(cameraPos: Vec3): LineGeometry {
     val camera = camera()
     return LineGeometry(
         cameraPos, camera.forwardVector().toVec3(), camera.leftVector().toVec3(), camera.upVector().toVec3(),
-        (mc.options.fov().get() as Number).toDouble(), mc.window.height.toDouble()
+        camera.fov.toDouble(), mc.window.height.toDouble()
     )
 }
 
@@ -185,7 +185,7 @@ fun LevelRenderContext.drawText(text: Component, pos: Vec3, colour: Colour = Col
     val matrix = stack.last().pose()
     with(scale * 0.025f) {
         val cameraPos = -camera().position()
-        matrix.translate(pos.toVector3f()).translate(cameraPos.x.toFloat(), cameraPos.y.toFloat(), cameraPos.z.toFloat()).rotate(camera().rotation()).scale(this, -this, this)
+        matrix.translate(pos.add(cameraPos).toVector3f()).rotate(camera().rotation()).scale(this, -this, this)
     }
 
     val consumers = MultiBufferSource.immediate(ALLOCATOR)

@@ -25,6 +25,7 @@ val rendererSources = when {
         "quoi/utils/ui/rendering/UIRenderer.kt",
         "quoi/utils/ui/rendering/Image.kt",
         "quoi/utils/render/WorldRenderContextUtils.kt",
+        "quoi/utils/render/OverlayGeometry.kt",
         "quoi/module/impl/render/RenderOptimiser.kt",
     )
     else -> listOf(
@@ -48,11 +49,15 @@ sourceSets.named("main") {
                 "quoi/mixins/HudMixin.java",
                 "quoi/mixins/accessors/GuiGraphicsExtractorAccessor.java",
                 "quoi/mixins/FirstPersonHandsAndItemsMixin.java",
+                "quoi/mixins/OverlayLevelRendererMixin.java",
+                "quoi/mixins/OverlayQuadSortingMixin.java",
             )
             sc.current.parsed < "26.3" -> listOf(
                 "quoi/mixins/LegacyGuiMixin.java",
                 "quoi/mixins/FirstPersonHandsAndItemsMixin.java",
                 "quoi/mixins/ItemInHandRendererMixin.java",
+                "quoi/mixins/OverlayLevelRendererMixin.java",
+                "quoi/mixins/OverlayQuadSortingMixin.java",
             )
             else -> listOf("quoi/mixins/LegacyGuiMixin.java", "quoi/mixins/LegacyItemInHandRendererMixin.java")
         }

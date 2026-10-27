@@ -49,6 +49,7 @@ class McBackend : RendererBackend {
     private var ctx: GuiGraphicsExtractor? = null
     private var basePose = Matrix3x2f()
     private var invGuiScale = 1f
+    private var inheritedScissor: ScreenRectangle? = null
 
     private class DrawState(val pose: Matrix3x2f = Matrix3x2f(), var alpha: Float = 1f) {
         fun set(other: DrawState) {
@@ -83,6 +84,7 @@ class McBackend : RendererBackend {
         this.ctx = ctx
         invGuiScale = 1f / max(1, mc.window.guiScale)
         basePose.set(ctx.pose()).scale(invGuiScale, invGuiScale)
+        inheritedScissor = ctx.scissorStack.peek()
 
         stateStack.clear()
         state = DrawState()
@@ -472,9 +474,13 @@ class McBackend : RendererBackend {
         val ctx = this.ctx ?: run { resetBatch(); return }
 
         val scissor = pendingScissor
+        val localScissor = scissor?.screenRect
+        val screenScissor = inheritedScissor?.let { inherited ->
+            if (localScissor == null) inherited else inherited.intersection(localScissor) ?: EMPTY_SCISSOR
+        } ?: localScissor
         var bounds = toScreenRectOuter(pendingMinX, pendingMinY, pendingMaxX, pendingMaxY)
-        if (scissor?.screenRect != null && bounds != null) {
-            bounds = scissor.screenRect.intersection(bounds)
+        if (screenScissor != null && bounds != null) {
+            bounds = screenScissor.intersection(bounds)
         }
 
         if (bounds != null && bounds.width > 0 && bounds.height > 0) {
@@ -494,7 +500,7 @@ class McBackend : RendererBackend {
                     clipped.first,
                     clipped.second,
                     pendingTexture != null,
-                    scissor?.screenRect,
+                    screenScissor,
                     bounds,
                 )
             )
@@ -531,8 +537,8 @@ class McBackend : RendererBackend {
         return (a shl 24) or (r shl 16) or (g shl 8) or b
     }
 
-    /** AABB of (x0,y0)-(x1,y1) transformed by the current local pose, in window pixels. */
-    private fun transformedAabb(x0: Float, y0: Float, x1: Float, y1: Float): FloatArray {
+    /** AABB of (x0,y0)-(x1,y1) after applying [pose]. */
+    private fun transformedAabb(x0: Float, y0: Float, x1: Float, y1: Float, pose: Matrix3x2f = state.pose): FloatArray {
         var minX = Float.MAX_VALUE
         var minY = Float.MAX_VALUE
         var maxX = -Float.MAX_VALUE
@@ -541,7 +547,7 @@ class McBackend : RendererBackend {
         val ys = floatArrayOf(y0, y0, y1, y1)
         for (i in 0 until 4) {
             tmpVec.set(xs[i], ys[i])
-            state.pose.transformPosition(tmpVec)
+            pose.transformPosition(tmpVec)
             minX = min(minX, tmpVec.x)
             minY = min(minY, tmpVec.y)
             maxX = max(maxX, tmpVec.x)
@@ -560,29 +566,20 @@ class McBackend : RendererBackend {
         // GuiRenderer only clamps the right and bottom edges before forwarding the
         // scissor to RenderPass. Negative or completely off-screen rectangles therefore
         // fail RenderPass's strict bounds validation instead of merely clipping content.
-        val windowWidth = mc.window.width.toFloat()
-        val windowHeight = mc.window.height.toFloat()
-        val clippedLeft = rect[0].coerceIn(0f, windowWidth)
-        val clippedTop = rect[1].coerceIn(0f, windowHeight)
-        val clippedRight = rect[2].coerceIn(0f, windowWidth)
-        val clippedBottom = rect[3].coerceIn(0f, windowHeight)
-        if (clippedRight <= clippedLeft || clippedBottom <= clippedTop) return EMPTY_SCISSOR
-
-        val left = floor(clippedLeft * invGuiScale).toInt()
-        val top = floor(clippedTop * invGuiScale).toInt()
-        val right = ceil(clippedRight * invGuiScale).toInt()
-        val bottom = ceil(clippedBottom * invGuiScale).toInt()
-        if (right <= left || bottom <= top) return EMPTY_SCISSOR
-        return ScreenRectangle(left, top, right - left, bottom - top)
+        val transformed = toScreenRectOuter(rect[0], rect[1], rect[2], rect[3]) ?: return EMPTY_SCISSOR
+        val screen = ScreenRectangle(0, 0, ceil(mc.window.width * invGuiScale).toInt(), ceil(mc.window.height * invGuiScale).toInt())
+        return transformed.intersection(screen) ?: EMPTY_SCISSOR
     }
 
     /** Window-px AABB → gui-space ScreenRectangle, rounded outwards (for bounds). */
     private fun toScreenRectOuter(minX: Float, minY: Float, maxX: Float, maxY: Float): ScreenRectangle? {
         if (maxX <= minX || maxY <= minY) return null
-        val left = floor(minX * invGuiScale).toInt()
-        val top = floor(minY * invGuiScale).toInt()
-        val right = ceil(maxX * invGuiScale).toInt()
-        val bottom = ceil(maxY * invGuiScale).toInt()
+        // Bounds and GPU scissors must use the same extractor pose as the vertices.
+        val rect = transformedAabb(minX, minY, maxX, maxY, basePose)
+        val left = floor(rect[0]).toInt()
+        val top = floor(rect[1]).toInt()
+        val right = ceil(rect[2]).toInt()
+        val bottom = ceil(rect[3]).toInt()
         if (right <= left || bottom <= top) return null
         return ScreenRectangle(left, top, right - left, bottom - top)
     }

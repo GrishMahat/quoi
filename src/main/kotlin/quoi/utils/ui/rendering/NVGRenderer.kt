@@ -6,8 +6,8 @@ import org.lwjgl.nanovg.NVGPaint
 import org.lwjgl.nanovg.NanoSVG.*
 import org.lwjgl.nanovg.NanoVG.*
 import org.lwjgl.nanovg.NanoVGGL3.*
-import org.lwjgl.opengl.GL33C
 import org.lwjgl.stb.STBImage.stbi_load_from_memory
+import org.lwjgl.stb.STBImage.stbi_image_free
 import org.lwjgl.system.MemoryUtil.memAlloc
 import org.lwjgl.system.MemoryUtil.memFree
 import quoi.QuoiMod.mc
@@ -46,12 +46,12 @@ object NVGRenderer {
     private var drawing: Boolean = false
 
     init {
-        vg = nvgCreate(NVG_ANTIALIAS or NVG_STENCIL_STROKES)
-        require(vg != -1L) { "Failed to initialize NanoVG" }
+        vg = NVGSpecialRenderer.preserveGlState { nvgCreate(NVG_ANTIALIAS or NVG_STENCIL_STROKES) }
+        require(vg != 0L) { "Failed to initialize NanoVG" }
     }
 
     private fun devicePixelRatio(): Float =
-        if (mc.window.screenWidth == 0) 1f else (mc.window.width / mc.window.screenWidth).toFloat()
+        if (mc.window.screenWidth == 0) 1f else mc.window.width.toFloat() / mc.window.screenWidth
 
     fun beginFrame(width: Float = mc.window.width.toFloat(), height: Float = mc.window.height.toFloat()) {
         if (drawing) throw IllegalStateException("[NVGRenderer] Already drawing, but called beginFrame")
@@ -59,17 +59,16 @@ object NVGRenderer {
         val dpr = devicePixelRatio()
 
         nvgBeginFrame(vg, width / dpr, height / dpr, dpr)
+        scissor = null
         nvgTextAlign(vg, NVG_ALIGN_LEFT or NVG_ALIGN_TOP)
         drawing = true
     }
 
     fun endFrame() {
         if (!drawing) throw IllegalStateException("[NVGRenderer] Not drawing, but called endFrame")
-        val previousProgram = GL33C.glGetInteger(GL33C.GL_CURRENT_PROGRAM)
         try {
             nvgEndFrame(vg)
         } finally {
-            GL33C.glUseProgram(previousProgram)
             drawing = false
         }
     }
@@ -87,7 +86,9 @@ object NVGRenderer {
     fun globalAlpha(amount: Float) = nvgGlobalAlpha(vg, amount.coerceIn(0f, 1f))
 
     fun pushScissor(x: Float, y: Float, w: Float, h: Float) {
-        scissor = Scissor(scissor, x, y, w + x, h + y)
+        val transform = FloatArray(6)
+        nvgCurrentTransform(vg, transform)
+        scissor = Scissor(scissor, x, y, w, h, transform)
         scissor?.applyScissor()
     }
 
@@ -104,7 +105,7 @@ object NVGRenderer {
         nvgStrokeWidth(vg, thickness)
         color(color)
         nvgStrokeColor(vg, nvgColor)
-        nvgStroke(vg)
+        stroke()
     }
 
     fun rect(
@@ -122,7 +123,7 @@ object NVGRenderer {
         nvgRoundedRectVarying(vg, x, y, w, h + .5f, tl, tr, br, bl)
         color(color)
         nvgFillColor(vg, nvgColor)
-        nvgFill(vg)
+        fill()
     }
 
     fun rect(x: Float, y: Float, w: Float, h: Float, color: Int, radius: Float = 0f) =
@@ -136,7 +137,7 @@ object NVGRenderer {
         nvgRect(vg, x, y, w, h + .5f)
         color(color)
         nvgFillColor(vg, nvgColor)
-        nvgFill(vg)
+        fill()
     }
 
     fun hollowRect(
@@ -157,7 +158,7 @@ object NVGRenderer {
         nvgPathWinding(vg, NVG_HOLE)
         color(color)
         nvgStrokeColor(vg, nvgColor)
-        nvgStroke(vg)
+        stroke()
     }
 
     fun hollowRect(x: Float, y: Float, w: Float, h: Float, thickness: Float, color: Int, radius: Float = 0f) =
@@ -183,7 +184,7 @@ object NVGRenderer {
         nvgRoundedRectVarying(vg, x, y, w, h, tl, tr, br, bl)
         gradient(color1, color2, x, y, w, h, gradient)
         nvgFillPaint(vg, nvgPaint)
-        nvgFill(vg)
+        fill()
     }
 
     fun gradientRect(
@@ -213,7 +214,7 @@ object NVGRenderer {
         nvgRoundedRect(vg, x, y, width, height, radius)
         nvgPathWinding(vg, NVG_HOLE)
         nvgFillPaint(vg, nvgPaint)
-        nvgFill(vg)
+        fill()
     }
 
     fun dropShadow(x: Float, y: Float, w: Float, h: Float, blur: Float, spread: Float, radii: Radii, colour: Int = Colour.RGB(0, 0, 0, 0.5f).rgb) =
@@ -225,10 +226,11 @@ object NVGRenderer {
         nvgCircle(vg, x, y, radius)
         color(color)
         nvgFillColor(vg, nvgColor)
-        nvgFill(vg)
+        fill()
     }
 
     fun text(text: String, x: Float, y: Float, size: Float, color: Int, font: Font, blur: Float = 0f) {
+        NVGSpecialRenderer.prepareDraw()
         nvgFontSize(vg, size)
         nvgFontFaceId(vg, getFontID(font))
         nvgFontBlur(vg, blur)
@@ -238,6 +240,11 @@ object NVGRenderer {
     }
 
     fun formattedText(text: String, x: Float, y: Float, size: Float, colour: Int, font: Font, shadow: Boolean = false) {
+        if (text.isEmpty()) return
+        if ('§' !in text && '&' !in text) {
+            text(text, x, y, size, if (shadow) colour.multiply(0.25f) else colour, font)
+            return
+        }
         var x = x
         for (segment in TextEngine.parse(text, colour)) {
             val text = segment.text
@@ -302,7 +309,7 @@ object NVGRenderer {
         nvgBeginPath(vg)
         nvgRoundedRect(vg, x, y, w, h + .5f, radius)
         nvgFillPaint(vg, nvgPaint)
-        nvgFill(vg)
+        fill()
     }
 
     fun image(image: Image, x: Float, y: Float, w: Float, h: Float, tl: Float, bl: Float, br: Float, tr: Float, color: Int? = null) {
@@ -317,7 +324,7 @@ object NVGRenderer {
         nvgBeginPath(vg)
         nvgRoundedRectVarying(vg, x, y, w, h, tl, tr, br, bl)
         nvgFillPaint(vg, nvgPaint)
-        nvgFill(vg)
+        fill()
     }
 
     fun image(image: Image, x: Float, y: Float, w: Float, h: Float, radii: Radii, color: Int? = null) =
@@ -328,15 +335,18 @@ object NVGRenderer {
         nvgBeginPath(vg)
         nvgRect(vg, x, y, w, h + .5f)
         nvgFillPaint(vg, nvgPaint)
-        nvgFill(vg)
+        fill()
     }
 
     fun String.image() = createImage("/assets/quoi/ui/images/$this")
 
     fun createImage(resourcePath: String): Image {
         val image = images.keys.find { it.identifier == resourcePath } ?: Image(resourcePath)
-        if (image.isSVG) images.getOrPut(image) { NVGImage(0, loadSVG(image)) }.count++
-        else images.getOrPut(image) { NVGImage(0, loadImage(image)) }.count++
+        images.getOrPut(image) {
+            NVGSpecialRenderer.preserveGlState {
+                NVGImage(0, if (image.isSVG) loadSVG(image) else loadImage(image))
+            }
+        }.count++
         return image
     }
 
@@ -365,7 +375,11 @@ object NVGRenderer {
             channels,
             4
         ) ?: throw NullPointerException("Failed to load image: ${image.identifier}")
-        return nvgCreateImageRGBA(vg, w[0], h[0], 0, buffer)
+        return try {
+            nvgCreateImageRGBA(vg, w[0], h[0], 0, buffer)
+        } finally {
+            stbi_image_free(buffer)
+        }
     }
 
     private fun loadSVG(image: Image): Int {
@@ -378,14 +392,26 @@ object NVGRenderer {
 
         try {
             val rasterizer = nsvgCreateRasterizer()
-            nsvgRasterize(rasterizer, svg, 0f, 0f, 1f, buffer, width, height, width * 4)
-            val nvgImage = nvgCreateImageRGBA(vg, width, height, 0, buffer)
-            nsvgDeleteRasterizer(rasterizer)
-            return nvgImage
+            try {
+                nsvgRasterize(rasterizer, svg, 0f, 0f, 1f, buffer, width, height, width * 4)
+                return nvgCreateImageRGBA(vg, width, height, 0, buffer)
+            } finally {
+                nsvgDeleteRasterizer(rasterizer)
+            }
         } finally {
             nsvgDelete(svg)
             memFree(buffer)
         }
+    }
+
+    private fun fill() {
+        NVGSpecialRenderer.prepareDraw()
+        nvgFill(vg)
+    }
+
+    private fun stroke() {
+        NVGSpecialRenderer.prepareDraw()
+        nvgStroke(vg)
     }
 
     private fun color(color: Int) {
@@ -414,16 +440,18 @@ object NVGRenderer {
         }.id
     }
 
-    private class Scissor(val previous: Scissor?, val x: Float, val y: Float, val maxX: Float, val maxY: Float) {
+    private class Scissor(val previous: Scissor?, val x: Float, val y: Float, val width: Float, val height: Float, val transform: FloatArray) {
         fun applyScissor() {
-            if (previous == null) nvgScissor(vg, x, y, maxX - x, maxY - y)
-            else {
-                val x = max(x, previous.x)
-                val y = max(y, previous.y)
-                val width = max(0f, (min(maxX, previous.maxX) - x))
-                val height = max(0f, (min(maxY, previous.maxY) - y))
-                nvgScissor(vg, x, y, width, height)
+            val current = FloatArray(6)
+            nvgCurrentTransform(vg, current)
+            nvgResetScissor(vg)
+            for (clip in generateSequence(this) { it.previous }.toList().asReversed()) {
+                nvgResetTransform(vg)
+                nvgTransform(vg, clip.transform[0], clip.transform[1], clip.transform[2], clip.transform[3], clip.transform[4], clip.transform[5])
+                nvgIntersectScissor(vg, clip.x, clip.y, clip.width, clip.height)
             }
+            nvgResetTransform(vg)
+            nvgTransform(vg, current[0], current[1], current[2], current[3], current[4], current[5])
         }
     }
 
