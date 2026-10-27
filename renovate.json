@@ -66,6 +66,11 @@
       "enabled": false
     },
     {
+      "description": "Fabric Loader updates are managed manually",
+      "matchPackageNames": ["net.fabricmc:fabric-loader"],
+      "enabled": false
+    },
+    {
       "description": "Keep the Java toolchain on the version required by these Minecraft targets",
       "matchDatasources": ["java-version"],
       "enabled": false
