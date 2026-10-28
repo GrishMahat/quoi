@@ -1,7 +1,9 @@
 package quoi.module.impl.misc
 
+import java.util.Optional
 import net.minecraft.network.chat.ClickEvent
 import net.minecraft.network.chat.Component
+import net.minecraft.network.chat.Style
 import quoi.api.events.ChatEvent
 import quoi.api.events.core.on
 import quoi.api.skyblock.dungeon.Dungeon
@@ -61,7 +63,13 @@ object GreatSpook : Module(
     private fun getCommand(text: Component): String? {
         val msg = text.string.noControlCodes.trim().removePrefix("[FEAR] Commitment Phobia: Please sign this paper!\n")
         if (!msg.startsWith("Click HERE to sign the ") || !msg.endsWith('.')) return null
+        //? if >=26.4-snapshot-6 {
+        /*val click = text.visit<ClickEvent>({ style, content ->
+            if ("HERE" in content.noControlCodes) Optional.ofNullable(style.clickEvent) else Optional.empty()
+        }, ClickEvent.RunCommand(""), Style.EMPTY).orElse(null)
+        *///?} else {
         val click = text.toFlatList().firstOrNull { "HERE" in it.string.noControlCodes }?.style?.clickEvent
+        //?}
         return (click as? ClickEvent.RunCommand)?.command?.takeIf { it.isNotBlank() }
     }
 

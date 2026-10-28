@@ -1,3 +1,5 @@
+//~ styled_text
+
 package quoi.module.impl.render
 
 import net.minecraft.ChatFormatting

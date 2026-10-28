@@ -1,3 +1,5 @@
+//~ styled_text
+
 package quoi.module.impl.general
 
 import kotlin.reflect.KProperty0

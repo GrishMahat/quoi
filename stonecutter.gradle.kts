@@ -85,6 +85,19 @@ stonecutter parameters {
         replace("FluidTags.LAVA", "Fluids.LAVA")
     }
 
+    // Snapshot 6 wraps GUI pipelines and bounds styled text traversal.
+    replacements.string(current.parsed >= "26.4-snapshot-6", "gui_pipeline") {
+        replace("import net.minecraft.client.renderer.RenderPipelines", "import net.minecraft.client.gui.GuiPipeline")
+        replace("RenderPipelines.GUI_TEXTURED", "GuiPipeline.TEXTURED")
+        replace("RenderPipelines.GUI", "GuiPipeline.DEFAULT")
+    }
+    replacements.regex(current.parsed >= "26.4-snapshot-6", "gui_pipeline") {
+        replace(": RenderPipeline\\b", ": GuiPipeline", ": GuiPipeline\\b", ": RenderPipeline")
+    }
+    replacements.string(current.parsed >= "26.4-snapshot-6", "styled_text") {
+        replace("}, Style.EMPTY)", "}, Unit, Style.EMPTY)")
+    }
+
     // Snapshot 5 moves pipeline definitions and carries GUI input in the extractor.
     replacements.string(snapshot5) {
         replace("net.minecraft.client.renderer.RenderPipelines", "net.minecraft.client.renderer.pipeline.RenderPipelines")

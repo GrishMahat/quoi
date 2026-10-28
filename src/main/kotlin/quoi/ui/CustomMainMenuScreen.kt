@@ -1,5 +1,6 @@
 //~ texture_resources
 //~ gui_extraction
+//~ gui_pipeline
 
 package quoi.ui
 
