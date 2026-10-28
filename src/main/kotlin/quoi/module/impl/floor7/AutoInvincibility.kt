@@ -23,6 +23,7 @@ import quoi.utils.skyblock.player.PetSwitcher
 import quoi.utils.skyblock.player.PetUtils
 import quoi.utils.skyblock.player.PlayerUtils.rightClick
 import quoi.utils.skyblock.player.SwapManager
+import quoi.utils.skyblock.player.container.ContainerSettings
 
 object AutoInvincibility : Module(
     "Auto Invincibility",
@@ -37,7 +38,7 @@ object AutoInvincibility : Module(
     private val phoenixSwapMethod by selector("Swap method", PhoenixSwapMethod.RodSwap, desc = "Method used to swap to the Phoenix pet. Rod Swap ignores input blocking.").childOf(::usePhoenixPet)
     private val bossOnly by switch("Boss only", desc = "Only triggers while being in boss room.")
     private val p3Only by switch("Phase 3 only", desc = "Only triggers during phase 3.")
-    private val blockInputs by switch("Block inputs", desc = "Blocks keyboard and mouse input while equipping masks or swapping through the pet menu. Does not affect Rod Swap.")
+    private val containerSettings = ContainerSettings(this)
 
     private var swapping = false
     private var previousPet: String? = null
@@ -121,7 +122,7 @@ object AutoInvincibility : Module(
 
                 modMessage("§eEquipping $maskName.")
 
-                if (!EquipmentSwapper.equip(maskName, blockInput = blockInputs)) {
+                if (!EquipmentSwapper.equip(maskName, settings = containerSettings)) {
                     modMessage("§cFailed to equip $maskName.")
                 }
             } finally {
@@ -151,7 +152,7 @@ object AutoInvincibility : Module(
                     PhoenixSwapMethod.PetMenu -> {
                         modMessage("§eSwapping to Phoenix.")
 
-                        if (!PetSwitcher.switchPet("Phoenix", blockInput = blockInputs)) {
+                        if (!PetSwitcher.switchPet("Phoenix", settings = containerSettings)) {
                             modMessage("§cFailed to queue Phoenix swap.")
                             return@launch
                         }
@@ -214,7 +215,7 @@ object AutoInvincibility : Module(
             when (phoenixSwapMethod.selected) {
                 PhoenixSwapMethod.RodSwap -> triggerRodSwap()
                 PhoenixSwapMethod.PetMenu -> {
-                    if (!PetSwitcher.switchPet(pet, blockInput = blockInputs)) {
+                    if (!PetSwitcher.switchPet(pet, settings = containerSettings)) {
                         modMessage("§cFailed to switch previous pet switch.")
                     }
                 }

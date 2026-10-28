@@ -27,7 +27,8 @@ import quoi.module.impl.render.clickgui.ClickGui
 import quoi.utils.ChatUtils.modMessage
 import quoi.utils.skyblock.item.ItemUtils.skyblockId
 import quoi.utils.skyblock.player.container.ContainerUtils
-import quoi.utils.skyblock.player.container.menuSettings
+import quoi.utils.skyblock.player.container.CONTAINER_MENU
+import quoi.utils.skyblock.player.container.IContainerSettings
 import quoi.utils.skyblock.player.container.task.*
 
 // TODO: redo?
@@ -36,7 +37,7 @@ import quoi.utils.skyblock.player.container.task.*
 object LeapManager : EventListener {
     private data class LeapRequest(
         val target: DungeonPlayer,
-        val blockInput: Boolean,
+        val settings: IContainerSettings,
         val swapBack: Boolean,
     )
 
@@ -113,37 +114,37 @@ object LeapManager : EventListener {
 
     fun leap(
         name: String,
-        blockInput: Boolean = false,
+        settings: IContainerSettings = CONTAINER_MENU,
         swapBack: Boolean = false,
     ) {
         check(mc.isSameThread) { "Leap requests must be submitted on the client thread" }
         if (name == "" || !inDungeons) return
 
         val teammate = dungeonTeammatesNoSelf.firstOrNull { !it.isDead && it.name == name }
-        startLeap(teammate, formatName(name), blockInput, swapBack)
+        startLeap(teammate, formatName(name), settings, swapBack)
     }
 
     fun leap(
         clazz: DungeonClass,
-        blockInput: Boolean = false,
+        settings: IContainerSettings = CONTAINER_MENU,
         swapBack: Boolean = false,
     ) {
         check(mc.isSameThread) { "Leap requests must be submitted on the client thread" }
         if (clazz == DungeonClass.Unknown || !inDungeons) return
 
         val teammate = dungeonTeammatesNoSelf.firstOrNull { !it.isDead && it.clazz == clazz }
-        startLeap(teammate, "&${clazz.colourCode}${clazz.name}", blockInput, swapBack)
+        startLeap(teammate, "&${clazz.colourCode}${clazz.name}", settings, swapBack)
     }
 
     private fun startLeap(
         teammate: DungeonPlayer?,
         formattedTarget: String,
-        blockInput: Boolean,
+        settings: IContainerSettings,
         swapBack: Boolean,
     ) {
         teammate ?: return modMessage("&cFailed to leap! $formattedTarget &cnot found")
 
-        val request = LeapRequest(teammate, blockInput, swapBack)
+        val request = LeapRequest(teammate, settings, swapBack)
         val openLeapMenu = (mc.screen as? AbstractContainerScreen<*>)?.takeIf { it.title.string == "Spirit Leap" }
 
         if (!inProgress && pendingLeap == null && openLeapMenu != null && ContainerManager.activeTask == null) {
@@ -210,7 +211,7 @@ object LeapManager : EventListener {
         }
         val newTask = containerTask(
             name = "Leap to ${leap.target.name}",
-            settings = menuSettings(blockInput = leap.blockInput),
+            settings = leap.settings,
         ) {
             if (!preOpened) {
                 action { PlayerUtils.interact() }

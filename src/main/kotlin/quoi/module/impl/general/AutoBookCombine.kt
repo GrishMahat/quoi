@@ -10,7 +10,7 @@ import quoi.module.Module
 import quoi.module.settings.Setting.Companion.json
 import quoi.utils.ChatUtils.modMessage
 import quoi.utils.skyblock.item.ItemUtils.extraAttributes
-import quoi.utils.skyblock.player.container.ContainerOptions
+import quoi.utils.skyblock.player.container.ContainerSettings
 import quoi.utils.skyblock.player.container.task.ContainerTask
 import quoi.utils.skyblock.player.container.task.containerTask
 import quoi.utils.skyblock.player.container.task.inv
@@ -20,7 +20,7 @@ object AutoBookCombine : Module(
     "Auto Book Combine",
     desc = "Automatically combines matching enchanted books in the Hypixel Anvil."
 ) {
-    private val clickDelay by slider("Click delay", 4, 1, 20, 1, desc = "Delay between clicks.", unit = " ticks").json("Click delay ticks")
+    private val containerSettings = ContainerSettings(this, showProgress = false)
     private val resultDelay by slider("Result delay", 10, 2, 40, 1, desc = "Delay before taking the combined book.", unit = " ticks").json("Result delay ticks")
     private val disableAfterFinish by switch("Disable after finish", true, desc = "Disables the module after all matching books have been combined.")
     private val autoCloseAfterFinish by switch("Auto close after finish", desc = "Closes the anvil after successfully combining books.")
@@ -37,26 +37,23 @@ object AutoBookCombine : Module(
 
             val pair = findBookPair(screen) ?: return@on finish(screen)
 
-            val containerId = screen.menu.containerId
             val isCurrentAnvil = {
-                currentAnvil()?.menu?.containerId == containerId
+                currentAnvil()?.menu === screen.menu && mc.player?.containerMenu === screen.menu
             }
 
             val task = containerTask(
-                force = true,
-                settings = ContainerOptions(silent = false, showProgress = false),
+                name = name,
+                settings = containerSettings,
             ) {
                 check("Anvil was closed", isCurrentAnvil)
-                quickMove(pair.first.inv)
-                wait(clickDelay)
+                quickMove(pair.first.inv).unless { !isCurrentAnvil() }
 
                 check("Anvil was closed", isCurrentAnvil)
-                quickMove(pair.second.inv)
-                wait(clickDelay)
+                quickMove(pair.second.inv).unless { !isCurrentAnvil() }
 
                 repeat(2) {
                     check("Anvil was closed", isCurrentAnvil)
-                    pickup(22.menu) // combined book slot
+                    pickup(22.menu).unless { !isCurrentAnvil() } // combined book slot
                     wait(resultDelay)
                 }
 

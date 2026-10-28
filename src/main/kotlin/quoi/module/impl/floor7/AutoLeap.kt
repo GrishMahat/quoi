@@ -21,6 +21,7 @@ import quoi.module.settings.UIComponent.Companion.childOf
 import quoi.utils.ChatUtils.modMessage
 import quoi.utils.skyblock.item.ItemUtils.skyblockId
 import quoi.utils.skyblock.player.LeapManager
+import quoi.utils.skyblock.player.container.ContainerSettings
 
 // TODO: rewrite this
 object AutoLeap : Module(
@@ -31,7 +32,7 @@ object AutoLeap : Module(
     private val presets by configMap<String, JsonObject>("auto_leap_presets.json")
 
     private val leapMode by selector("Leap mode", LeapMode.Name, "Choose boss leap targets by player name or class.").open()
-    private val blockInputs by switch("Block inputs", desc = "Blocks keyboard and mouse input while leaping.")
+    private val containerSettings = ContainerSettings(this)
     private val swapBack by switch("Swap back", desc = "Restores your previous hotbar slot after leaping.")
 
     private var presetName by textInput("Preset name", length = 32, desc = "Preset to save or load.", placeholder = "My preset").suggests { presets.keys.sorted() }
@@ -270,7 +271,7 @@ object AutoLeap : Module(
     private fun leap(name: String) {
         LeapManager.leap(
             name,
-            blockInput = blockInputs,
+            settings = containerSettings,
             swapBack = swapBack,
         )
     }
@@ -278,7 +279,7 @@ object AutoLeap : Module(
     private fun leap(clazz: DungeonClass) {
         LeapManager.leap(
             clazz,
-            blockInput = blockInputs,
+            settings = containerSettings,
             swapBack = swapBack,
         )
     }

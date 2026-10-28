@@ -4,6 +4,8 @@ import quoi.api.abobaui.elements.ElementScope
 import quoi.api.customtriggers.*
 import quoi.config.TypeName
 import quoi.utils.skyblock.player.PetSwitcher
+import quoi.utils.skyblock.player.container.CONTAINER_MENU
+import quoi.utils.skyblock.player.container.IContainerSettings
 
 @TypeName("pet")
 class PetAction(
@@ -17,7 +19,9 @@ class PetAction(
         check(PetSwitcher.switchPet(
             ctx.expand(name).trim(),
             item = ctx.expand(item).trim().takeIf { it.isNotEmpty() },
-            blockInput = blockInput,
+            settings = object : IContainerSettings by CONTAINER_MENU {
+                override val blockInput = this@PetAction.blockInput
+            },
         )) { "Could not start pet swap" }
     }
 

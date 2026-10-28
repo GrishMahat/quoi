@@ -8,6 +8,8 @@ import quoi.api.customtriggers.*
 import quoi.config.TypeName
 import quoi.api.skyblock.dungeon.enums.DungeonClass
 import quoi.utils.skyblock.player.LeapManager
+import quoi.utils.skyblock.player.container.CONTAINER_MENU
+import quoi.utils.skyblock.player.container.IContainerSettings
 
 @TypeName("leap")
 class LeapAction(
@@ -20,10 +22,13 @@ class LeapAction(
         if (dungeonClass == DungeonClass.Unknown && name.isBlank()) "Enter a player name or select a class." else null
 
     override fun execute(ctx: TriggerContext) {
+        val settings = object : IContainerSettings by CONTAINER_MENU {
+            override val blockInput = this@LeapAction.blockInput
+        }
         if (dungeonClass == DungeonClass.Unknown) {
-            LeapManager.leap(ctx.expand(name).trim(), blockInput = blockInput, swapBack = swapBack)
+            LeapManager.leap(ctx.expand(name).trim(), settings = settings, swapBack = swapBack)
         } else {
-            LeapManager.leap(dungeonClass, blockInput = blockInput, swapBack = swapBack)
+            LeapManager.leap(dungeonClass, settings = settings, swapBack = swapBack)
         }
     }
 

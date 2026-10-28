@@ -12,10 +12,10 @@ import quoi.api.events.core.on
 import quoi.api.skyblock.Pet
 import quoi.utils.ChatUtils.modMessage
 import quoi.utils.StringUtils.noControlCodes
-import quoi.utils.skyblock.item.ItemUtils.lore
-import quoi.utils.skyblock.item.ItemUtils.loreString
+import quoi.utils.skyblock.item.ItemUtils.getCleanLore
 import quoi.utils.skyblock.player.PetUtils.pet
-import quoi.utils.skyblock.player.container.menuSettings
+import quoi.utils.skyblock.player.container.CONTAINER_MENU
+import quoi.utils.skyblock.player.container.IContainerSettings
 import quoi.utils.skyblock.player.container.task.ContainerTask
 import quoi.utils.skyblock.player.container.task.ContainerTaskResult
 import quoi.utils.skyblock.player.container.task.containerTask
@@ -64,7 +64,7 @@ object PetSwitcher : EventListener {
     fun switchPet(
         name: String,
         item: String? = null,
-        blockInput: Boolean = false,
+        settings: IContainerSettings = CONTAINER_MENU,
     ): Boolean {
         val cleanedName = Pet.cleanName(name)
         val cleanedItem = item?.let(::cleanPetItemName)?.takeIf(String::isNotEmpty)
@@ -74,13 +74,10 @@ object PetSwitcher : EventListener {
         val label = item?.let { "$cleanedName ($it)" } ?: cleanedName
         val target = item { stack -> stack.matchesPet(cleanedName, cleanedItem) }.menu
 
-        val newTask = containerTask(
-            name = "Pet: $cleanedName",
-            settings = menuSettings(blockInput = blockInput),
-        ) {
+        val newTask = containerTask(name = "Pet: $cleanedName", settings = settings) {
             openContainer("petsmenu", menuTitle)
             pickup(target, failureMessage = "Couldn't find $label").unless { stack ->
-                val summonable = stack.loreString?.contains("Left-click to summon!") == true
+                val summonable = stack.getCleanLore().any { it.contains("Left-click to summon!") }
                 confirmationTicks = 0
                 pendingSwitch = stack.pet
                     ?.takeIf { summonable }
@@ -89,7 +86,6 @@ object PetSwitcher : EventListener {
             }
             onFinished { result ->
                 if (result != ContainerTaskResult.Success) pendingSwitch = null
-
                 task = null
             }
         }
@@ -112,13 +108,11 @@ object PetSwitcher : EventListener {
         if (item == null) return true
         if (pet?.heldItem?.contains(item, ignoreCase = true) == true) return true
 
-        val heldItem = lore?.firstNotNullOfOrNull { line ->
-            val cleanedLine = line.noControlCodes
-            cleanedLine
-                .substringAfter("Held Item:", "")
-                .trim()
-                .takeIf { cleanedLine.startsWith("Held Item:", ignoreCase = true) }
-        } ?: return false
+        val heldItem = getCleanLore()
+            .firstOrNull { it.startsWith("Held Item:", ignoreCase = true) }
+            ?.substringAfter(':')
+            ?.trim()
+            ?: return false
 
         return heldItem.contains(item, ignoreCase = true)
     }

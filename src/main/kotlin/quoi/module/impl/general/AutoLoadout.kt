@@ -5,13 +5,14 @@ import quoi.module.Module
 import quoi.module.settings.UIComponent.Companion.childOf
 import quoi.module.settings.impl.KeybindComponent
 import quoi.utils.skyblock.player.LoadoutSwapper
+import quoi.utils.skyblock.player.container.ContainerSettings
 
 object AutoLoadout : Module(
     "Auto Loadout",
 ) {
-    private val preventMoving by switch("Prevent moving", desc = "Stops your movement while a loadout equip is in progress.")
-    private val blockInputs by switch("Block inputs", desc = "Blocks keyboard and mouse input while a loadout equip is in progress.")
+    private val containerSettings = ContainerSettings(this)
     private val keybinds by text("Keybinds")
+
     @Suppress("unused")
     private val loadoutKeys = (1..12).map { i ->
         register(
@@ -23,10 +24,6 @@ object AutoLoadout : Module(
 
     private fun onLoadoutKey(slot: Int) {
         if (!enabled || mc.screen != null) return
-        LoadoutSwapper.equip(
-            slot,
-            preventMove = preventMoving,
-            blockInput = blockInputs,
-        )
+        LoadoutSwapper.equip(slot, settings = containerSettings)
     }
 }

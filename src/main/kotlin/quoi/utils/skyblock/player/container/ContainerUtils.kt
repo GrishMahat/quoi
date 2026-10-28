@@ -1,10 +1,13 @@
 package quoi.utils.skyblock.player.container
 
+import net.minecraft.client.gui.screens.Screen
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import net.minecraft.client.player.LocalPlayer
 import net.minecraft.network.protocol.game.*
 import net.minecraft.world.inventory.AbstractContainerMenu
 import net.minecraft.world.inventory.ContainerInput
 import net.minecraft.world.inventory.MenuType
+import net.minecraft.world.inventory.Slot
 import quoi.QuoiMod.logger
 import quoi.annotations.Init
 import quoi.annotations.Internal
@@ -15,6 +18,7 @@ import quoi.api.events.WorldEvent
 import quoi.api.events.core.EventListener
 import quoi.api.events.core.Priority
 import quoi.api.events.core.on
+import quoi.mixins.accessors.AbstractContainerScreenAccessor
 import quoi.module.impl.render.clickgui.ClickGui
 import quoi.utils.Shortcuts
 import quoi.utils.skyblock.player.container.task.ContainerAction
@@ -191,6 +195,16 @@ object ContainerUtils : EventListener, Shortcuts {
             MenuType.FURNACE, MenuType.SMOKER, MenuType.BLAST_FURNACE -> 3
             MenuType.SHULKER_BOX -> 27
             else -> 54
+        }
+
+    val Screen.hoveredSlot: Slot?
+        get() {
+            if (this !is AbstractContainerScreen<*>) return null
+            val window = mc.window
+            return (this as AbstractContainerScreenAccessor).`quoi$getSlotAtPos`(
+                mc.mouseHandler.getScaledXPos(window),
+                mc.mouseHandler.getScaledYPos(window)
+            )
         }
 
     fun LocalPlayer.clickSlot(slot: Int, containerId: Int = ContainerUtils.containerId, button: Int = 0, shift: Boolean = false) {

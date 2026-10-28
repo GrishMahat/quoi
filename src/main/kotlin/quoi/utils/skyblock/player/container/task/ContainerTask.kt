@@ -4,7 +4,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.withContext
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import net.minecraft.world.inventory.AbstractContainerMenu
 import net.minecraft.world.inventory.ContainerInput
 import net.minecraft.world.item.ItemStack
@@ -14,7 +13,6 @@ import quoi.annotations.Internal
 import quoi.utils.ChatUtils
 import quoi.utils.skyblock.item.ItemUtils.loreString
 import quoi.utils.skyblock.player.container.CONTAINER_ZERO
-import quoi.utils.skyblock.player.container.ContainerOptions
 import quoi.utils.skyblock.player.container.IContainerSettings
 
 @DslMarker
@@ -36,15 +34,10 @@ class ContainerTask(
     val name: String?,
     val actions: List<ContainerAction>,
     val force: Boolean,
-    settings: IContainerSettings,
+    val settings: IContainerSettings,
     private val onComplete: (() -> Unit)?,
     private val onFinished: ((ContainerTaskResult) -> Unit)? = null,
 ) {
-    // copy settings so changing them doesn't affect a running task
-    val settings = ContainerOptions(
-        settings.startDelay, settings.clickDelay, settings.endDelay,
-        settings.invWalk, settings.silent, settings.blockInput, settings.showProgress,
-    )
     private val completion = CompletableDeferred<ContainerTaskResult>()
     var result: ContainerTaskResult? = null
         private set
@@ -61,13 +54,12 @@ class ContainerTask(
     internal var silentInventoryOpen = false
 
     private val blocksForMenu: Boolean
-        get() = !completed &&
-                (silentInventoryOpen || mc.screen is AbstractContainerScreen<*> ||
+        get() = !completed && settings.silent && mc.screen == null &&
+                (silentInventoryOpen ||
                         mc.player?.let { it.containerMenu !== it.inventoryMenu } == true)
 
     val stopsMovement: Boolean
-        get() = (!settings.invWalk || (!force && settings.clickDelay.second > 0 &&
-                actions.any { it is ContainerAction.Click && it.target.inContainer != true })) && blocksForMenu
+        get() = !settings.invWalk && blocksForMenu
 
     internal val blocksInput: Boolean
         get() = settings.blockInput && blocksForMenu
@@ -256,7 +248,7 @@ class ContainerTaskBuilder(val force: Boolean) {
 /**
  * @param name optional task name. if not null it will be rendered in the middle of the screen
  * @param force if `true`, bypasses [IContainerSettings.clickDelay] delay
- * @param settings [IContainerSettings] for the task. [CONTAINER_ZERO] by default
+ * @param settings settings shared with the caller, or [CONTAINER_ZERO] for tasks without a settings group
  */
 fun containerTask(
     name: String? = null,

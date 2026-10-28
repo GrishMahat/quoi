@@ -7,7 +7,8 @@ import quoi.api.commands.QuoiCommand
 import quoi.api.commands.internal.GreedyString
 import quoi.utils.ChatUtils.modMessage
 import quoi.utils.StringUtils.noControlCodes
-import quoi.utils.skyblock.player.container.menuSettings
+import quoi.utils.skyblock.player.container.CONTAINER_MENU
+import quoi.utils.skyblock.player.container.IContainerSettings
 import quoi.utils.skyblock.player.container.task.ContainerManager
 import quoi.utils.skyblock.player.container.task.ContainerTaskResult
 import quoi.utils.skyblock.player.container.task.containerTask
@@ -24,7 +25,7 @@ object EquipmentSwapper {
 
     fun equip(
         name: String,
-        blockInput: Boolean = false,
+        settings: IContainerSettings = CONTAINER_MENU,
     ): Boolean {
         val player = mc.player ?: return false
         if (name.isBlank() || ContainerManager.active) return false
@@ -35,10 +36,7 @@ object EquipmentSwapper {
 
         if ((36..39).any { matches(player.inventory.getItem(it)) }) return true
 
-        val newTask = containerTask(
-            name = "Equipment",
-            settings = menuSettings(blockInput = blockInput),
-        ) {
+        val newTask = containerTask(name = "Equipment", settings = settings) {
             openContainer("stats", "Stats & Equipment")
 
             quickMove(item(matches).inv)

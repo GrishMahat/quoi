@@ -13,45 +13,35 @@ interface IContainerSettings {
     val showProgress: Boolean get() = true
 }
 
-class ContainerSettings(parent: AreaBoundListener) : SettingGroup(parent, "Settings"), IContainerSettings {
-    override val startDelay by rangeSlider("Start delay", 1 to 2, 0, 5, unit = "t")
-    override val clickDelay by rangeSlider("Click delay", 1 to 2, 0, 5, unit = "t")
-    override val endDelay by rangeSlider("End delay", 1 to 2, 0, 5, unit = "t")
-    override val invWalk by switch("Inventory walk")
-    override val silent by switch("Silent GUI")
-}
-
-val CONTAINER_ZERO = object : IContainerSettings {}
-
-/**
- * Container settings for callers without a [ContainerSettings] group
- */
-data class ContainerOptions(
-    override val startDelay: Pair<Int, Int> = 0 to 0,
-    override val clickDelay: Pair<Int, Int> = 0 to 0,
-    override val endDelay: Pair<Int, Int> = 0 to 0,
-    override val invWalk: Boolean = true,
-    override val silent: Boolean = true,
-    override val blockInput: Boolean = !invWalk,
-    override val showProgress: Boolean = true,
-) : IContainerSettings {
+class ContainerSettings(
+    parent: AreaBoundListener,
+    startDelay: Pair<Int, Int> = CONTAINER_MENU.startDelay,
+    clickDelay: Pair<Int, Int> = CONTAINER_MENU.clickDelay,
+    endDelay: Pair<Int, Int> = CONTAINER_MENU.endDelay,
+    invWalk: Boolean = CONTAINER_MENU.invWalk,
+    silent: Boolean = CONTAINER_MENU.silent,
+    blockInput: Boolean = CONTAINER_MENU.blockInput,
+    showProgress: Boolean = CONTAINER_MENU.showProgress,
+) : SettingGroup(parent, "Settings"), IContainerSettings {
     init {
         for (range in listOf(startDelay, clickDelay, endDelay)) {
             require(range.first >= 0 && range.second >= range.first) { "Invalid container delay: $range" }
         }
     }
+
+    override var startDelay by rangeSlider("Start delay", startDelay, 0, 10, unit = "t")
+    override var clickDelay by rangeSlider("Click delay", clickDelay, 0, 10, unit = "t")
+    override var endDelay by rangeSlider("End delay", endDelay, 0, 10, unit = "t")
+    override var invWalk by switch("Inventory walk", invWalk)
+    override var silent by switch("Silent GUI", silent)
+    override var blockInput by switch("Block input", blockInput, desc = "Blocks keyboard and mouse input during the task.")
+    override var showProgress by switch("Show progress", showProgress, desc = "Displays the current task and its progress.")
 }
 
-/**
- * Creates settings for menu commands and triggers
- */
-fun menuSettings(
-    preventMovement: Boolean = true,
-    blockInput: Boolean = false,
-    showProgress: Boolean = true,
-): IContainerSettings = ContainerOptions(
-    clickDelay = 1 to 1,
-    invWalk = !preventMovement,
-    blockInput = blockInput,
-    showProgress = showProgress,
-)
+val CONTAINER_ZERO = object : IContainerSettings {}
+
+val CONTAINER_MENU = object : IContainerSettings {
+    override val clickDelay = 1 to 1
+    override val invWalk = false
+    override val blockInput = false
+}

@@ -10,6 +10,9 @@ import quoi.utils.StringUtils.noControlCodes
 
 object ItemUtils {
     private val chargesRegex = Regex("Charges: (\\d+)/(\\d+)⸕")
+    private val stackSizeRegex = Regex("^(?:[1-9]|[1-5]\\d|6[0-4])(?:\\s*[xX×])?\\s+|\\s+(?:[xX×]\\s*(?:[1-9]|[1-5]\\d|6[0-4])|(?:[1-9]|[1-5]\\d|6[0-4])\\s*[xX×])$")
+    private val whitespaceRegex = Regex("\\s+")
+    private val upgradeRegex = Regex("[✪➊➋➌➍➎⚚◆]")
 
     inline val ItemStack?.extraAttributes: CompoundTag?
         get() = this?.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY)?.copyTag()
@@ -19,6 +22,32 @@ object ItemUtils {
 
     inline val ItemStack?.skyblockUuid: String?
         get() = this.extraAttributes?.getString("uuid")?.orElse(null)
+
+    val ItemStack?.cleanName: String
+        get() = this?.hoverName?.string.noControlCodes
+
+    val ItemStack?.reforgeModifier: String?
+        get() = extraAttributes?.getString("modifier")?.orElse(null)?.takeUnless(String::isBlank)
+
+    fun ItemStack?.getCleanLore(): List<String> = lore.orEmpty().map { it.noControlCodes }
+
+    val ItemStack?.normalizedName: String?
+        get() = this?.takeUnless { it.isEmpty }?.let {
+            it.cleanName.normalizeItemName(it.reforgeModifier).takeIf(String::isNotEmpty)
+        }
+
+    fun String.normalizeItemName(reforge: String? = null): String {
+        val normalized = noControlCodes
+            .replace(upgradeRegex, "")
+            .trim()
+            .replace(stackSizeRegex, "")
+            .trim()
+            .replace("'", "")
+            .lowercase()
+            .replace(whitespaceRegex, " ")
+        val prefix = reforge?.replace('_', ' ')?.lowercase()?.trim()?.takeIf { it.isNotEmpty() }
+        return if (prefix == null) normalized else normalized.removePrefix("$prefix ")
+    }
 
     inline val ItemStack?.lore: List<String>?
         get() = this?.get(DataComponents.LORE)?.lines?.map { it.string }
@@ -53,5 +82,4 @@ object ItemUtils {
             chargesRegex.find(line.noControlCodes)?.groupValues?.get(1)?.toIntOrNull()
         } ?: 0
     }
-
 }

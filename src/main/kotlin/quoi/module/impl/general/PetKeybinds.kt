@@ -11,7 +11,6 @@ import quoi.api.commands.internal.GreedyString
 import quoi.api.events.GuiEvent
 import quoi.api.events.core.on
 import quoi.api.input.Keybinds
-import quoi.api.skyblock.Pet as SkyblockPet
 import quoi.config.Config
 import quoi.module.Module
 import quoi.module.settings.UIComponent.Companion.childOf
@@ -24,10 +23,11 @@ import quoi.utils.skyblock.item.ItemUtils.loreString
 import quoi.utils.skyblock.item.ItemUtils.skyblockId
 import quoi.utils.skyblock.item.ItemUtils.skyblockUuid
 import quoi.utils.skyblock.player.PetUtils.pet
+import quoi.utils.skyblock.player.container.ContainerSettings
 import quoi.utils.skyblock.player.container.ContainerUtils.clickSlot
-import quoi.utils.skyblock.player.container.menuSettings
 import quoi.utils.skyblock.player.container.task.ContainerTaskResult
 import quoi.utils.skyblock.player.container.task.containerTask
+import quoi.api.skyblock.Pet as SkyblockPet
 
 /**
  * modified OdinFabric (BSD 3-Clause)
@@ -38,6 +38,7 @@ object PetKeybinds : Module(
     name = "Pet Keybinds",
     desc = "Keybinds for the pets menu."
 ) {
+    private val containerSettings = ContainerSettings(this)
     private val unequipKeybind by keybind("Unequip", desc = "Unequips the current pet.")
     private val nextPageKeybind by keybind("Next page", desc = "Goes to the next page.")
     private val previousPageKeybind by keybind("Previous page", desc = "Goes to the previous page.")
@@ -54,10 +55,7 @@ object PetKeybinds : Module(
         KeybindComponent("Pet $i", key, "Pet $i on the list.").childOf(::advanced).value
     }
 
-    private val petsRegex = Regex(
-        """^(?:\((\d+)/(\d+)\) )?Pets(?: \((\d+)/(\d+)\))?$""",
-        RegexOption.IGNORE_CASE,
-    )
+    private val petsRegex = Regex("""^(?:\((\d+)/(\d+)\) )?Pets(?: \((\d+)/(\d+)\))?$""", RegexOption.IGNORE_CASE)
 
     val petMap by MapSetting("PetKeys map", mutableMapOf<String, String>())
 
@@ -103,11 +101,10 @@ object PetKeybinds : Module(
             if (uuid in petMap) return@sub modMessage("§cThis pet is already in the list!")
 
             petMap[uuid] = name.string
-//            modMessage("&aAdded &r$name&a to the pet list in position ${petMap.keys.indexOf(uuid) + 1}!")
             Config.save()
             when (source) {
                 "list" -> modMessage(petMap.asPet().toClickable("list"), LIST_ID)
-                "get"  -> modMessage(petsCache.asPet().toClickable("get"), GET_ID)
+                "get" -> modMessage(petsCache.asPet().toClickable("get"), GET_ID)
             }
         }
 
@@ -115,11 +112,10 @@ object PetKeybinds : Module(
             if (uuid !in petMap) return@sub modMessage("§cThis pet is not in the list!")
 
             petMap.remove(uuid)
-//            modMessage("&aRemoved &r$name&a pet from the pet list!")
             Config.save()
             when (source) {
                 "list" -> modMessage(petMap.asPet().toClickable("list"), LIST_ID)
-                "get"  -> modMessage(petsCache.asPet().toClickable("get"), GET_ID)
+                "get" -> modMessage(petsCache.asPet().toClickable("get"), GET_ID)
             }
         }
 
@@ -183,13 +179,11 @@ object PetKeybinds : Module(
                 val petIndex = petKeys.indexOfFirst { it.key == keyCode }.takeIf { it != -1 } ?: return false
                 petMap.entries.elementAtOrNull(petIndex)?.let { (uuid, _) ->
                     screen.menu.slots.subList(10, 43).indexOfFirst { it?.item?.skyblockUuid == uuid }
-                }?.takeIf { it != -1 }?.plus(10)
-                    ?: return false//.also { modMessage("§cCouldn't find matching pet or there is no pet in that position.") }
+                }?.takeIf { it != -1 }?.plus(10) ?: return false
             }
         }
 
         if (screen.menu.slots[slot].item.loreString?.contains("Click to despawn!") == true && unequipKeybind.key != keyCode) {
-//            modMessage("§cThat pet is already equipped!")
             if (closeIfAlreadyEquipped) slot = 49
             else if (noUnequip) return false
         }
@@ -202,14 +196,11 @@ object PetKeybinds : Module(
         var pets = emptyList<ItemStack>()
         val task = containerTask(
             name = "Read pets",
-            settings = menuSettings(showProgress = false),
+            settings = containerSettings,
         ) {
             openContainer(
                 "petsmenu",
-                Regex(
-                    """^(?:\(\d+/\d+\) )?Pets(?: \(\d+/\d+\))?$""",
-                    RegexOption.IGNORE_CASE,
-                ),
+                Regex("""^(?:\(\d+/\d+\) )?Pets(?: \(\d+/\d+\))?$""", RegexOption.IGNORE_CASE),
                 waitForItems = true,
                 timeout = timeout,
             )

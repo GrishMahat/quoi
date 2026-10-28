@@ -4,6 +4,8 @@ import quoi.api.abobaui.elements.ElementScope
 import quoi.api.customtriggers.*
 import quoi.config.TypeName
 import quoi.utils.skyblock.player.EquipmentSwapper
+import quoi.utils.skyblock.player.container.CONTAINER_MENU
+import quoi.utils.skyblock.player.container.IContainerSettings
 
 @TypeName("equip")
 class EquipAction(
@@ -15,7 +17,9 @@ class EquipAction(
     override fun execute(ctx: TriggerContext) {
         check(EquipmentSwapper.equip(
             ctx.expand(name).trim(),
-            blockInput = blockInput,
+            settings = object : IContainerSettings by CONTAINER_MENU {
+                override val blockInput = this@EquipAction.blockInput
+            },
         )) { "Could not start equipment swap" }
     }
 

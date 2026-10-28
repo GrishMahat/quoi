@@ -1,17 +1,16 @@
 package quoi.utils.skyblock.player
 
-import net.minecraft.world.item.ItemStack
 import quoi.QuoiMod.mc
 import quoi.annotations.Init
 import quoi.api.commands.QuoiCommand
 import quoi.utils.ChatUtils.modMessage
-import quoi.utils.StringUtils.noControlCodes
-import quoi.utils.skyblock.item.ItemUtils.loreString
-import quoi.utils.skyblock.player.container.menuSettings
+import quoi.utils.skyblock.item.ItemUtils.getCleanLore
+import quoi.utils.skyblock.player.container.CONTAINER_MENU
+import quoi.utils.skyblock.player.container.IContainerSettings
 import quoi.utils.skyblock.player.container.task.ContainerManager
 import quoi.utils.skyblock.player.container.task.ContainerTaskResult
-import quoi.utils.skyblock.player.container.task.menu
 import quoi.utils.skyblock.player.container.task.containerTask
+import quoi.utils.skyblock.player.container.task.menu
 
 @Init
 object LoadoutSwapper {
@@ -26,8 +25,7 @@ object LoadoutSwapper {
     @JvmOverloads
     fun equip(
         slot: Int,
-        preventMove: Boolean = true,
-        blockInput: Boolean = false,
+        settings: IContainerSettings = CONTAINER_MENU,
     ): Boolean {
         if (slot !in 1..loadoutSlots.size) {
             modMessage("&cInvalid loadout slot. Use &e/quoi loadout <1-${loadoutSlots.size}>&c.")
@@ -36,13 +34,11 @@ object LoadoutSwapper {
         if (ContainerManager.active) return false
 
         val targetSlot = loadoutSlots[slot - 1]
-        val newTask = containerTask(
-            name = "Loadout $slot",
-            settings = menuSettings(preventMovement = preventMove, blockInput = blockInput),
-        ) {
+        val newTask = containerTask(name = "Loadout $slot", settings = settings) {
             openContainer("loadout", "(1/3) Loadouts")
             check("Loadout slot $slot is not equipable") {
-                mc.player?.containerMenu?.items?.getOrNull(targetSlot)?.isLoadoutButton() == true
+                mc.player?.containerMenu?.items?.getOrNull(targetSlot)?.getCleanLore()
+                    ?.any { it.contains("Left-click to equip!") } == true
             }
             pickup(targetSlot.menu)
             catchContainer("(1/3) Loadouts")
@@ -59,10 +55,5 @@ object LoadoutSwapper {
         }
 
         return newTask.run().result == null
-    }
-
-    private fun ItemStack.isLoadoutButton(): Boolean {
-        val lore = loreString?.noControlCodes ?: return false
-        return lore.contains("Left-click to equip!")
     }
 }
