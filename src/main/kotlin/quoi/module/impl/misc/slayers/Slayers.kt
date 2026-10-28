@@ -1,11 +1,12 @@
 package quoi.module.impl.misc.slayers
 
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext
-import net.minecraft.network.protocol.game.ClientboundAddEntityPacket
 import net.minecraft.network.protocol.game.ClientboundSetPlayerTeamPacket
 import net.minecraft.network.protocol.game.ClientboundSystemChatPacket
 import net.minecraft.sounds.SoundEvents
 import net.minecraft.world.entity.LivingEntity
+import net.minecraft.world.entity.Mob
+import net.minecraft.world.entity.decoration.ArmorStand
 import quoi.api.colour.Colour
 import quoi.api.colour.alpha
 import quoi.api.colour.withAlpha
@@ -23,6 +24,7 @@ import quoi.module.settings.UIComponent.Companion.visibleIf
 import quoi.module.settings.group.SettingGroup.Companion.childOf
 import quoi.module.settings.group.SettingGroup.Companion.json
 import quoi.utils.ChatUtils.modMessage
+import quoi.utils.EntityUtils.getEntities
 import quoi.utils.EntityUtils.getEntity
 import quoi.utils.EntityUtils.interpolatedBox
 import quoi.utils.StringUtils.formatTime
@@ -30,12 +32,6 @@ import quoi.utils.StringUtils.noControlCodes
 import quoi.utils.romanToInt
 import quoi.utils.skyblock.player.PlayerUtils
 import quoi.utils.ui.textPair
-
-//? if <26.2 {
-import net.minecraft.world.entity.EntityType as EntityTypes
-//?} else {
-/*import net.minecraft.world.entity.EntityTypes
-*///?}
 
 @Suppress("unnecessary_safe_call")
 object Slayers : Module(
@@ -60,13 +56,7 @@ object Slayers : Module(
 
     private var spawnStartedAt = 0L
     private var killStartedAt = 0L
-    private var lastBossSpawn: ClientboundAddEntityPacket? = null
-
-    private data class BossInfo(val entity: LivingEntity, val tier: Int)
-
-    private var lastBoss: BossInfo? = null
-    private var cocoonTicks = 0
-    private var hatchedBoss = false
+    private var finishedBossId: Int? = null
 
     @Suppress("unused")
     private val debug by textHud("Debug") {
@@ -87,10 +77,6 @@ object Slayers : Module(
         on<PacketEvent.ReceivedPost> { handlePacket(this) }
 
         on<WorldEvent.Change> { reset() }
-
-        on<TickEvent.Server> {
-            if (cocoonTicks > 0) cocoonTicks--
-        }
 
         on<SlayerEvent.State> {
             val now = System.currentTimeMillis()
@@ -160,102 +146,72 @@ object Slayers : Module(
 
     private fun handlePacket(event: PacketEvent.ReceivedPost) {
         when (val packet = event.packet) {
-            is ClientboundAddEntityPacket -> {
-                if (packet.type !in bossTypes.values) return
-                if (cocoonTicks > 0 && packet.type != lastBoss?.entity?.type) return
-                lastBossSpawn = packet
-            }
-
             is ClientboundSystemChatPacket -> {
                 if (packet.overlay) return
                 val text = packet.content.string.noControlCodes.trim()
-                val match = spawnRegex.matchEntire(text)
-                if (match != null) {
-                    val type = bossTypes[match.groupValues[1]] ?: return
-                    val spawn = lastBossSpawn
-                    lastBossSpawn = null
-                    if (spawn?.type != type) return
-
-                    trackBoss(spawn, romanToInt(match.groupValues[2]))
-                }
-
                 when (text) {
-                    "YOU COCOONED YOUR SLAYER BOSS" -> {
-                        if (lastBoss == null) return
-                        cocoonTicks = 140
-                        lastBossSpawn = null
-                    }
+                    "YOU COCOONED YOUR SLAYER BOSS", "SLAYER QUEST COMPLETE!" -> updateQuestState(QuestState.SLAIN)
                     "SLAYER QUEST STARTED!" -> {
-                        val boss = lastBoss
-                        val spawn = lastBossSpawn
-                        if (cocoonTicks > 0 && boss != null && spawn?.type == boss.entity.type &&
-                            spawn.id != boss.entity.id && trackBoss(spawn, boss.tier, hatched = true)
-                        ) return
-
-                        updateQuestState(QuestState.SPAWNING)
+                        if (currentBoss?.isAlive != true) updateQuestState(QuestState.SPAWNING)
                     }
-                    "SLAYER QUEST COMPLETE!" -> updateQuestState(QuestState.SLAIN)
                     "SLAYER QUEST FAILED!" -> updateQuestState(QuestState.FAILED)
                 }
             }
 
             is ClientboundSetPlayerTeamPacket -> {
-                if (cocoonTicks > 0 || (hatchedBoss && currentBoss?.isAlive == true)) return
+                if (currentBoss?.isAlive == true) return
                 val params = packet.parameters.orElse(null) ?: return
                 val text = (params.playerPrefix.string + params.playerSuffix.string).noControlCodes.trim()
                 when {
                     text.contains("Combat") || text.contains("Kills") -> updateQuestState(QuestState.SPAWNING)
-                    text == "Slay the boss!" -> updateQuestState(QuestState.KILLING)
                     text == "Boss slain!" -> updateQuestState(QuestState.SLAIN)
                 }
             }
         }
     }
 
-    private fun trackBoss(spawn: ClientboundAddEntityPacket, tier: Int, hatched: Boolean = false): Boolean {
-        val boss = (getEntity(spawn.id) as? LivingEntity)?.takeIf { it.isAlive } ?: return false
-        currentBoss = boss
-        questTier = tier
-        lastBoss = BossInfo(boss, tier)
-        lastBossSpawn = null
-        cocoonTicks = 0
-        hatchedBoss = hatched
-        updateQuestState(QuestState.KILLING)
-        return true
-    }
-
     private fun updateQuestState(new: QuestState) {
         val old = questState
         if (old == new) return
         questState = new
-        if (new != QuestState.KILLING) resetBoss()
-        if (new == QuestState.SPAWNING || new == QuestState.FAILED || new == QuestState.NONE) {
-            lastBoss = null
-            cocoonTicks = 0
+        if (new != QuestState.KILLING) {
+            currentBoss?.let { finishedBossId = it.id }
+            resetBoss()
         }
         SlayerEvent.State(old, new).post()
     }
 
     private fun resetBoss() {
-        lastBossSpawn = null
         currentBoss = null
         questTier = 0
-        hatchedBoss = false
     }
 
     private fun reset() {
         updateQuestState(QuestState.NONE)
         resetBoss()
-        lastBoss = null
-        cocoonTicks = 0
+        finishedBossId = null
         spawnStartedAt = 0L
         killStartedAt = 0L
     }
 
     var currentBoss by trackedBy<TickEvent.End, LivingEntity?>(null) { boss ->
-        if (questState != QuestState.KILLING) return@trackedBy null
+        if (boss?.isAlive == true && !boss.isRemoved) return@trackedBy boss
+        if (boss?.isDeadOrDying == true) updateQuestState(QuestState.SLAIN)
+        else resetBoss()
+        if (questState == QuestState.FAILED) return@trackedBy null
 
-        boss?.takeUnless { it.isDeadOrDying || it.isRemoved }
+        for (owner in getEntities<ArmorStand>()) {
+            if (owner.customName?.string.noControlCodes.trim() != "${player.gameProfile.name}'s SLAYER BOSS") continue
+            val name = (getEntity(owner.id - 2) as? ArmorStand)?.customName?.string.noControlCodes
+            val tier = tierRegex.find(name)?.groupValues?.get(1)?.let(::romanToInt) ?: continue
+            val entity = getEntity(owner.id - 3) as? Mob ?: continue
+            if (!entity.isAlive || entity.id == finishedBossId) continue
+
+            questTier = tier
+            updateQuestState(QuestState.KILLING)
+            return@trackedBy entity
+        }
+        null
     }
         private set
 
@@ -281,14 +237,5 @@ object Slayers : Module(
         })
     }
 
-    private val spawnRegex = Regex("SLAYER BOSS! The (.+) (IV|V|I{1,3}) spawned!")
-    private val bossTypes = mapOf(
-        "Revenant Horror" to EntityTypes.ZOMBIE,
-        "Atoned Horror" to EntityTypes.ZOMBIE,
-        "Tarantula Broodfather" to EntityTypes.SPIDER,
-        "Conjoined Brood" to EntityTypes.SPIDER,
-        "Sven Packmaster" to EntityTypes.WOLF,
-        "Voidgloom Seraph" to EntityTypes.ENDERMAN,
-        "Inferno Demonlord" to EntityTypes.BLAZE,
-    )
+    private val tierRegex = Regex(" (IV|V|I{1,3}) ")
 }
