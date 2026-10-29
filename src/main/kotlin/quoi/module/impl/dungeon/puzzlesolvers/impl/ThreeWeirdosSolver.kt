@@ -22,7 +22,6 @@ import quoi.utils.render.drawStyledBox
 import quoi.utils.skyblock.player.interact.AuraAction
 import quoi.utils.skyblock.player.interact.AuraManager
 import quoi.utils.vec3
-import java.util.concurrent.CopyOnWriteArraySet
 import kotlin.math.abs
 
 /**
@@ -39,7 +38,7 @@ object ThreeWeirdosSolver : SettingGroup(PuzzleSolvers, "Three weirdos") {
     private val triggerbot by switch("Triggerbot", desc = "Talks to each NPC and opens the correct chest when you look at them.").asParent()
 
     private var correctPos: BlockPos? = null
-    private var wrongPositions = CopyOnWriteArraySet<BlockPos>()
+    private val wrongPositions = mutableSetOf<BlockPos>()
     private val clickedNPCs = mutableSetOf<Int>()
 
     private var lastClick = 0L
@@ -58,19 +57,15 @@ object ThreeWeirdosSolver : SettingGroup(PuzzleSolvers, "Three weirdos") {
                 val wrong = wrong.any { it.matches(msg) }
                 if (!solution && !wrong) return@on
 
-                mc.execute {
-                    val room = Dungeon.currentRoom?.takeIf { it.name == "Three Weirdos" } ?: return@execute
-                    if (!module.active || (!solver && !auto && !triggerbot)) return@execute
+                val room = Dungeon.currentRoom?.takeIf { it.name == "Three Weirdos" } ?: return@on
+                val correctNPC = getEntities<ArmorStand>().find { it.name.string == npc } ?: return@on
+                val relativePos = room.getRelativeCoords(BlockPos(correctNPC.x.toInt() - 1, 69, correctNPC.z.toInt() - 1))
+                val pos = room.getRealCoords(relativePos.offset(1, 0, 0))
 
-                    val correctNPC = getEntities<ArmorStand>().find { it.name.string == npc } ?: return@execute
-                    val relativePos = room.getRelativeCoords(BlockPos(correctNPC.x.toInt() - 1, 69, correctNPC.z.toInt() - 1))
-                    val pos = room.getRealCoords(relativePos.offset(1, 0, 0))
-
-                    if (solution) {
-                        correctPos = pos
-                        SoundUtils.play(SoundEvents.FIREWORK_ROCKET_LARGE_BLAST, 2f, 1f)
-                    } else wrongPositions.add(pos)
-                }
+                if (solution) {
+                    correctPos = pos
+                    SoundUtils.play(SoundEvents.FIREWORK_ROCKET_LARGE_BLAST, 2f, 1f)
+                } else wrongPositions.add(pos)
             }
         }
 

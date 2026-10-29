@@ -1,6 +1,5 @@
 package quoi.module.impl.dungeon
 
-import java.util.concurrent.ConcurrentHashMap
 import net.minecraft.core.BlockPos
 import net.minecraft.network.protocol.game.ClientboundMoveEntityPacket
 import net.minecraft.world.entity.EquipmentSlot
@@ -38,7 +37,7 @@ object BloodCamp : Module( // todo auto
     private val tickOffset by slider("Spawn offset", 0, -20, 20, unit = "t")
 
     private var watcherPhase = 0
-    private val entities = ConcurrentHashMap<Int, BloodEntity>()
+    private val entities = mutableMapOf<Int, BloodEntity>()
 
     init {
         on<PacketEvent.Received, ClientboundMoveEntityPacket> {

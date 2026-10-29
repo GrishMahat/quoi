@@ -32,15 +32,12 @@ object ContainerUtils : EventListener, Shortcuts {
 
     private val catches = mutableListOf<ContainerCatch>()
 
-    @Volatile
     var containerId = 0
         private set
 
-    @Volatile
     var lastStateId = 0
         private set
 
-    @Volatile
     var containerServerSide = false
         private set
 

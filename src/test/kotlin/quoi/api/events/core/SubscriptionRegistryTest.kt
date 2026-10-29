@@ -1,6 +1,8 @@
 package quoi.api.events.core
 
 import org.junit.jupiter.api.Test
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.test.assertContentEquals
 import kotlin.test.assertTrue
 
@@ -22,7 +24,6 @@ class SubscriptionRegistryTest {
         listOf(low, firstHigh, secondHigh, normal).forEach(registry::add)
 
         val expected = listOf(firstHigh, secondHigh, normal, low)
-        assertContentEquals(expected, registry.subscriptions)
         assertContentEquals(expected, registry.dispatchSnapshot.asList())
     }
 
@@ -39,7 +40,6 @@ class SubscriptionRegistryTest {
 
         assertContentEquals(listOf(original), snapshot.asList())
         assertContentEquals(listOf(added), registry.dispatchSnapshot.asList())
-        assertContentEquals(listOf(added), registry.subscriptions)
     }
 
     @Test
@@ -52,7 +52,26 @@ class SubscriptionRegistryTest {
         assertContentEquals(listOf(remaining), registry.dispatchSnapshot.asList())
 
         registry.remove(remaining)
-        assertTrue(registry.subscriptions.isEmpty())
         assertTrue(registry.dispatchSnapshot.isEmpty())
+    }
+
+    @Test
+    fun `concurrent registration and removal preserve every remaining subscription in priority order`() {
+        val registry = SubscriptionRegistry<TestEvent>()
+        val entries = List(200) { subscription(it) }
+        val workers = Executors.newFixedThreadPool(4)
+        try {
+            val tasks = entries.mapIndexed { index, sub ->
+                workers.submit {
+                    registry.add(sub)
+                    if (index % 2 == 0) registry.remove(sub)
+                }
+            }
+            tasks.forEach { it.get(5, TimeUnit.SECONDS) }
+        } finally {
+            workers.shutdownNow()
+        }
+
+        assertContentEquals(entries.filterIndexed { i, _ -> i % 2 != 0 }.reversed(), registry.dispatchSnapshot.asList())
     }
 }

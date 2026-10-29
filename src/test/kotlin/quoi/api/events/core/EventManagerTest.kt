@@ -140,7 +140,7 @@ class EventManagerTest {
         assertEquals(1, calls)
         assertTrue(event.completed)
         assertNull(event.subscription)
-        assertFalse(EventManager.getRegistry<TestEvent>(TestEvent::class.java).subscriptions.contains(sub))
+        assertFalse(EventManager.getRegistry<TestEvent>(TestEvent::class.java).dispatchSnapshot.contains(sub))
     }
 
     @Test

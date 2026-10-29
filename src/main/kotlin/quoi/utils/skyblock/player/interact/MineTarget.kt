@@ -6,7 +6,6 @@ import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.block.state.BlockState
-import quoi.QuoiMod.mc
 import quoi.annotations.Internal
 import quoi.utils.WorldUtils.startPrediction
 import quoi.utils.WorldUtils.state
@@ -121,8 +120,9 @@ class MineTarget(
         }
     }
 
-    fun onBlockUpdate(pos: BlockPos, state: BlockState) =
-        mc.execute { if (pos == this.pos && state.isAir) finished = true }
+    fun onBlockUpdate(pos: BlockPos, state: BlockState) {
+        if (pos == this.pos && state.isAir) finished = true
+    }
 
     fun onSlotChange(stack: ItemStack) {
         if (ItemStack.matches(item, stack)) return

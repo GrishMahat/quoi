@@ -33,18 +33,16 @@ object CatMode : Module(
             if (!meowSound || packet.sound == SoundEvents.CAT_AMBIENT_BABY) return@on
 
             cancel()
-            mc.execute {
-                level.playLocalSound(
-                    packet.x,
-                    packet.y,
-                    packet.z,
-                    SoundEvents.CAT_AMBIENT_BABY.value(),
-                    packet.source,
-                    packet.volume,
-                    packet.pitch,
-                    false
-                )
-            }
+            level.playLocalSound(
+                packet.x,
+                packet.y,
+                packet.z,
+                SoundEvents.CAT_AMBIENT_BABY.value(),
+                packet.source,
+                packet.volume,
+                packet.pitch,
+                false
+            )
         }
     }
 

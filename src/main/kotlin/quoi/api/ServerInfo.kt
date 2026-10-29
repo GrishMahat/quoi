@@ -4,8 +4,6 @@ import quoi.api.events.PacketEvent
 import quoi.api.events.TickEvent
 import quoi.api.events.WorldEvent
 import quoi.utils.Scheduler.scheduleLoop
-import kotlinx.atomicfu.atomic
-import kotlinx.atomicfu.update
 import net.minecraft.util.Util
 import net.minecraft.network.protocol.ping.ClientboundPongResponsePacket
 import net.minecraft.network.protocol.ping.ServerboundPingRequestPacket
@@ -13,8 +11,7 @@ import quoi.annotations.Init
 import quoi.api.events.core.EventListener
 import quoi.api.events.core.on
 import quoi.utils.connection
-import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.ConcurrentSkipListSet
+import java.util.TreeSet
 
 /**
  * modified devonian (GPL-3.0) (c) Synnerz
@@ -24,14 +21,14 @@ import java.util.concurrent.ConcurrentSkipListSet
 object ServerInfo : EventListener {
     private var lastBeat = 0L
 
-    private val samples = ConcurrentLinkedQueue<PingSample>()
-    private var pingSum = atomic(0.0)
-    private var weightSum = atomic(0)
-    private var medianMax = ConcurrentSkipListSet<PingSample> { a, b -> b.value.compareTo(a.value).let { if (it == 0) a.time.compareTo(b.time) else it } }
-    private var medianMin = ConcurrentSkipListSet<PingSample> { a, b -> a.value.compareTo(b.value).let { if (it == 0) a.time.compareTo(b.time) else it } }
+    private val samples = ArrayDeque<PingSample>()
+    private var pingSum = 0.0
+    private var weightSum = 0
+    private val medianMax = TreeSet<PingSample> { a, b -> b.value.compareTo(a.value).let { if (it == 0) a.time.compareTo(b.time) else it } }
+    private val medianMin = TreeSet<PingSample> { a, b -> a.value.compareTo(b.value).let { if (it == 0) a.time.compareTo(b.time) else it } }
 
     val currentPing: Double get() = samples.lastOrNull()?.value ?: 0.0
-    val averagePing: Double get() = if (weightSum.value == 0) 0.0 else pingSum.value / weightSum.value
+    val averagePing: Double get() = if (weightSum == 0) 0.0 else pingSum / weightSum
     val medianPing: Double get() = when {
         medianMax.size > medianMin.size -> medianMax.first.value
         medianMin.size > medianMax.size -> medianMin.first.value
@@ -101,18 +98,16 @@ object ServerInfo : EventListener {
             var deltaPing = 0.0
             var deltaWeight = 0
 
-            while (samples.isNotEmpty() && samples.peek().time < t - 30_000L) {
-                val sample = samples.poll()
-                if (sample != null) {
-                    if (!medianMax.remove(sample)) medianMin.remove(sample)
-                    deltaPing += sample.value * sample.weight
-                    deltaWeight += sample.weight
-                }
+            while (samples.isNotEmpty() && samples.first().time < t - 30_000L) {
+                val sample = samples.removeFirst()
+                if (!medianMax.remove(sample)) medianMin.remove(sample)
+                deltaPing += sample.value * sample.weight
+                deltaWeight += sample.weight
             }
 
             if (deltaWeight > 0) {
-                pingSum.update { it - deltaPing }
-                weightSum.minusAssign(deltaWeight)
+                pingSum -= deltaPing
+                weightSum -= deltaWeight
                 rebalanceHeaps()
             }
 
@@ -135,8 +130,8 @@ object ServerInfo : EventListener {
         if (ping > 1.0e6) return
         val sample = PingSample(t, ping, weight)
 
-        pingSum.update { it + ping * weight }
-        weightSum.plusAssign(weight)
+        pingSum += ping * weight
+        weightSum += weight
         samples.add(sample)
 
         if (ping > medianPing) medianMin.add(sample)

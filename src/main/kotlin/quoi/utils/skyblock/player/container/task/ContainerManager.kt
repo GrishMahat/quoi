@@ -26,7 +26,6 @@ import kotlin.coroutines.coroutineContext
 @Init
 @OptIn(Internal::class)
 object ContainerManager : EventListener {
-    @Volatile
     var activeTask: ContainerTask? = null
         private set
     private var job: Job? = null

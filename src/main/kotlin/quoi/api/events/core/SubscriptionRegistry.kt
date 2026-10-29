@@ -1,13 +1,11 @@
 package quoi.api.events.core
 
-import java.util.concurrent.CopyOnWriteArrayList
-
 /**
  * Holds every [Subscription] registered for a single [Event] type.
  * All elements are ordered descending by [Subscription.priority]
  */
 class SubscriptionRegistry<T : Event> {
-    val subscriptions = CopyOnWriteArrayList<Subscription<T>>()
+    private val subscriptions = mutableListOf<Subscription<T>>()
     @Volatile
     var dispatchSnapshot: Array<Subscription<T>> = emptyArray()
         private set

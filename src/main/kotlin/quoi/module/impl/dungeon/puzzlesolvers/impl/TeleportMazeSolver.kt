@@ -22,7 +22,6 @@ import quoi.utils.skyblock.player.MovementUtils.moveTo
 import quoi.utils.skyblock.player.MovementUtils.movementTask
 import quoi.utils.skyblock.player.MovementUtils.resetInput
 import quoi.utils.skyblock.player.RotationUtils.rotate
-import java.util.concurrent.CopyOnWriteArraySet
 import kotlin.math.abs
 import kotlin.math.atan2
 
@@ -42,7 +41,7 @@ object TeleportMazeSolver : SettingGroup(PuzzleSolvers, "Teleport maze") { // to
 
     private var tpPads = setOf<BlockPos>()
     private var correctPortals = setOf<BlockPos>()
-    private var visited = CopyOnWriteArraySet<BlockPos>()
+    private val visited = mutableSetOf<BlockPos>()
     private var best: BlockPos? = null
 
     private var walking = false

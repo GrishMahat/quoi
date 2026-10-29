@@ -2,8 +2,8 @@ package quoi.module.impl.dungeon.puzzlesolvers.impl
 
 import net.minecraft.core.BlockPos
 import net.minecraft.network.protocol.game.ClientboundSoundPacket
-import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.level.ClipContext
+import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.Vec3
@@ -28,7 +28,6 @@ import quoi.utils.skyblock.item.ItemUtils.isShortbow
 import quoi.utils.skyblock.item.ItemUtils.skyblockId
 import quoi.utils.skyblock.item.TeleportUtils.getEtherwarpDirection
 import quoi.utils.skyblock.player.PlayerUtils.useItem
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.abs
 import kotlin.math.sqrt
 
@@ -53,7 +52,7 @@ object CreeperBeamsSolver : SettingGroup(PuzzleSolvers, "Creeper beams"), Reposi
     private var lastShotTime = 0L
     private var waitingForUpdate = false
     override var repositionTicker: Ticker? = null
-    private var solvedPairs = 0
+    private val progress = BeamsPairProgress()
 
     init {
         on<DungeonEvent.Room.Enter> {
@@ -87,16 +86,15 @@ object CreeperBeamsSolver : SettingGroup(PuzzleSolvers, "Creeper beams"), Reposi
                 old.block.equalsOneOf(Blocks.PRISMARINE, Blocks.SEA_LANTERN) &&
                 updated.block.equalsOneOf(Blocks.PRISMARINE, Blocks.SEA_LANTERN)
             ) {
-                mc.execute {
-                    val room = Dungeon.currentRoom ?: return@execute
-                    val prev = currentLanternPairs.size
+                val room = Dungeon.currentRoom ?: return@on
+                val world = mc.level
+                mc.schedule {
+                    if (!module.active || mc.level !== world || Dungeon.currentRoom !== room) return@schedule
+                    val previous = currentLanternPairs.keys.toSet()
 
                     recalculateLanternPairs(room)
 
-                    if (currentLanternPairs.size < prev && ++solvedPairs == 4) {
-                        if (announce) ChatUtils.command("pc Beams done!")
-                        if (auto) mc.options.keyShift.isDown = false
-                    }
+                    completePairs(previous - currentLanternPairs.keys)
                 }
 
                 return@on
@@ -119,11 +117,12 @@ object CreeperBeamsSolver : SettingGroup(PuzzleSolvers, "Creeper beams"), Reposi
                 waitingForUpdate = false
                 currentLanternPairs.remove(pair.key)
                 activePair = null
+                completePairs(listOf(pair.key))
             }
         }
 
         on<TickEvent.End> {
-            if (!triggerbot || auto || ClearExecutor.active || mc.screen != null || Dungeon.isDead || solvedPairs >= 4 || currentLanternPairs.isEmpty()) return@on
+            if (!triggerbot || auto || ClearExecutor.active || mc.screen != null || Dungeon.isDead || progress.solvedPairs >= 4 || currentLanternPairs.isEmpty()) return@on
             if (!player.mainHandItem.isShortbow) return@on
             val now = System.currentTimeMillis()
             if (now - lastShotTime < PuzzleSolvers.shootCd) return@on
@@ -152,7 +151,7 @@ object CreeperBeamsSolver : SettingGroup(PuzzleSolvers, "Creeper beams"), Reposi
         }
 
         on<TickEvent.End> {
-            if (!auto || ClearExecutor.active || PuzzleSolvers.screenBlocksAuto || solvedPairs >= 4 || currentLanternPairs.isEmpty()) return@on
+            if (!auto || ClearExecutor.active || PuzzleSolvers.screenBlocksAuto || progress.solvedPairs >= 4 || currentLanternPairs.isEmpty()) return@on
             val room = Dungeon.currentRoom ?: return@on
 
             val start = room.getRealCoords(BlockPos(16, 74, 14))
@@ -215,7 +214,13 @@ object CreeperBeamsSolver : SettingGroup(PuzzleSolvers, "Creeper beams"), Reposi
         return Dungeon.currentRoom?.name == "Creeper Beams"
     }
 
-    private var currentLanternPairs = ConcurrentHashMap<BlockPos, Pair<BlockPos, Colour>>()
+    private val currentLanternPairs = mutableMapOf<BlockPos, Pair<BlockPos, Colour>>()
+
+    private fun completePairs(keys: Collection<BlockPos>) {
+        if (!progress.complete(keys)) return
+        if (announce) ChatUtils.command("pc Beams done!")
+        if (auto) mc.options.keyShift.isDown = false
+    }
 
     private fun recalculateLanternPairs(room: OdonRoom) {
         currentLanternPairs.clear()
@@ -239,7 +244,7 @@ object CreeperBeamsSolver : SettingGroup(PuzzleSolvers, "Creeper beams"), Reposi
         waitingForUpdate = false
         lastShotTime = -1
         repositionTicker = null
-        solvedPairs = 0
+        progress.reset()
     }
 
     private fun getArrowHit(yaw: Float, pitch: Float): BlockPos? {
@@ -300,4 +305,17 @@ object CreeperBeamsSolver : SettingGroup(PuzzleSolvers, "Creeper beams"), Reposi
         var stage: Int = 0, // 0 = not hit, 1 = first hit, 2 = both hit
         val key: BlockPos = first
     )
+}
+
+internal class BeamsPairProgress {
+    private val completed = mutableSetOf<BlockPos>()
+    val solvedPairs: Int get() = completed.size
+
+    fun complete(keys: Collection<BlockPos>): Boolean {
+        val previous = solvedPairs
+        completed.addAll(keys)
+        return previous < 4 && solvedPairs >= 4
+    }
+
+    fun reset() = completed.clear()
 }

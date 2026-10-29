@@ -3,10 +3,10 @@ package quoi.module.impl.general
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.*
-import quoi.QuoiMod.scope
 import quoi.api.events.MouseEvent
 import quoi.api.events.TickEvent
 import quoi.api.events.WorldEvent
+import quoi.api.events.core.asyncScope
 import quoi.api.events.core.on
 import quoi.api.input.Keybinds
 import quoi.config.Config
@@ -161,10 +161,10 @@ object AutoClicker: Module(
     private fun startClicking(isLeft: Boolean) {
         if (isLeft) {
             if (leftJob?.isActive == true) return
-            leftJob = scope.launch { click(true) }
+            leftJob = asyncScope.launch { click(true) }
         } else {
             if (rightJob?.isActive == true) return
-            rightJob = scope.launch { click(false) }
+            rightJob = asyncScope.launch { click(false) }
         }
     }
 
@@ -193,25 +193,11 @@ object AutoClicker: Module(
     }
 
     private suspend fun click(isLeft: Boolean) {
-        val job = currentCoroutineContext()[Job] ?: return
+        while (currentCoroutineContext().isActive && shouldAutoClick(isLeft)) {
+            if (!isLeft) player.rightClick()
+            else if (!lookingAtBreakable) player.leftClick()
 
-        while (job.isActive) {
-            val nextDelay = CompletableDeferred<Long>()
-            mc.execute {
-                if (!job.isActive || !shouldAutoClick(isLeft)) {
-                    nextDelay.complete(-1)
-                    return@execute
-                }
-
-                if (!isLeft) player.rightClick()
-                else if (!lookingAtBreakable) player.leftClick()
-
-                nextDelay.complete(randomDelay(if (isLeft) leftCps else rightCps))
-            }
-
-            val delayMillis = nextDelay.await()
-            if (delayMillis < 0) return
-            delay(delayMillis.milliseconds)
+            delay(randomDelay(if (isLeft) leftCps else rightCps).milliseconds)
         }
     }
 

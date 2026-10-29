@@ -2,17 +2,21 @@ package quoi.module.impl.mining
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
 import net.minecraft.core.registries.BuiltInRegistries
+import net.minecraft.world.level.ChunkPos
 import net.minecraft.world.level.block.Block
 import net.minecraft.world.level.block.Blocks
+import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.level.chunk.LevelChunk
-import quoi.QuoiMod.scope
 import quoi.api.colour.Colour
 import quoi.api.colour.withAlpha
 import quoi.api.events.RenderEvent
 import quoi.api.events.WorldEvent
+import quoi.api.events.core.EventListener
+import quoi.api.events.core.asyncScope
 import quoi.api.events.core.on
 import quoi.api.skyblock.location.Island
 import quoi.module.Module
@@ -33,7 +37,6 @@ import quoi.utils.render.drawFilledBox
 import quoi.utils.render.drawStyledBox
 import quoi.utils.render.drawText
 import quoi.utils.vec3
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.absoluteValue
 import kotlin.math.pow
 import kotlin.math.sqrt
@@ -53,28 +56,40 @@ object CrystalHollowsScanner : Module(
     private val thickness by slider("Thickness", 4f, 1f, 8f, 1f).visibleIf { routeScanner }
 
     val scannedChunks = HashSet<Long>()
-    val foundStructures = ConcurrentHashMap<Structure, MutableList<BlockPos>>()
+    val foundStructures = mutableMapOf<Structure, MutableList<BlockPos>>()
     val foundRouteBlocks = mutableListOf<BlockPos>()
+    private var worldGeneration = 0L
+    private val lifecycle = object : EventListener {}
 
     init {
         on<WorldEvent.Chunk.Load> {
-            if (!structureScanner && !routeScanner) return@on
-            scope.launch(Dispatchers.IO) {
-                try {
-                    val chunkX = chunk.pos.x shl 4
-                    val chunkZ = chunk.pos.z shl 4
+            val scanStructures = structureScanner
+            val scanRoutes = routeScanner
+            if (!scanStructures && !scanRoutes) return@on
+            val chunkPos = chunk.pos
+            if (chunkPos.minBlockX !in X_MIN..X_MAX || chunkPos.minBlockZ !in Z_MIN..Z_MAX) return@on
+            if (!scannedChunks.add(chunkPos.pack())) return@on
+            isDirty = true
 
-                    if (chunkX !in X_MIN..X_MAX || chunkZ !in Z_MIN..Z_MAX) return@launch
-
-                    val chunkKey = chunk.pos.pack()
-
-                    if (!scannedChunks.contains(chunkKey)) {
-                        scannedChunks.add(chunkKey)
-                        handleChunk(chunk)
-                        if (CrystalHollowsMap.enabled) isDirty = true
-                    }
-                } catch (_: Exception) {
+            val world = chunk.level
+            val generation = worldGeneration
+            val stateAt = snapshot(chunk, scanRoutes)
+            lifecycle.asyncScope.launch {
+                val result = withContext(Dispatchers.Default) {
+                    scanCrystalHollowsChunk(chunkPos, scanStructures, scanRoutes, stateAt)
                 }
+                if (worldGeneration != generation || mc.level !== world) return@launch
+
+                result.structures.forEach { (structure, positions) ->
+                    positions.forEach position@{ realPos ->
+                        val pos = realPos.offset(-structure.xOffset, -structure.yOffset, -structure.zOffset)
+                        val existing = foundStructures.getOrPut(structure) { mutableListOf() }
+                        if (existing.isNotEmpty() && (!structure.canBeMultiple || existing.any { it.isWithinChunks(pos, 4) })) return@position
+                        existing.add(realPos)
+                        ChatUtils.modMessage("Found ${structure.displayName} at ${pos.x}, ${pos.y}, ${pos.z}")
+                    }
+                }
+                foundRouteBlocks.addAll(result.routeBlocks.filterNot { it in foundRouteBlocks })
             }
         }
 
@@ -104,105 +119,129 @@ object CrystalHollowsScanner : Module(
             }
         }
 
-        on<WorldEvent.Change> {
+        lifecycle.on<WorldEvent.Change> {
+            worldGeneration++
             scannedChunks.clear()
             foundStructures.clear()
             foundRouteBlocks.clear()
+            isDirty = true
         }
     }
+}
 
-    private fun handleChunk(chunk: LevelChunk) {
-        val fromY = if (structureScanner && !routeScanner) 30 else 0
-        val toY = if (routeScanner && !structureScanner) 70 else 180
-        val scanPos = BlockPos.MutableBlockPos()
-        for (x in 0..15) {
-            for (z in 0..15) {
-                for (y in fromY..toY) {
-                    val pos = scanPos.set(chunk.pos.minBlockX + x, y, chunk.pos.minBlockZ + z)
-                    val firstBlock = chunk.getBlockState(pos).block
+internal data class CrystalHollowsChunkScan(
+    val structures: Map<Structure, List<BlockPos>>,
+    val routeBlocks: List<BlockPos>,
+)
 
-                    if (structureScanner) Structure.candidates(firstBlock).forEach { structure ->
-                        if (!structure.quarter.test(pos)) return@forEach
+private fun snapshot(chunk: LevelChunk, scanRoutes: Boolean): (BlockPos) -> BlockState {
+    val sections = chunk.sections.map { it.states.copy() }
+    val minY = chunk.minY
+    val minX = chunk.pos.minBlockX
+    val minZ = chunk.pos.minBlockZ
+    val borders = mutableMapOf<BlockPos, BlockState>()
+    if (scanRoutes) {
+        for (y in 0..70) for (i in 0..15) {
+            for (pos in listOf(
+                BlockPos(minX - 1, y, minZ + i), BlockPos(minX + 16, y, minZ + i),
+                BlockPos(minX + i, y, minZ - 1), BlockPos(minX + i, y, minZ + 16),
+            )) borders[pos] = chunk.level.getBlockState(pos)
+        }
+    }
+    return { pos ->
+        if (pos.x in minX..minX + 15 && pos.z in minZ..minZ + 15) {
+            sections[(pos.y - minY) shr 4].get(pos.x and 15, pos.y and 15, pos.z and 15)
+        } else borders.getValue(pos)
+    }
+}
 
-                        if (structure.canBeMultiple) {
-                            val existing = foundStructures[structure] ?: mutableListOf()
-                            if (existing.any { it.isWithinChunks(pos, 4) }) return@forEach
-                        } else {
-                            if (foundStructures.containsKey(structure)) return@forEach
-                        }
+internal fun scanCrystalHollowsChunk(chunkPos: ChunkPos, scanStructures: Boolean, scanRoutes: Boolean, stateAt: (BlockPos) -> BlockState): CrystalHollowsChunkScan {
+    val structures = mutableMapOf<Structure, MutableList<BlockPos>>()
+    val routeBlocks = mutableListOf<BlockPos>()
+    val fromY = if (scanStructures && !scanRoutes) 30 else 0
+    val toY = if (scanRoutes && !scanStructures) 70 else 180
+    val scanPos = BlockPos.MutableBlockPos()
+    for (x in 0..15) {
+        for (z in 0..15) {
+            for (y in fromY..toY) {
+                val pos = scanPos.set(chunkPos.minBlockX + x, y, chunkPos.minBlockZ + z)
+                val firstBlock = stateAt(pos).block
 
-                        if (scanStructure(chunk, structure, x, y, z)) {
-                            val realPos = pos.immutable().offset(structure.xOffset, structure.yOffset, structure.zOffset)
-                            foundStructures.computeIfAbsent(structure) { mutableListOf() }.add(realPos)
-                            ChatUtils.modMessage("Found ${structure.displayName} at ${pos.x}, ${pos.y}, ${pos.z}")
-                        }
+                if (scanStructures) Structure.candidates(firstBlock).forEach { structure ->
+                    if (!structure.quarter.test(pos)) return@forEach
+
+                    if (structure.canBeMultiple) {
+                        val existing = structures[structure].orEmpty()
+                        if (existing.any { it.isWithinChunks(pos, 4) }) return@forEach
+                    } else {
+                        if (structures.containsKey(structure)) return@forEach
                     }
 
-                    if (routeScanner) {
-                        if (firstBlock != Blocks.COBBLESTONE || y > 70) continue
-                        val valid = routeDirections.all {
-                            val state = chunk.level.getBlockState(pos.relative(it))
-                            state.isAir || state.block in glassBlocks
-                        }
-
-                        if (valid && pos !in foundRouteBlocks) {
-                            foundRouteBlocks.add(pos.immutable())
-                        }
+                    if (scanStructure(structure, pos, stateAt)) {
+                        val realPos = pos.immutable().offset(structure.xOffset, structure.yOffset, structure.zOffset)
+                        structures.getOrPut(structure) { mutableListOf() }.add(realPos)
                     }
+                }
+
+                if (scanRoutes) {
+                    if (firstBlock != Blocks.COBBLESTONE || y > 70) continue
+                    val valid = routeDirections.all {
+                        val state = stateAt(pos.relative(it))
+                        state.isAir || state.block in glassBlocks
+                    }
+
+                    if (valid) routeBlocks.add(pos.immutable())
                 }
             }
         }
     }
-
-    private fun scanStructure(chunk: LevelChunk, structure: Structure, x: Int, startY: Int, z: Int): Boolean {
-        if (startY + structure.blocks.size >= 180) return false
-
-        val pos = BlockPos.MutableBlockPos()
-        for (i in 1 until structure.blocks.size) {
-            val block = structure.blocks[i] ?: continue
-
-            val checkY = startY + i
-            val state = chunk.getBlockState(pos.set(chunk.pos.minBlockX + x, checkY, chunk.pos.minBlockZ + z))
-
-            if (!state.block.matchesStructureBlock(block)) {
-                return false
-            }
-        }
-        return true
-    }
-
-    private fun Block.matchesStructureBlock(expected: Block): Boolean {
-        if (expected != Blocks.SKELETON_SKULL) return this == expected
-
-        return this in skullBlocks
-    }
-
-    private fun BlockPos.isWithinChunks(other: BlockPos, chunks: Int): Boolean {
-        val dx = (this.x shr 4) - (other.x shr 4)
-        val dz = (this.z shr 4) - (other.z shr 4)
-        return dx.absoluteValue <= chunks && dz.absoluteValue <= chunks
-    }
-
-    private val skullBlocks = setOf(
-        Blocks.SKELETON_SKULL,
-        Blocks.SKELETON_WALL_SKULL,
-        Blocks.WITHER_SKELETON_SKULL,
-        Blocks.WITHER_SKELETON_WALL_SKULL,
-        Blocks.ZOMBIE_HEAD,
-        Blocks.ZOMBIE_WALL_HEAD,
-        Blocks.PLAYER_HEAD,
-        Blocks.PLAYER_WALL_HEAD,
-        Blocks.CREEPER_HEAD,
-        Blocks.CREEPER_WALL_HEAD,
-        Blocks.DRAGON_HEAD,
-        Blocks.DRAGON_WALL_HEAD,
-        Blocks.PIGLIN_HEAD,
-        Blocks.PIGLIN_WALL_HEAD
-    )
-
-    private val glassBlocks by lazy {
-        BuiltInRegistries.BLOCK.filter { BuiltInRegistries.BLOCK.getKey(it).toString().contains("glass") }.toSet()
-    }
-
-    private val routeDirections = Direction.entries.filter { it != Direction.DOWN }
+    return CrystalHollowsChunkScan(structures, routeBlocks)
 }
+
+private fun scanStructure(structure: Structure, start: BlockPos, stateAt: (BlockPos) -> BlockState): Boolean {
+    if (start.y + structure.blocks.size >= 180) return false
+
+    val pos = BlockPos.MutableBlockPos()
+    for (i in 1 until structure.blocks.size) {
+        val block = structure.blocks[i] ?: continue
+
+        val state = stateAt(pos.set(start.x, start.y + i, start.z))
+
+        if (!state.block.matchesStructureBlock(block)) return false
+    }
+    return true
+}
+
+private fun Block.matchesStructureBlock(expected: Block): Boolean {
+    if (expected != Blocks.SKELETON_SKULL) return this == expected
+    return this in skullBlocks
+}
+
+private fun BlockPos.isWithinChunks(other: BlockPos, chunks: Int): Boolean {
+    val dx = (this.x shr 4) - (other.x shr 4)
+    val dz = (this.z shr 4) - (other.z shr 4)
+    return dx.absoluteValue <= chunks && dz.absoluteValue <= chunks
+}
+
+private val skullBlocks = setOf(
+    Blocks.SKELETON_SKULL,
+    Blocks.SKELETON_WALL_SKULL,
+    Blocks.WITHER_SKELETON_SKULL,
+    Blocks.WITHER_SKELETON_WALL_SKULL,
+    Blocks.ZOMBIE_HEAD,
+    Blocks.ZOMBIE_WALL_HEAD,
+    Blocks.PLAYER_HEAD,
+    Blocks.PLAYER_WALL_HEAD,
+    Blocks.CREEPER_HEAD,
+    Blocks.CREEPER_WALL_HEAD,
+    Blocks.DRAGON_HEAD,
+    Blocks.DRAGON_WALL_HEAD,
+    Blocks.PIGLIN_HEAD,
+    Blocks.PIGLIN_WALL_HEAD
+)
+
+private val glassBlocks by lazy {
+    BuiltInRegistries.BLOCK.filter { BuiltInRegistries.BLOCK.getKey(it).toString().contains("glass") }.toSet()
+}
+
+private val routeDirections = Direction.entries.filter { it != Direction.DOWN }

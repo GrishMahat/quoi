@@ -87,6 +87,7 @@ object CrystalHollowsMap : Module(
     init {
         on<WorldEvent.Change> {
             mapPlayers.clear()
+            meshedChunks = emptyList()
         }
 
         on<TickEvent.End> {
@@ -209,13 +210,11 @@ object CrystalHollowsMap : Module(
     private fun rebuildMeshedChunks() {
         val grid = Array(GRID_SIZE) { BooleanArray(GRID_SIZE) }
 
-        synchronized(scannedChunks) {
-            scannedChunks.forEach { chunkKey ->
-                val cx = (chunkKey shr 32).toInt() - CHUNK_OFFSET
-                val cz = chunkKey.toInt() - CHUNK_OFFSET
-                if (cx in 0 until GRID_SIZE && cz in 0 until GRID_SIZE) {
-                    grid[cx][cz] = true
-                }
+        scannedChunks.forEach { chunkKey ->
+            val cx = (chunkKey shr 32).toInt() - CHUNK_OFFSET
+            val cz = chunkKey.toInt() - CHUNK_OFFSET
+            if (cx in 0 until GRID_SIZE && cz in 0 until GRID_SIZE) {
+                grid[cx][cz] = true
             }
         }
 

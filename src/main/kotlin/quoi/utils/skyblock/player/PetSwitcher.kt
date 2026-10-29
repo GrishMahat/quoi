@@ -25,10 +25,8 @@ import quoi.utils.skyblock.player.container.task.item
 object PetSwitcher : EventListener {
     private val menuTitle = Regex("""^(?:\(\d+/\d+\) )?Pets(?: \(\d+/\d+\))?$""", RegexOption.IGNORE_CASE)
 
-    @Volatile
     private var task: ContainerTask? = null
 
-    @Volatile
     private var pendingSwitch: PendingSwitch? = null
     private var confirmationTicks = 0
 

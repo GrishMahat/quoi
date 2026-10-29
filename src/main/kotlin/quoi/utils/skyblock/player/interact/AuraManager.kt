@@ -89,10 +89,10 @@ object AuraManager : EventListener, Shortcuts {
             when (packet) {
                 is ClientboundBlockUpdatePacket -> mineTarget?.onBlockUpdate(packet.pos, packet.blockState)
                 is ClientboundSectionBlocksUpdatePacket -> if (mineTarget != null) packet.runUpdates(mineTarget!!::onBlockUpdate)
-                is ClientboundBlockDestructionPacket -> mc.execute {
-                    val target = mineTarget ?: return@execute
+                is ClientboundBlockDestructionPacket -> {
+                    val target = mineTarget ?: return@on
                     if (target.custom && target.pos == packet.pos) {
-                        if (packet.progress >= 10 && target.progress == 0f) return@execute
+                        if (packet.progress >= 10 && target.progress == 0f) return@on
                         target.progress = (packet.progress / 10f).coerceIn(0f, 1f)
                     }
                 }

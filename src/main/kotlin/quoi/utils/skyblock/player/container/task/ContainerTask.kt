@@ -3,6 +3,7 @@ package quoi.utils.skyblock.player.container.task
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import net.minecraft.world.inventory.AbstractContainerMenu
 import net.minecraft.world.inventory.ContainerInput
@@ -14,6 +15,7 @@ import quoi.utils.ChatUtils
 import quoi.utils.skyblock.item.ItemUtils.loreString
 import quoi.utils.skyblock.player.container.CONTAINER_ZERO
 import quoi.utils.skyblock.player.container.IContainerSettings
+import kotlin.coroutines.coroutineContext
 
 @DslMarker
 private annotation class TaskDsl
@@ -74,7 +76,11 @@ class ContainerTask(
      * Cancelling the caller also cancels the task
      */
     suspend fun await(): ContainerTaskResult = try {
-        if (!completed) withContext(mc.asCoroutineDispatcher()) { run() }
+        if (!completed) {
+            coroutineContext.ensureActive()
+            if (mc.isSameThread) run()
+            else withContext(mc.asCoroutineDispatcher()) { run() }
+        }
         completion.await()
     } catch (e: CancellationException) {
         cancel()

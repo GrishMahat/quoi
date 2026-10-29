@@ -6,9 +6,10 @@ import net.minecraft.network.chat.HoverEvent
 import net.minecraft.network.chat.MutableComponent
 import net.minecraft.network.chat.Style
 import net.minecraft.world.item.ItemStack
-import quoi.QuoiMod.scope
 import quoi.api.commands.internal.GreedyString
 import quoi.api.events.GuiEvent
+import quoi.api.events.core.EventListener
+import quoi.api.events.core.asyncScope
 import quoi.api.events.core.on
 import quoi.api.input.Keybinds
 import quoi.config.Config
@@ -65,6 +66,7 @@ object PetKeybinds : Module(
     const val GET_ID = 69
 
     init {
+        val commandListener = object : EventListener {}
         val petCommand = command.sub("petkeybinds").description("Pet Keybinds module settings.")
 
         petCommand.sub("clear") {
@@ -78,7 +80,7 @@ object PetKeybinds : Module(
         }.description("Shows the pet list.")
 
         petCommand.sub("get") {
-            scope.launch {
+            commandListener.asyncScope.launch {
                 petsCache = getPets()
                 if (petsCache.isEmpty()) return@launch
                 modMessage(petsCache.asPet().toClickable("get"), GET_ID)

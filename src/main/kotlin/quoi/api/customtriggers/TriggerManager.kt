@@ -50,7 +50,6 @@ object TriggerManager : EventListener {
         }
     )
     private var initialized = false
-    @Volatile private var generation = 0L
     var editing = false
         set(value) {
             field = value
@@ -71,15 +70,8 @@ object TriggerManager : EventListener {
             else engine.tick()
         }
         on<TickEvent.Server> {
-            // Server ticks originate on the network thread.
-            val level = mc.level
-            val started = generation
-            mc.execute {
-                if (mc.level === level && generation == started) {
-                    if (editing) previewEngine.tick(server = true)
-                    else if (canRun) engine.tick(server = true)
-                }
-            }
+            if (editing) previewEngine.tick(server = true)
+            else if (canRun) engine.tick(server = true)
         }
         on<ChatEvent.Receive> {
             if (!canRun) return@on
@@ -137,7 +129,6 @@ object TriggerManager : EventListener {
     }
 
     fun reset() {
-        generation++
         engine.reset()
         previewEngine.reset()
         previewTrigger = null

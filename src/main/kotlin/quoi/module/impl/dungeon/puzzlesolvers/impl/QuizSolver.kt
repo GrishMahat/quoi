@@ -75,8 +75,7 @@ object QuizSolver : SettingGroup(PuzzleSolvers, "Quiz") {
 
         on<ChatEvent.Packet> {
             if (!solver && !auto && !triggerbot) return@on
-            val msg = unformatted.trim()
-            mc.execute { if (module.active && (solver || auto || triggerbot)) handleMessage(msg) }
+            handleMessage(unformatted.trim())
         }
 
         on<DungeonEvent.Room.Enter> {
@@ -129,7 +128,7 @@ object QuizSolver : SettingGroup(PuzzleSolvers, "Quiz") {
         }
 
         on<TickEvent.Server> {
-            mc.execute { if (timerTicks > 0) timerTicks-- }
+            if (timerTicks > 0) timerTicks--
         }
     }
 

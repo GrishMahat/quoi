@@ -20,7 +20,6 @@ import quoi.utils.StringUtils.containsOneOf
 import quoi.utils.aabb
 import quoi.utils.render.drawFilledBox
 import quoi.utils.render.drawWireFrameBox
-import java.util.concurrent.CopyOnWriteArrayList
 
 // https://github.com/Noamm9/CatgirlAddons/blob/main/src/main/kotlin/catgirlroutes/module/impl/dungeons/Secrets.kt
 object SecretHighlights : ToggleableGroup(
@@ -44,8 +43,8 @@ object SecretHighlights : ToggleableGroup(
     private val itemSound = sound("Item sound").childOf(::playSound)
 
     private data class Secret(val blockPos: BlockPos, var isLocked: Boolean = false)
-    private val clickedSecrets = CopyOnWriteArrayList<Secret>()
-    private val itemEntities = CopyOnWriteArrayList<ItemEntity>()
+    private val clickedSecrets = mutableListOf<Secret>()
+    private val itemEntities = mutableSetOf<ItemEntity>()
 
     override fun onDisable() {
         clickedSecrets.clear()
@@ -96,7 +95,7 @@ object SecretHighlights : ToggleableGroup(
             if (!itemHighlight) return@on
             val itemEntity = entity as? ItemEntity ?: return@on
             if (itemEntity.item.hoverName.string.containsOneOf(dungeonItemDrops, true)) {
-                itemEntities.addIfAbsent(itemEntity)
+                itemEntities.add(itemEntity)
                 cancel()
             }
         }
