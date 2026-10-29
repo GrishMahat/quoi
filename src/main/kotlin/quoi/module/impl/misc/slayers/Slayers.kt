@@ -74,7 +74,34 @@ object Slayers : Module(
     }.setting().visibleIf { Test.enabled }
 
     init {
-        on<PacketEvent.ReceivedPost> { handlePacket(this) }
+        on<PacketEvent.ReceivedPost> {
+            val new = when (val packet = packet) {
+                is ClientboundSystemChatPacket -> {
+                    if (packet.overlay) return@on
+                    when (packet.content.string.noControlCodes.trim()) {
+                        "YOU COCOONED YOUR SLAYER BOSS", "SLAYER QUEST COMPLETE!" -> QuestState.SLAIN
+                        "SLAYER QUEST STARTED!" -> if (currentBoss?.isAlive == true) questState else QuestState.SPAWNING
+                        "SLAYER QUEST FAILED!" -> QuestState.FAILED
+                        else -> return@on
+                    }
+                }
+
+                is ClientboundSetPlayerTeamPacket -> {
+                    if (currentBoss?.isAlive == true) return@on
+                    val params = packet.parameters.orElse(null) ?: return@on
+                    val text = (params.playerPrefix.string + params.playerSuffix.string).noControlCodes.trim()
+                    when {
+                        text.contains("Combat") || text.contains("Kills") -> QuestState.SPAWNING
+                        text == "Slay the boss!" -> QuestState.KILLING
+                        text == "Boss slain!" -> QuestState.SLAIN
+                        else -> return@on
+                    }
+                }
+
+                else -> return@on
+            }
+            updateQuestState(new)
+        }
 
         on<WorldEvent.Change> { reset() }
 
@@ -144,67 +171,40 @@ object Slayers : Module(
     var questState = QuestState.NONE
         private set
 
-    private fun handlePacket(event: PacketEvent.ReceivedPost) {
-        when (val packet = event.packet) {
-            is ClientboundSystemChatPacket -> {
-                if (packet.overlay) return
-                val text = packet.content.string.noControlCodes.trim()
-                when (text) {
-                    "YOU COCOONED YOUR SLAYER BOSS", "SLAYER QUEST COMPLETE!" -> updateQuestState(QuestState.SLAIN)
-                    "SLAYER QUEST STARTED!" -> {
-                        if (currentBoss?.isAlive != true) updateQuestState(QuestState.SPAWNING)
-                    }
-                    "SLAYER QUEST FAILED!" -> updateQuestState(QuestState.FAILED)
-                }
-            }
-
-            is ClientboundSetPlayerTeamPacket -> {
-                if (currentBoss?.isAlive == true) return
-                val params = packet.parameters.orElse(null) ?: return
-                val text = (params.playerPrefix.string + params.playerSuffix.string).noControlCodes.trim()
-                when {
-                    text.contains("Combat") || text.contains("Kills") -> updateQuestState(QuestState.SPAWNING)
-                    text == "Boss slain!" -> updateQuestState(QuestState.SLAIN)
-                }
-            }
-        }
-    }
-
     private fun updateQuestState(new: QuestState) {
         val old = questState
         if (old == new) return
         questState = new
         if (new != QuestState.KILLING) {
             currentBoss?.let { finishedBossId = it.id }
-            resetBoss()
+            currentBoss = null
+            questTier = 0
         }
         SlayerEvent.State(old, new).post()
     }
 
-    private fun resetBoss() {
-        currentBoss = null
-        questTier = 0
-    }
-
     private fun reset() {
         updateQuestState(QuestState.NONE)
-        resetBoss()
+        currentBoss = null
+        questTier = 0
         finishedBossId = null
         spawnStartedAt = 0L
         killStartedAt = 0L
     }
 
-    var currentBoss by trackedBy<TickEvent.End, LivingEntity?>(null) { boss ->
+    var currentBoss: LivingEntity? by trackedBy<TickEvent.End, LivingEntity?>(null) { boss ->
         if (boss?.isAlive == true && !boss.isRemoved) return@trackedBy boss
         if (boss?.isDeadOrDying == true) updateQuestState(QuestState.SLAIN)
-        else resetBoss()
+        else currentBoss = null
+        questTier = 0
         if (questState == QuestState.FAILED) return@trackedBy null
 
         for (owner in getEntities<ArmorStand>()) {
             if (owner.customName?.string.noControlCodes.trim() != "${player.gameProfile.name}'s SLAYER BOSS") continue
-            val name = (getEntity(owner.id - 2) as? ArmorStand)?.customName?.string.noControlCodes
+            val bossStand = findBossStand(owner) ?: continue
+            val name = bossStand.customName?.string.noControlCodes
             val tier = tierRegex.find(name)?.groupValues?.get(1)?.let(::romanToInt) ?: continue
-            val entity = getEntity(owner.id - 3) as? Mob ?: continue
+            val entity = getEntity(bossStand.id - 1) as? Mob ?: continue
             if (!entity.isAlive || entity.id == finishedBossId) continue
 
             questTier = tier
@@ -214,6 +214,11 @@ object Slayers : Module(
         null
     }
         private set
+
+    private fun findBossStand(owner: ArmorStand): ArmorStand? =
+        getEntities<ArmorStand>(owner.position(), radius = 1.0) {
+            it.distanceToSqr(owner) <= 1.0 && tierRegex.containsMatchIn(it.customName?.string.noControlCodes)
+        }.minByOrNull { it.distanceToSqr(owner) }
 
     private fun LevelRenderContext.drawSlayer(entity: LivingEntity?, colour: Colour? = null, main: Boolean = true) {
         if (entity == null || entity.isInvisible || entity.isDeadOrDying) return
@@ -237,5 +242,5 @@ object Slayers : Module(
         })
     }
 
-    private val tierRegex = Regex(" (IV|V|I{1,3}) ")
+    private val tierRegex = Regex(".* (I{1,3}|IV|V) \\d+.*❤$")
 }
