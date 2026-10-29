@@ -127,8 +127,7 @@ loom {
             runDirectory.set(layout.projectDirectory.dir(providers.gradleProperty("run_directory").orElse("run").get()))
             jvmArguments.addAll(
                 "-Dmixin.debug.export=true",
-                "-Ddevauth.enabled=${providers.gradleProperty("devauth_enabled").orElse("true").get()}",
-                "-Ddevauth.account=${providers.gradleProperty("devauth_account").orElse("main").get()}",
+                "-Ddevauth.configDir=${rootProject.file(".devauth").absolutePath}",
                 "-XX:+AllowEnhancedClassRedefinition",
                 "-XX:+IgnoreUnrecognizedVMOptions",
             )

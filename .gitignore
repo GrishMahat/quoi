@@ -5,3 +5,5 @@
 build/
 run/
 /.kotlin
+/.devauth/*
+!/.devauth/config.toml
