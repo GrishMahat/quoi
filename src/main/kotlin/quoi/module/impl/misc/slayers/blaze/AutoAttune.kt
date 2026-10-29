@@ -1,10 +1,7 @@
 package quoi.module.impl.misc.slayers.blaze
 
 import net.minecraft.world.InteractionHand
-import quoi.api.events.ChatEvent
-import quoi.api.events.PacketEvent
-import quoi.api.events.SlayerEvent
-import quoi.api.events.TickEvent
+import quoi.api.events.*
 import quoi.api.events.core.Subscription
 import quoi.api.events.core.on
 import quoi.api.events.core.once
@@ -64,7 +61,8 @@ object AutoAttune : ToggleableGroup(BlazeSlayer, "Auto attune") {
             }
         }
 
-        on<SlayerEvent.State> { onDisable() }
+        Slayers.on<SlayerEvent.State> { onDisable() }
+        Slayers.on<WorldEvent.Change> { onDisable() }
 
         on<ChatEvent.Packet> {
             if (unformatted.startsWith("Strike using the") || unformatted.startsWith("Your hit was reduced by Hellion Shield!")) cancel()
