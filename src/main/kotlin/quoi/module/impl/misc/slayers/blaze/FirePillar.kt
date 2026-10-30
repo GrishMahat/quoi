@@ -1,39 +1,48 @@
 package quoi.module.impl.misc.slayers.blaze
 
-import net.minecraft.sounds.SoundEvents
+import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import net.minecraft.world.entity.decoration.ArmorStand
 import quoi.api.colour.Colour
 import quoi.api.events.ChatEvent
 import quoi.api.events.SlayerEvent
 import quoi.api.events.TickEvent
 import quoi.api.events.WorldEvent
+import quoi.api.events.core.asyncScope
 import quoi.api.events.core.on
 import quoi.module.impl.misc.slayers.QuestState
 import quoi.module.impl.misc.slayers.Slayers
+import quoi.module.impl.misc.slayers.Throttle
+import quoi.module.impl.misc.slayers.slayerAlert
 import quoi.module.settings.UIComponent.Companion.childOf
 import quoi.module.settings.group.ToggleableGroup
 import quoi.utils.ChatUtils.modMessage
 import quoi.utils.EntityUtils.getEntities
-import quoi.utils.Scheduler.scheduleTask
 import quoi.utils.StringUtils.noControlCodes
-import quoi.utils.skyblock.player.PlayerUtils
+import quoi.utils.skyblock.item.ItemUtils.skyblockId
 import quoi.utils.skyblock.player.PlayerUtils.interact
 import quoi.utils.skyblock.player.SwapManager
 import quoi.utils.ui.textPair
 
 object FirePillar : ToggleableGroup(BlazeSlayer, "Fire pillar", desc = "Warns about and optionally auto-cloaks your fire pillar.") {
+    private const val CLOAK_ID = "WITHER_CLOAK"
+    private const val PILLAR_GONE_GRACE_MS = 1_000L
+    private const val MIN_CLOAK_MS = 2_000L
+    private const val CLOAK_TIMEOUT_MS = 8_000L
+
     private val warning by switch("Warning", true, desc = "Show warning alerts for the fire pillar.")
     private val warnSeconds by slider("Warning time", 2, 1, 8, 1, unit = "s", desc = "Seconds remaining before detonation to trigger the warning.").childOf(::warning)
     private val spawnAlert by switch("Spawn alert", true, desc = "Show an alert immediately when a fire pillar appears.").childOf(::warning)
     private val playSound by switch("Play sound", true, desc = "Play a sound alert when warnings trigger.").childOf(::warning)
     private val soundPitch by slider("Pitch", 1.0f, 0.5f, 2.0f, 0.1f).childOf(::playSound)
 
-    private val autoCloak by switch("Auto cloak", true, desc = "Automatically toggles Wither Cloak before detonation.")
+    private val autoCloak by switch("Auto cloak", false, desc = "Automatically toggles Wither Cloak before detonation.")
     private val cloakSeconds by slider("Cloak at", 1, 1, 3, 1, unit = "s", desc = "Seconds remaining before detonation to activate Wither Cloak.").childOf(::autoCloak)
-    private val autoUncloak by switch("Auto uncloak", true, desc = "Automatically deactivates Wither Cloak after the pillar detonates.").childOf(::autoCloak)
-    private val uncloakDelay by slider("Uncloak delay", 15, 5, 40, 1, unit = "t", desc = "Delay in ticks after detonation before uncloaking.").childOf(::autoUncloak)
-    private val autoDelay by slider("Swap delay", 3, 1, 10, 1, unit = "t", desc = "Delay in ticks between swapping, clicking, and restoring slot.").childOf(::autoCloak)
-    private val bossRadius by slider("Detection radius", 20.0, 5.0, 40.0, 1.0, unit = "blocks", desc = "Radius to detect active fire pillar stands.")
+    private val autoUncloak by switch("Auto uncloak", false, desc = "Automatically deactivates Wither Cloak after the pillar detonates. Off by default: the veil drops on its own when it runs out.").childOf(::autoCloak)
+    private val uncloakDelay by slider("Uncloak delay", 750L, 500L, 4_000L, 50L, unit = "ms", desc = "Delay after detonation before uncloaking.").childOf(::autoUncloak)
+    private val autoDelay by slider("Swap delay", 150L, 50L, 1_000L, 50L, unit = "ms", desc = "Delay between swapping, clicking, and restoring slot.").childOf(::autoCloak)
+    private val bossRadius by slider("Detection radius", 20.0, 5.0, 40.0, 1.0, unit = "blocks", desc = "Radius around your boss to detect active fire pillar stands.")
 
     @Suppress("unused")
     private val hud by textHud("Fire pillar timer", Colour.RED) {
@@ -61,16 +70,26 @@ object FirePillar : ToggleableGroup(BlazeSlayer, "Fire pillar", desc = "Warns ab
 
     private enum class Action { IDLE, CLOAKING, UNCLOAKING }
 
-    private var activePillarId: Int? = null
+    private class PillarState {
+        var warnedSpawn = false
+        var warnedDetonation = false
+    }
+
+    private val scan = Throttle(250)
+    private val pillarStates = mutableMapOf<Int, PillarState>()
     private var currentSeconds: Int? = null
-    private var warnedSpawn = false
-    private var warnedDetonation = false
+    private var hadPillar = false
+    private var goneSince = 0L
     private var cloakedForPillar = false
+    private var cloakedAt = 0L
+    private var closeToDetonation = false
+    private var cooldownWarned = false
 
     private var inCloak = false
     private var cloakCooldownEnd = 0L
     private var pendingAction = Action.IDLE
     private var swapBackSlot = -1
+    private var cloakGeneration = 0
 
     init {
         on<ChatEvent.Packet> {
@@ -89,68 +108,57 @@ object FirePillar : ToggleableGroup(BlazeSlayer, "Fire pillar", desc = "Warns ab
                 return@on
             }
 
-            val boss = BlazeSlayer.blazeBoss
-            val center = boss?.position() ?: player.position()
-            val firePillar = getEntities<ArmorStand>(center, radius = bossRadius).firstOrNull { stand ->
-                val name = stand.customName?.string?.noControlCodes?.trim() ?: return@firstOrNull false
-                firePillarRegex.containsMatchIn(name)
-            }
+            val now = System.currentTimeMillis()
+            if (!scan.ready(now)) return@on
+            scan.mark(now)
 
-            if (firePillar == null) {
-                if (activePillarId != null) {
-                    onPillarFinished()
-                }
-                currentSeconds = null
-                activePillarId = null
+            val boss = BlazeSlayer.blazeBoss
+            val pillars = boss?.let { b ->
+                getEntities<ArmorStand>(b.position(), radius = bossRadius).mapNotNull { stand ->
+                    val name = stand.customName?.string?.noControlCodes?.trim() ?: return@mapNotNull null
+                    val seconds = firePillarRegex.find(name)?.groupValues?.get(1)?.toIntOrNull() ?: return@mapNotNull null
+                    stand.id to seconds
+                }.sortedBy { it.second }
+            }.orEmpty()
+
+            pillarStates.keys.retainAll(pillars.mapTo(HashSet()) { it.first })
+            currentSeconds = pillars.firstOrNull()?.second
+
+            if (pillars.isEmpty()) {
+                if (!hadPillar) return@on
+                if (goneSince == 0L) goneSince = now
+                // stands can be re-created between scans, so wait before calling it finished
+                if (now - goneSince >= PILLAR_GONE_GRACE_MS) finishPillars(now)
                 return@on
             }
+            hadPillar = true
+            goneSince = 0L
 
-            val name = firePillar.customName?.string?.noControlCodes?.trim() ?: return@on
-            val match = firePillarRegex.find(name) ?: return@on
-            val seconds = match.groupValues[1].toIntOrNull() ?: return@on
-            currentSeconds = seconds
-
-            // New fire pillar appeared
-            if (activePillarId != firePillar.id) {
-                activePillarId = firePillar.id
-                warnedSpawn = false
-                warnedDetonation = false
-                cloakedForPillar = false
-
+            for ((id, seconds) in pillars) {
+                val state = pillarStates.getOrPut(id) { PillarState() }
+                if (state.warnedSpawn) continue
+                state.warnedSpawn = true
                 if (warning && spawnAlert) {
-                    showAlert(
-                        title = "§c§lFIRE PILLAR!",
-                        subtitle = "§e${seconds}s §7remaining",
-                        pitch = soundPitch,
-                        stayAlive = 25
-                    )
-                    warnedSpawn = true
+                    slayerAlert("§c§lFIRE PILLAR!", "§e${seconds}s §7remaining", playSound, soundPitch, 25)
                 }
             }
 
-            // Warning alert at or below slider threshold
-            if (seconds <= warnSeconds && !warnedDetonation) {
-                warnedDetonation = true
-                showAlert(
-                    title = "§4§lDETONATING IN ${seconds}s!",
-                    pitch = soundPitch,
-                    stayAlive = 20
-                )
+            // only the soonest pillar is worth warning about / cloaking for
+            val (soonestId, seconds) = pillars.first()
+            val state = pillarStates.getValue(soonestId)
+            if (seconds <= 3) closeToDetonation = true
+            if (seconds <= warnSeconds && !state.warnedDetonation) {
+                state.warnedDetonation = true
+                if (warning) {
+                    slayerAlert("§4§lDETONATING IN ${seconds}s!", playSound = playSound, pitch = soundPitch, stayAlive = 20)
+                }
             }
 
-            // Auto Wither Cloak at or below cloak threshold
-            if (autoCloak && seconds <= cloakSeconds && !cloakedForPillar && !inCloak && pendingAction == Action.IDLE) {
-                if (isCloakOnCooldown()) {
-                    modMessage("&cCannot cloak: Wither Cloak is on cooldown!")
-                } else {
+            if (autoCloak && !cloakedForPillar && !inCloak && seconds <= cloakSeconds) {
+                if (triggerCloak(activate = true)) {
                     cloakedForPillar = true
-                    triggerCloak(activate = true)
+                    cloakedAt = now
                 }
-            }
-
-            // If timer reached 0s, pillar detonated
-            if (seconds <= 0) {
-                onPillarFinished()
             }
         }
 
@@ -158,59 +166,74 @@ object FirePillar : ToggleableGroup(BlazeSlayer, "Fire pillar", desc = "Warns ab
         on<WorldEvent.Change> { this@FirePillar.reset() }
     }
 
-    private fun showAlert(title: String, subtitle: String = "", pitch: Float = soundPitch, stayAlive: Int = 20) {
-        if (!warning) return
-        PlayerUtils.setTitle(
-            title = title,
-            subtitle = subtitle,
-            playSound = playSound,
-            sound = SoundEvents.EXPERIENCE_ORB_PICKUP,
-            pitch = pitch,
-            stayAlive = stayAlive
-        )
-    }
-
-    private fun triggerCloak(activate: Boolean) {
-        if (pendingAction != Action.IDLE) return
-        if (activate && inCloak) return
-        if (!activate && !inCloak) return
+    /** Returns true when the cloak swap actually succeeded. */
+    private fun triggerCloak(activate: Boolean): Boolean {
+        if (pendingAction != Action.IDLE) return false
+        if (activate == inCloak) return false
+        if (activate && isCloakOnCooldown()) {
+            if (!cooldownWarned) {
+                modMessage("&cCannot cloak: Wither Cloak is on cooldown!")
+                cooldownWarned = true
+            }
+            return false
+        }
 
         val originalSlot = player.inventory.selectedSlot
-        val swap = SwapManager.swapById("WITHER_CLOAK")
-        if (!swap.success) return
+        if (!SwapManager.swapById(CLOAK_ID).success) return false
 
         pendingAction = if (activate) Action.CLOAKING else Action.UNCLOAKING
         swapBackSlot = originalSlot
+        val gen = ++cloakGeneration
 
-        scheduleTask(autoDelay) {
-            if (!enabled || pendingAction == Action.IDLE) return@scheduleTask
-            modMessage(if (activate) "&aCloaking fire pillar!" else "&cUncloaking fire pillar!")
-            interact()
-        }
+        asyncScope.launch {
+            try {
+                delay(jitter(autoDelay, autoDelay / 4).milliseconds)
+                if (!enabled || gen != cloakGeneration || pendingAction == Action.IDLE) return@launch
+                // another feature may have moved the slot while we waited
+                if (player.mainHandItem.skyblockId != CLOAK_ID) return@launch
 
-        scheduleTask(autoDelay * 2) {
-            val slot = swapBackSlot
-            swapBackSlot = -1
-            pendingAction = Action.IDLE
-
-            if (slot in 0..8 && enabled) {
-                SwapManager.swapToSlot(slot)
-            }
-        }
-    }
-
-    private fun onPillarFinished() {
-        if (autoCloak && cloakedForPillar) {
-            cloakedForPillar = false
-            if (autoUncloak) {
-                scheduleTask(uncloakDelay) {
-                    if (inCloak && pendingAction == Action.IDLE && enabled) {
-                        triggerCloak(activate = false)
+                modMessage(if (activate) "&aCloaking fire pillar!" else "&cUncloaking fire pillar!")
+                interact()
+                delay(jitter(autoDelay, autoDelay / 4).milliseconds)
+            } finally {
+                if (gen == cloakGeneration) {
+                    pendingAction = Action.IDLE
+                    val slot = swapBackSlot
+                    swapBackSlot = -1
+                    if (slot in 0..8 && player.inventory.selectedSlot != slot && player.mainHandItem.skyblockId == CLOAK_ID) {
+                        SwapManager.swapToSlot(slot)
                     }
                 }
             }
         }
+        return true
     }
+
+    /**
+     * Called on every scan while the pillar stands are gone. Only uncloaks once the
+     * countdown actually ran down and the cloak has been held for a moment, so a
+     * stand that blinks out between scans can't cut the cloak short.
+     */
+    private fun finishPillars(now: Long) {
+        if (!cloakedForPillar) return
+        // pillar vanished before the countdown got low: not a detonation, wait it out
+        if (!closeToDetonation && now - cloakedAt < CLOAK_TIMEOUT_MS) return
+        if (now - cloakedAt < MIN_CLOAK_MS) return
+
+        cloakedForPillar = false
+        if (!autoUncloak) return
+
+        val gen = cloakGeneration
+        val wait = jitter(uncloakDelay, 200L)
+        asyncScope.launch {
+            delay(wait.milliseconds)
+            if (!enabled || gen != cloakGeneration || !inCloak) return@launch
+            triggerCloak(activate = false)
+        }
+    }
+
+    private fun jitter(baseMs: Long, spreadMs: Long): Long =
+        (baseMs + kotlin.random.Random.nextLong(-spreadMs, spreadMs + 1)).coerceAtLeast(50L)
 
     private fun isCloakOnCooldown(): Boolean =
         System.currentTimeMillis() < cloakCooldownEnd
@@ -226,14 +249,17 @@ object FirePillar : ToggleableGroup(BlazeSlayer, "Fire pillar", desc = "Warns ab
     }
 
     private fun reset() {
-        if (swapBackSlot in 0..8 && pendingAction != Action.IDLE) {
-            SwapManager.swapToSlot(swapBackSlot)
-        }
-        activePillarId = null
+        cloakGeneration++
+        if (swapBackSlot in 0..8) SwapManager.swapToSlot(swapBackSlot)
+        scan.reset()
+        pillarStates.clear()
         currentSeconds = null
-        warnedSpawn = false
-        warnedDetonation = false
+        hadPillar = false
+        goneSince = 0L
         cloakedForPillar = false
+        cloakedAt = 0L
+        closeToDetonation = false
+        cooldownWarned = false
         inCloak = false
         cloakCooldownEnd = 0L
         pendingAction = Action.IDLE

@@ -1,18 +1,16 @@
 package quoi.module.impl.misc.slayers.vampire
 
-import net.minecraft.sounds.SoundEvents
-import net.minecraft.world.entity.decoration.ArmorStand
+import quoi.api.events.SlayerEvent
 import quoi.api.events.TickEvent
 import quoi.api.events.WorldEvent
 import quoi.api.events.core.on
 import quoi.module.impl.misc.slayers.QuestState
 import quoi.module.impl.misc.slayers.Slayers
+import quoi.module.impl.misc.slayers.Throttle
+import quoi.module.impl.misc.slayers.slayerAlert
 import quoi.module.settings.group.ToggleableGroup
-import quoi.utils.EntityUtils.getEntities
-import quoi.utils.StringUtils.noControlCodes
 import quoi.utils.WorldUtils.registryName
 import quoi.utils.WorldUtils.state
-import quoi.utils.skyblock.player.PlayerUtils
 
 @Suppress("unused_expression")
 object ManiaAlert : ToggleableGroup(
@@ -20,8 +18,7 @@ object ManiaAlert : ToggleableGroup(
     "Mania alert",
     desc = "Alerts during the Mania phase. Green while you stand on a safe green/lime terracotta spot, red otherwise.",
 ) {
-    private var nextScan = 0L
-    private var nextAlert = 0L
+    private val alert = Throttle(5_000)
 
     // Skyblocker keys the colour to the block under your feet: green dyed
     // terracotta is the safe spot; registry name keeps it working on any mappings
@@ -32,37 +29,25 @@ object ManiaAlert : ToggleableGroup(
 
     init {
         on<TickEvent.End> {
-            if (Slayers.questState != QuestState.KILLING) return@on
+            if (Slayers.questState != QuestState.KILLING) {
+                alert.reset()
+                return@on
+            }
+            if (VampireSlayer.standNames.none { it.contains("MANIA") }) return@on
+
             val now = System.currentTimeMillis()
-            if (now < nextScan) return@on
-            nextScan = now + 250
+            if (!alert.ready(now)) return@on
+            alert.mark(now)
 
-            val boss = BloodfiendESP.pinBoss() ?: return@on
-            val mania = getEntities<ArmorStand>(boss.position(), 6.0) {
-                it.isAlive && it.customName?.string?.noControlCodes?.contains("MANIA") == true
-            }.isNotEmpty()
-            if (!mania || now < nextAlert) return@on
-            nextAlert = now + 5_000
-
-            PlayerUtils.setTitle(
-                title = if (onSafeSpot()) "§a§lMANIA" else "§c§lMANIA",
-                playSound = true,
-                sound = SoundEvents.EXPERIENCE_ORB_PICKUP,
-                pitch = 0f,
-                stayAlive = 15,
-                fadeOut = 5,
-            )
+            slayerAlert(if (onSafeSpot()) "§a§lMANIA" else "§c§lMANIA")
         }
 
-        on<WorldEvent.Change> {
-            nextScan = 0L
-            nextAlert = 0L
-        }
+        on<SlayerEvent.State> { alert.reset() }
+        on<WorldEvent.Change> { alert.reset() }
     }
 
     override fun onDisable() {
-        nextScan = 0L
-        nextAlert = 0L
+        alert.reset()
         super.onDisable()
     }
 }
