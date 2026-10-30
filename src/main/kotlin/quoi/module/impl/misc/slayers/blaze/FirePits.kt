@@ -26,6 +26,7 @@ object FirePits : ToggleableGroup(BlazeSlayer, "Fire pits", desc = "Warns when f
     private val scan = Throttle(250)
     private var previousRatio = 1.0
     private var triggered = false
+    private var observedMax = 0.0
 
     init {
         on<TickEvent.End> {
@@ -56,7 +57,10 @@ object FirePits : ToggleableGroup(BlazeSlayer, "Fire pits", desc = "Warns when f
             val name = bossStand.customName?.string?.noControlCodes?.trim() ?: return@on
             val match = healthRegex.find(name) ?: return@on
             val current = StringUtils.parseNumber(match.groupValues[1])
-            val max = match.groupValues.getOrNull(2)?.takeIf { it.isNotBlank() }?.let(StringUtils::parseNumber)
+            val parsedMax = match.groupValues.getOrNull(2)?.takeIf { it.isNotBlank() }?.let(StringUtils::parseNumber)
+            if (parsedMax != null && parsedMax > observedMax) observedMax = parsedMax
+            // tier table is only a bootstrap: any nametag that shows a full cur/max pair wins
+            val max = observedMax.takeIf { it > 0.0 }
                 ?: when (Slayers.questTier) {
                     3 -> 45_000_000.0
                     4 -> 150_000_000.0
@@ -85,5 +89,6 @@ object FirePits : ToggleableGroup(BlazeSlayer, "Fire pits", desc = "Warns when f
         scan.reset()
         previousRatio = 1.0
         triggered = false
+        observedMax = 0.0
     }
 }

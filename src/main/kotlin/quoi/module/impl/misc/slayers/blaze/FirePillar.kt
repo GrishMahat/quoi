@@ -70,16 +70,12 @@ object FirePillar : ToggleableGroup(BlazeSlayer, "Fire pillar", desc = "Warns ab
 
     private enum class Action { IDLE, CLOAKING, UNCLOAKING }
 
-    private class PillarState {
-        var warnedSpawn = false
-        var warnedDetonation = false
-    }
-
     private val scan = Throttle(250)
-    private val pillarStates = mutableMapOf<Int, PillarState>()
     private var currentSeconds: Int? = null
     private var hadPillar = false
     private var goneSince = 0L
+    private var lastPillarCount = 0
+    private var lastSoonestSeconds = Int.MAX_VALUE
     private var cloakedForPillar = false
     private var cloakedAt = 0L
     private var closeToDetonation = false
@@ -121,7 +117,6 @@ object FirePillar : ToggleableGroup(BlazeSlayer, "Fire pillar", desc = "Warns ab
                 }.sortedBy { it.second }
             }.orEmpty()
 
-            pillarStates.keys.retainAll(pillars.mapTo(HashSet()) { it.first })
             currentSeconds = pillars.firstOrNull()?.second
 
             if (pillars.isEmpty()) {
@@ -134,27 +129,23 @@ object FirePillar : ToggleableGroup(BlazeSlayer, "Fire pillar", desc = "Warns ab
             hadPillar = true
             goneSince = 0L
 
-            for ((id, seconds) in pillars) {
-                val state = pillarStates.getOrPut(id) { PillarState() }
-                if (state.warnedSpawn) continue
-                state.warnedSpawn = true
-                if (warning && spawnAlert) {
-                    slayerAlert("§c§lFIRE PILLAR!", "§e${seconds}s §7remaining", playSound, soundPitch, 25)
-                }
-            }
-
             // only the soonest pillar is worth warning about / cloaking for
-            val (soonestId, seconds) = pillars.first()
-            val state = pillarStates.getValue(soonestId)
-            if (seconds <= 3) closeToDetonation = true
-            if (seconds <= warnSeconds && !state.warnedDetonation) {
-                state.warnedDetonation = true
-                if (warning) {
-                    slayerAlert("§4§lDETONATING IN ${seconds}s!", playSound = playSound, pitch = soundPitch, stayAlive = 20)
-                }
-            }
+            val soonest = pillars.first().second
 
-            if (autoCloak && !cloakedForPillar && !inCloak && seconds <= cloakSeconds) {
+            // alert on pillar count and countdown crossings, not stand ids: stands are
+            // re-created with new ids mid-countdown, so per-id state would re-fire alerts
+            if (warning && spawnAlert && pillars.size > lastPillarCount) {
+                slayerAlert("§c§lFIRE PILLAR!", "§e${soonest}s §7remaining", playSound, soundPitch, 25)
+            }
+            lastPillarCount = pillars.size
+
+            if (soonest <= 3) closeToDetonation = true
+            if (warning && soonest <= warnSeconds && lastSoonestSeconds > warnSeconds) {
+                slayerAlert("§4§lDETONATING IN ${soonest}s!", playSound = playSound, pitch = soundPitch, stayAlive = 20)
+            }
+            lastSoonestSeconds = soonest
+
+            if (autoCloak && !cloakedForPillar && !inCloak && soonest <= cloakSeconds) {
                 if (triggerCloak(activate = true)) {
                     cloakedForPillar = true
                     cloakedAt = now
@@ -215,6 +206,9 @@ object FirePillar : ToggleableGroup(BlazeSlayer, "Fire pillar", desc = "Warns ab
      * stand that blinks out between scans can't cut the cloak short.
      */
     private fun finishPillars(now: Long) {
+        // the pillar episode has ended regardless of cloak state
+        lastPillarCount = 0
+        lastSoonestSeconds = Int.MAX_VALUE
         if (!cloakedForPillar) return
         // pillar vanished before the countdown got low: not a detonation, wait it out
         if (!closeToDetonation && now - cloakedAt < CLOAK_TIMEOUT_MS) return
@@ -252,10 +246,11 @@ object FirePillar : ToggleableGroup(BlazeSlayer, "Fire pillar", desc = "Warns ab
         cloakGeneration++
         if (swapBackSlot in 0..8) SwapManager.swapToSlot(swapBackSlot)
         scan.reset()
-        pillarStates.clear()
         currentSeconds = null
         hadPillar = false
         goneSince = 0L
+        lastPillarCount = 0
+        lastSoonestSeconds = Int.MAX_VALUE
         cloakedForPillar = false
         cloakedAt = 0L
         closeToDetonation = false
