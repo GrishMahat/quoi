@@ -33,10 +33,10 @@ object FirePillar : ToggleableGroup(BlazeSlayer, "Fire pillar", desc = "Warns ab
 
     private const val VEIL_MAX_MS = 10_000L
 
-    private val warning by switch("Warning", true, desc = "Show warning alerts for the fire pillar.")
+    private val warning by switch("Warning", false, desc = "Show warning alerts for the fire pillar.")
     private val warnSeconds by slider("Warning time", 2, 1, 8, 1, unit = "s", desc = "Seconds remaining before detonation to trigger the warning.").childOf(::warning)
-    private val spawnAlert by switch("Spawn alert", true, desc = "Show an alert immediately when a fire pillar appears.").childOf(::warning)
-    private val playSound by switch("Play sound", true, desc = "Play a sound alert when warnings trigger.").childOf(::warning)
+    private val spawnAlert by switch("Spawn alert", false, desc = "Show an alert immediately when a fire pillar appears.").childOf(::warning)
+    private val playSound by switch("Play sound", false, desc = "Play a sound alert when warnings trigger.").childOf(::warning)
     private val soundPitch by slider("Pitch", 1.0f, 0.5f, 2.0f, 0.1f).childOf(::playSound)
 
     private val autoCloak by switch("Auto cloak", false, desc = "Automatically toggles Wither Cloak before detonation.")

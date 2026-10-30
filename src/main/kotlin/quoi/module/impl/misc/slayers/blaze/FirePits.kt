@@ -16,9 +16,9 @@ import quoi.utils.StringUtils
 import quoi.utils.StringUtils.noControlCodes
 
 object FirePits : ToggleableGroup(BlazeSlayer, "Fire pits", desc = "Warns when fire pits spawn below a set boss health percentage.") {
-    private val warning by switch("Warning", true, desc = "Show a warning when fire pits spawn.")
+    private val warning by switch("Warning", false, desc = "Show a warning when fire pits spawn.")
     private val threshold by slider("Warning at", 33, 5, 90, 1, unit = "%", desc = "Boss health percentage that triggers the warning.").childOf(::warning)
-    private val playSound by switch("Play sound", true, desc = "Play a sound when the warning triggers.").childOf(::warning)
+    private val playSound by switch("Play sound", false, desc = "Play a sound when the warning triggers.").childOf(::warning)
     private val soundPitch by slider("Pitch", 0.8f, 0.5f, 2.0f, 0.1f).childOf(::playSound)
 
     private val healthRegex = Regex("""([\d,]+(?:\.\d+)?[BMK]?)(?:\s*/\s*([\d,]+(?:\.\d+)?[BMK]?))?\s*❤""", RegexOption.IGNORE_CASE)
