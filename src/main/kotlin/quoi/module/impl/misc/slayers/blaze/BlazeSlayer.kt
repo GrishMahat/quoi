@@ -25,11 +25,13 @@ import quoi.utils.StringUtils.noControlCodes
 import quoi.utils.ui.textPair
 
 // todo auto aim.
-object BlazeSlayer : SettingGroup(Slayers, "Blaze", area = Island.CrimsonIsle, subarea = "smoldering tomb"), ISlayer {
+object BlazeSlayer : SettingGroup(Slayers, "Blaze", area = Island.CrimsonIsle), ISlayer {
 
     override val features = setOf(
         AutoAttune,
-        DamageDodge
+        DamageDodge,
+        FirePillar,
+        FirePits
     )
 
     private var gummyRemaining by slider("remaining", 0L, 0L, Long.MAX_VALUE).hide()

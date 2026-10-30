@@ -231,6 +231,7 @@ Download the JAR for your Minecraft version from [Releases](https://github.com/j
   - Adds boss ESP, spawn alerts, and spawn and kill time messages.
   - **Enderman** - Highlights the Yang Glyph beacon and draws a tracer.
   - **Blaze** - Adds dagger attunement, damage dodging, and a Gummy Polar Bear timer.
+  - **Bloodfiend** - Highlights the Rift's Bloodfiend boss , with Steak, Twinclaws and Mania alerts plus Blood Ichor and Killer Spring highlights, labels, boss lines, sound dedupe and fight automation (melon healing, Holy Ice, Steak Stake swap, Impel prompts, totem breaking).
 - **Test**
   - Provides developer debugging tools.
 
@@ -294,9 +295,11 @@ Download the JAR for your Minecraft version from [Releases](https://github.com/j
 </details>
 
 ## Discord
+
 Join the [quoi! Discord](https://discord.gg/QCWgrQ57pN) or dm me (@jcnlk).
 
 ## Licence Note
+
 GPL-3.0, but I don't give a single fuck if you use the code without crediting. Do whatever.
 
 ## Credits

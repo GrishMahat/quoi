@@ -20,12 +20,12 @@ import quoi.module.impl.misc.Test
 import quoi.module.impl.misc.slayers.blaze.BlazeSlayer
 import quoi.module.impl.misc.slayers.enderman.BeaconESP
 import quoi.module.impl.misc.slayers.enderman.EndermanSlayer
+import quoi.module.impl.misc.slayers.vampire.VampireSlayer
 import quoi.module.settings.UIComponent.Companion.visibleIf
 import quoi.module.settings.group.SettingGroup.Companion.childOf
 import quoi.module.settings.group.SettingGroup.Companion.json
 import quoi.utils.ChatUtils.modMessage
 import quoi.utils.EntityUtils.getEntities
-import quoi.utils.EntityUtils.getEntity
 import quoi.utils.EntityUtils.interpolatedBox
 import quoi.utils.StringUtils.formatTime
 import quoi.utils.StringUtils.noControlCodes
@@ -39,7 +39,7 @@ object Slayers : Module(
     desc = "Various slayer features.",
     area = Island.Skyblock
 ) {
-    private val slayers: Set<ISlayer> = setOf(BlazeSlayer, EndermanSlayer)
+    private val slayers: Set<ISlayer> = setOf(BlazeSlayer, EndermanSlayer, VampireSlayer)
 
     internal val beaconHighlight = highlight(colour = Colour.RED, fillColour = Colour.RED, glow = false)
         .json("Enderman Beacon ESP Style").childOf(BeaconESP.component)
@@ -79,9 +79,9 @@ object Slayers : Module(
                 is ClientboundSystemChatPacket -> {
                     if (packet.overlay) return@on
                     when (packet.content.string.noControlCodes.trim()) {
-                        "YOU COCOONED YOUR SLAYER BOSS", "SLAYER QUEST COMPLETE!" -> QuestState.SLAIN
+                        "YOU COCOONED YOUR SLAYER BOSS", "SLAYER QUEST COMPLETE!", "NICE! SLAYER BOSS SLAIN!" -> QuestState.SLAIN
                         "SLAYER QUEST STARTED!" -> if (currentBoss?.isAlive == true) questState else QuestState.SPAWNING
-                        "SLAYER QUEST FAILED!" -> QuestState.FAILED
+                        "SLAYER QUEST FAILED!", "Your Slayer Quest has been cancelled!" -> QuestState.FAILED
                         else -> return@on
                     }
                 }
@@ -92,8 +92,8 @@ object Slayers : Module(
                     val text = (params.playerPrefix.string + params.playerSuffix.string).noControlCodes.trim()
                     when {
                         text.contains("Combat") || text.contains("Kills") -> QuestState.SPAWNING
-                        text == "Slay the boss!" -> QuestState.KILLING
-                        text == "Boss slain!" -> QuestState.SLAIN
+                        text.contains("Slay the boss") -> QuestState.KILLING
+                        text.contains("Boss slain") -> QuestState.SLAIN
                         else -> return@on
                     }
                 }
@@ -199,13 +199,21 @@ object Slayers : Module(
         questTier = 0
         if (questState == QuestState.FAILED) return@trackedBy null
 
-        for (owner in getEntities<ArmorStand>()) {
-            if (owner.customName?.string.noControlCodes.trim() != "${player.gameProfile.name}'s SLAYER BOSS") continue
-            val bossStand = findBossStand(owner) ?: continue
-            val name = bossStand.customName?.string.noControlCodes
+        val playerName = player.gameProfile.name
+        for (stand in getEntities<ArmorStand>()) {
+            val name = stand.customName?.string.noControlCodes.trim()
+            if (name.endsWith(" 0❤")) continue
             val tier = tierRegex.find(name)?.groupValues?.get(1)?.let(::romanToInt) ?: continue
-            val entity = getEntity(bossStand.id - 1) as? Mob ?: continue
-            if (!entity.isAlive || entity.id == finishedBossId) continue
+
+            val owned = getEntities<ArmorStand>(stand.position(), 3.0) {
+                it != stand && it.distanceToSqr(stand) <= 9.0 &&
+                    it.customName?.string.noControlCodes.trim().contains(playerName)
+            }.isNotEmpty()
+            if (!owned) continue
+
+            val entity = getEntities<LivingEntity>(stand.position(), 3.0) {
+                it != player && it !is ArmorStand && it.isAlive && it.id != finishedBossId
+            }.minByOrNull { it.distanceToSqr(stand) } ?: continue
 
             questTier = tier
             updateQuestState(QuestState.KILLING)
@@ -214,11 +222,6 @@ object Slayers : Module(
         null
     }
         private set
-
-    private fun findBossStand(owner: ArmorStand): ArmorStand? =
-        getEntities<ArmorStand>(owner.position(), radius = 1.0) {
-            it.distanceToSqr(owner) <= 1.0 && tierRegex.containsMatchIn(it.customName?.string.noControlCodes)
-        }.minByOrNull { it.distanceToSqr(owner) }
 
     private fun LevelRenderContext.drawSlayer(entity: LivingEntity?, colour: Colour? = null, main: Boolean = true) {
         if (entity == null || entity.isInvisible || entity.isDeadOrDying) return
@@ -242,5 +245,5 @@ object Slayers : Module(
         })
     }
 
-    private val tierRegex = Regex(".* (I{1,3}|IV|V) \\d+.*❤$")
+    private val tierRegex = Regex(" ([IVX]+) \\d+.*❤")
 }
