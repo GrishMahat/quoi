@@ -31,6 +31,8 @@ object FirePillar : ToggleableGroup(BlazeSlayer, "Fire pillar", desc = "Warns ab
     private const val MIN_CLOAK_MS = 2_000L
     private const val CLOAK_TIMEOUT_MS = 8_000L
 
+    private const val VEIL_MAX_MS = 10_000L
+
     private val warning by switch("Warning", true, desc = "Show warning alerts for the fire pillar.")
     private val warnSeconds by slider("Warning time", 2, 1, 8, 1, unit = "s", desc = "Seconds remaining before detonation to trigger the warning.").childOf(::warning)
     private val spawnAlert by switch("Spawn alert", true, desc = "Show an alert immediately when a fire pillar appears.").childOf(::warning)
@@ -82,6 +84,7 @@ object FirePillar : ToggleableGroup(BlazeSlayer, "Fire pillar", desc = "Warns ab
     private var cooldownWarned = false
 
     private var inCloak = false
+    private var veilUntil = 0L
     private var cloakCooldownEnd = 0L
     private var pendingAction = Action.IDLE
     private var swapBackSlot = -1
@@ -90,7 +93,10 @@ object FirePillar : ToggleableGroup(BlazeSlayer, "Fire pillar", desc = "Warns ab
     init {
         on<ChatEvent.Packet> {
             when (unformatted) {
-                "Creeper Veil Activated!" -> inCloak = true
+                "Creeper Veil Activated!" -> {
+                    inCloak = true
+                    veilUntil = System.currentTimeMillis() + VEIL_MAX_MS
+                }
                 "Creeper Veil De-activated!" -> disableCloak(5_000L)
                 "Creeper Veil De-activated! (Expired)",
                 "Not enough mana! Creeper Veil De-activated!" -> disableCloak(10_000L)
@@ -105,6 +111,9 @@ object FirePillar : ToggleableGroup(BlazeSlayer, "Fire pillar", desc = "Warns ab
             }
 
             val now = System.currentTimeMillis()
+            // the veil can drop without a matching chat line ("Not enough vitality!", ...):
+            // past its 10s cap it is gone for sure, so a stale flag self-heals here
+            if (inCloak && now >= veilUntil) disableCloak(10_000L)
             if (!scan.ready(now)) return@on
             scan.mark(now)
 
@@ -154,7 +163,13 @@ object FirePillar : ToggleableGroup(BlazeSlayer, "Fire pillar", desc = "Warns ab
         }
 
         on<SlayerEvent.State> { this@FirePillar.reset() }
-        on<WorldEvent.Change> { this@FirePillar.reset() }
+        on<WorldEvent.Change> {
+            // cloak state comes from chat messages, not fight state: a world change is
+            // the only reset that can safely assume the veil is gone
+            inCloak = false
+            cloakCooldownEnd = 0L
+            this@FirePillar.reset()
+        }
     }
 
     /** Returns true when the cloak swap actually succeeded. */
@@ -209,12 +224,16 @@ object FirePillar : ToggleableGroup(BlazeSlayer, "Fire pillar", desc = "Warns ab
         // the pillar episode has ended regardless of cloak state
         lastPillarCount = 0
         lastSoonestSeconds = Int.MAX_VALUE
-        if (!cloakedForPillar) return
+        if (!cloakedForPillar) {
+            closeToDetonation = false
+            return
+        }
         // pillar vanished before the countdown got low: not a detonation, wait it out
         if (!closeToDetonation && now - cloakedAt < CLOAK_TIMEOUT_MS) return
         if (now - cloakedAt < MIN_CLOAK_MS) return
 
         cloakedForPillar = false
+        closeToDetonation = false
         if (!autoUncloak) return
 
         val gen = cloakGeneration
@@ -239,6 +258,8 @@ object FirePillar : ToggleableGroup(BlazeSlayer, "Fire pillar", desc = "Warns ab
     }
 
     override fun onDisable() {
+        inCloak = false
+        cloakCooldownEnd = 0L
         reset()
     }
 
@@ -255,8 +276,6 @@ object FirePillar : ToggleableGroup(BlazeSlayer, "Fire pillar", desc = "Warns ab
         cloakedAt = 0L
         closeToDetonation = false
         cooldownWarned = false
-        inCloak = false
-        cloakCooldownEnd = 0L
         pendingAction = Action.IDLE
         swapBackSlot = -1
     }

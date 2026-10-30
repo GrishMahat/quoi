@@ -155,7 +155,9 @@ object BloodItems : ToggleableGroup(
     }
 
     fun isKillerSpringStand(stand: ArmorStand): Boolean =
-        stand.cachedTexture() == SPRING_TEXTURE
+        // while disabled no events maintain the cache, so decode fresh instead of
+        // trusting a stale entry (equipment change / id reuse)
+        (if (enabled) stand.cachedTexture() else stand.headTexture) == SPRING_TEXTURE
 
     override fun onDisable() {
         reset()

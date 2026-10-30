@@ -41,24 +41,29 @@ private class ActiveStateInterceptor(
 private val asyncScopes = ConcurrentHashMap<EventListener, CoroutineScope>()
 
 val EventListener.asyncScope: CoroutineScope
-    get() = asyncScopes.compute(this) { listener, scope ->
-        if (scope != null && scope.coroutineContext[Job]?.isActive == true) {
-            return@compute scope
-        }
+    get() {
+        // the parent scope must be resolved before compute: a compute() re-entering the
+        // same map throws IllegalStateException("Recursive update") on colliding keys
+        val parentJob = parent()?.asyncScope?.coroutineContext?.get(Job)
 
-        val parentJob = listener.parent()?.asyncScope?.coroutineContext?.get(Job)
-        val job = if (parentJob != null) SupervisorJob(parentJob) else SupervisorJob()
+        return asyncScopes.compute(this) { listener, scope ->
+            if (scope != null && scope.coroutineContext[Job]?.isActive == true) {
+                return@compute scope
+            }
 
-        job.invokeOnCompletion {
-            asyncScopes.remove(listener)
-        }
+            val job = if (parentJob != null) SupervisorJob(parentJob) else SupervisorJob()
 
-        CoroutineScope(
-            job +
-                    CoroutineExceptionHandler { _, t -> if (t !is ListenerInactiveException) t.printStackTrace() } +
-                    ActiveStateInterceptor(mc.asCoroutineDispatcher(), listener)
-        )
-    }!!
+            job.invokeOnCompletion {
+                asyncScopes.remove(listener)
+            }
+
+            CoroutineScope(
+                job +
+                        CoroutineExceptionHandler { _, t -> if (t !is ListenerInactiveException) t.printStackTrace() } +
+                        ActiveStateInterceptor(mc.asCoroutineDispatcher(), listener)
+            )
+        }!!
+    }
 
 /**
  * cancels all running async tasks for this [EventListener]

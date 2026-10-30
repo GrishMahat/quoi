@@ -163,8 +163,8 @@ object BloodfiendAssist : ToggleableGroup(
             return
         }
         missingIceLogged = false
-        selectAndUse(slot, "[Rift] Used Holy Ice.")
-        holyIceUntil = now + rnd(1400, 2000)
+        // only arm the cooldown on success: a failed swap (e.g. TOO_FAST) retries next tick
+        if (selectAndUse(slot, "[Rift] Used Holy Ice.")) holyIceUntil = now + rnd(1400, 2000)
     }
 
     // ===== Steak Stake =====
@@ -275,7 +275,7 @@ object BloodfiendAssist : ToggleableGroup(
     }
 
     // ===== item helpers =====
-    private fun selectAndUse(slot: Int, message: String) {
+    private fun selectAndUse(slot: Int, message: String): Boolean {
         val p = player
         val originalSlot = p.inventory.selectedSlot
         val reaction = rnd(100, 250)
@@ -287,12 +287,12 @@ object BloodfiendAssist : ToggleableGroup(
                 modMessage(message)
             }
             itemUseUntil = 0L
-            return
+            return true
         }
 
         if (!SwapManager.swapToSlot(slot).success) {
             itemUseUntil = 0L
-            return
+            return false
         }
 
         asyncScope.launch {
@@ -308,6 +308,7 @@ object BloodfiendAssist : ToggleableGroup(
                 if (mc.player?.inventory?.selectedSlot == slot) SwapManager.swapToSlot(originalSlot)
             }
         }
+        return true
     }
 
     private fun hotbarSlotOf(id: String): Int? {

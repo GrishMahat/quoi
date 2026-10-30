@@ -19,7 +19,7 @@ import quoi.utils.EntityUtils.getEntities
 import quoi.utils.StringUtils.noControlCodes
 
 object VampireSlayer : SettingGroup(Slayers, "Bloodfiend", area = Island.Rift), ISlayer {
-    override val features = setOf(TwinClaws, ManiaAlert, BloodItems, BloodfiendAssist)
+    override val features = setOf(TwinClaws, ManiaAlert, Stake, BloodItems, BloodfiendAssist)
 
     override val entitiesForRender: List<Pair<LivingEntity, Colour?>>
         get() = emptyList()
